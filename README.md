@@ -58,7 +58,7 @@ The outer frame, `index.html`, has a CSP that allows it to access `notebook.md`,
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title></title>
 <style type="text/css">
@@ -83,7 +83,7 @@ frame.addEventListener('load', async () => {
 </script>
   </head>
   <body>
-    <iframe id="frame" sandbox="allow-scripts"></iframe>
+    <iframe id="frame" src="/frame.html"></iframe>
   </body>
 </html>
 ```
@@ -94,7 +94,7 @@ frame.addEventListener('load', async () => {
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'">
     <title></title>
 <style type="text/css">
 body {
@@ -114,6 +114,7 @@ addEventListener('message', e => {
   if (e.data[0] === 'notebook') {
     const frame = document.getElementById('frame')
     frame.addEventListener('load', async () => {
+      const data = e.data[1]
       frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
     })
     const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
@@ -147,20 +148,218 @@ addEventListener('message', e => {
 </html>
 ```
 
-Here is an example `notebook.md` that has buttons to attempt to do some things. It can be checked by running the above code, with https://ristretto.codeberg.page replaced with the URL where it will be running, and opening it up and inspecting it in different browsers. You can check the server logs and the logs in the web inspectors of the browsers to make sure attempts to access other pages are blocked.
+Here is an example `notebook.md` that has buttons to attempt to do some things. It can be checked following these instructions:
+
+- Place the three files (`index.html`, `frame.html`, and `notebook.md`) in a directory
+- replace `https://ristretto.codeberg.page` with the URL where it will be running (such as `http://localhost:4000`)
+- Run a web server on the directory like `python -m http.server 4000`
+- Opening it up and inspecting it in different browsers. You can check the server logs and the logs in the web inspectors of the browsers to make sure attempts to access other pages are blocked.
 
 `notebook.md`
 
 ````md
+# Ristretto Container Demo
+
+This is a demo that runs right inside the container, and tries some actions that are protected against by the iframe sandbox and CSP.
 
 `entry.js`
 
 ```js
+class RunCodeBlock extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.nameEl = document.createElement('h2')
+    this.htmlEl = document.createElement('textarea')
+    this.htmlEl.readOnly = true
+    this.jsEl = document.createElement('textarea')
+    this.jsEl.readOnly = true
+    this.outputEl = document.createElement('div')
+    const heading = text => {
+      const el = document.createElement('h3')
+      el.innerText = text
+      return el
+    }
+    this.shadowRoot.append(
+      this.nameEl,
+      heading('HTML'),
+      this.htmlEl,
+      heading('JavaScript'),
+      this.jsEl,
+      heading('Output'),
+      this.outputEl,
+    )
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: 'flex';
+        flex-direction: column;
+        gap: 5px;
+        margin: 10px;
+      }
+      textarea {
+        font-family: monospace;
+        width: 500px;
+        height: 200px;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  get name() {
+    return this.nameEl.innerText
+  }
+
+  set name(value) {
+    this.nameEl.innerText = value
+  }
+
+  set html(value) {
+    this.htmlEl.value = value
+  }
+
+  get html() {
+    return this.htmlEl.value
+  }
+
+  set js(value) {
+    this.jsEl.value = value
+  }
+
+  get js() {
+    return this.jsEl.value
+  }
+
+  async run() {
+    if (this.html !== undefined) {
+      this.outputEl.innerHTML = this.html
+    }
+    if (this.js) {
+      const fn = (await import(
+        `data:text/javascript;base64,${btoa(this.js)}`
+      )).default
+      if (typeof fn === 'function') {
+        fn(this.outputEl)
+      } else {
+        console.error("Didn't get function from data import")
+      }
+    }
+  }
+}
+
+customElements.define('run-code-block', RunCodeBlock)
+
+function unindent(s) {
+  const spaces = Math.min(20, ...([...s.matchAll(/^([ ]+)\S/gm)].map(m => m[1].length)))
+  return s.replaceAll(new RegExp(`^${' '.repeat(spaces)}`, 'gm'), '')
+}
+
 async function run() {
-  
+  const runCodeBlocks = [
+    {
+      title: 'Navigate to same site with query string',
+      html: `
+        <a href="https://ristretto.codeberg.page/notebook.md?data=private">
+          Link
+        </a>
+      `,
+    },
+    {
+      title: 'Navigate to another site',
+      html: `
+        <a href="https://justatest.requestcatcher.com/test?data=private">
+          Link
+        </a>
+      `,
+    },
+    {
+      title: 'Make a request to the same site',
+      html: `
+        <p>
+          <button class="send">
+            Send
+          </button>
+          <span style="margin: 0 10px">
+            Status/Error:
+          </span>
+          <span class="output">Ready</span>
+        </p>
+      `,
+      js: `
+        export default el => {
+          const outputEl = el.querySelector('.output')
+          el.querySelector('.send').addEventListener(
+            'click',
+            async () => {
+              let resp, e
+              outputEl.innerText = 'Sending'
+              try {
+                resp = await fetch('https://ristretto.codeberg.page/notebook.md?data=private')
+              } catch (err) {
+                e = err
+              }
+              outputEl.innerText = (e ?? resp.status).toString()
+            }
+          )
+        }
+      `,
+    },
+    {
+      title: 'Add a style with a URL',
+      html: `
+        <p>
+          <button class="add">
+            Add
+          </button>
+          <div class="test" style="min-width: 50px; min-height: 50px"></div>
+        </p>
+      `,
+      js: `
+        export default el => {
+          el.querySelector('.add').addEventListener(
+            'click',
+            async () => {
+              const style = document.createElement('style')
+              style.textContent = \`
+                .test {
+                  background-image: url('http://placekitten.com/200/300');
+                  border: 5px solid blue;
+                }
+              \`
+              el.appendChild(style)
+            }
+          )
+        }
+      `,
+    },
+  ]
+  const codeBlocks = runCodeBlocks.map(({title, html, js}) => {
+    const el = document.createElement('run-code-block')
+    el.title = title
+    el.html = unindent(html ?? '').trim()
+    el.js = unindent(js ?? '').trim()
+    return el
+  })
+  document.body.append(...codeBlocks)
+  for (const codeBlock of codeBlocks) {
+    codeBlock.run()
+  }
 }
 
 run()
 ```
 
 ````
+
+If you try clicking the links or download in a new browser, you can see that they don't load.
+
+A strict CSP is necessary for these to pass. If you allow direct fetch access to even one file URL from the inner iframe, it can send info from inside the inner iframe in the query string (the CSP checks the path but not the query string). This would likely be a trusted server, but it's still against the goals of this sandbox.
+
+Having the data in the sandbox stay in the sandbox, unless the user copies or downloads it, depends on the browser being secure. Be sure to use an up-to-date browser.
+
+Also the `data:`, `'unsafe-inline'`, and `'unsafe-eval'` are needed for notebook features, but make it so some browser vulnerabilities that have happened recently would occur here. For instance, [font vulnerability](https://security.stackexchange.com/questions/91347/how-can-a-font-be-used-for-privilege-escalation) and [image vulnerability](https://arstechnica.com/gadgets/2023/09/apple-patches-clickless-0-day-image-processing-vulnerability-in-ios-macos/). So it's important to be careful.
+
+These shouldn't allow for external access, but it needs to be investigated more fully.
