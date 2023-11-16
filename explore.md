@@ -24,10 +24,14 @@ export default class FileCard extends HTMLElement {
         align-items: center;
         gap: 15px;
         width: 160px;
-        height: 160px;
+        padding: 10px 0px;
         font-family: monospace;
         font-weight: 700;
         font-size: 12px;
+        border: 2px solid transparent;
+      }
+      :host([selected]) {
+        border-color: blue;
       }
       .icon {
         width: 128px;
@@ -77,10 +81,12 @@ export default class FileCardList extends HTMLElement {
   }
 
   childClicked(e) {
-    this.listEl.querySelector('[selected]')?.forEach?.(el => {
-      el.removeAttribute('selected')
-    })
-    e.target.setAttribute('selected', '')
+    if (e.target !== this.listEl) {
+      this.listEl.querySelectorAll('[selected]')?.forEach?.(el => {
+        el.removeAttribute('selected')
+      })
+      e.target.setAttribute('selected', '')
+    }
   }
 
   get name() {
