@@ -81,11 +81,12 @@ export default class FileCardList extends HTMLElement {
   }
 
   childClicked(e) {
-    if (e.target !== this.listEl) {
+    if (e.target !== this.listEl && !e.target.hasAttribute('selected')) {
       this.listEl.querySelectorAll('[selected]')?.forEach?.(el => {
         el.removeAttribute('selected')
       })
       e.target.setAttribute('selected', '')
+      this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
     }
   }
 
@@ -104,39 +105,93 @@ export default class FileCardList extends HTMLElement {
   get items() {
     this.listEl.children
   }
+
+  get selectedItem() {
+    return this.listEl.querySelector('[selected]')
+  }
 }
 
 customElements.define('file-card-list', FileCardList)
 ```
 
-`app.js`
+`ExploreApp.js`
+
+```js
+export default class ExploreApp extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.dataTemplates = [
+      'colors.json', 'cat.png', 'example-notebook.md'
+    ]
+    this.notebookTemplates = {
+      'colors.json': [
+        'palette.md',
+        'shapes.md',
+      ],
+      'cat.png': [
+        'transform.md',
+        'histogram.md',
+      ],
+      'example-notebook.md': [
+        'list.md',
+        'tabbed.md',
+        'overlay.md',
+      ],
+    }
+    this.dataSelect = document.createElement('file-card-list')
+    this.dataSelect.name = 'Data'
+    this.dataSelect.items = this.dataTemplates.map((template, i) => {
+      const el = document.createElement('file-card')
+      el.name = template
+      if (i === 0) {
+        el.setAttribute('selected', true)
+      }
+      return el
+    })
+    this.dataSelect.addEventListener('select-item', e => {
+      this.updateNotebookItems()
+    })
+    this.notebookSelect = document.createElement('file-card-list')
+    this.notebookSelect.name = 'Notebook'
+    this.updateNotebookItems()
+    this.shadowRoot.append(this.dataSelect, this.notebookSelect)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  updateNotebookItems() {
+    this.notebookSelect.items = this.notebookTemplates[
+      this.dataSelect.selectedItem.name
+    ].map((template, i) => {
+      const el = document.createElement('file-card')
+      el.name = template
+      if (i === 0) {
+        el.setAttribute('selected', true)
+      }
+      return el
+    })
+  }
+}
+
+customElements.define('explore-app', ExploreApp)
+```
+
+`setup.js`
 
 ```js
 async function setup() {
-  const data = {
-    data: {
-      name: 'Data',
-      templates: [
-        'colors.json', 'cat.png', 'example-notebook.md'
-      ]
-    },
-    notebooks: {
-      name: 'Notebooks',
-      templates: [
-        'colors.json', 'cat.png', 'example-notebook.md'
-      ]
-    },
-  }
-  document.body.append(...(Object.entries(data)).map(([key, group]) => {
-    const el = document.createElement('file-card-list')
-    el.name = group.name
-    el.items = group.templates.map(template => {
-      const el = document.createElement('file-card')
-      el.name = template
-      return el
-    })
-    return el
-  }))
+  document.body.append(document.createElement('explore-app'))
 }
 
 setup()
