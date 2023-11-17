@@ -37,6 +37,12 @@ export default class FileCard extends HTMLElement {
         width: 128px;
         height: 128px;
         background: #bbb;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .icon img {
+        flex-grow: 1;
       }
     `
     this.shadowRoot.append(style)
@@ -48,6 +54,12 @@ export default class FileCard extends HTMLElement {
 
   set name(name) {
     this.nameEl.innerText = name
+  }
+
+  set image(data) {
+    const img = document.createElement('img')
+    img.src = `data:image/png;base64,${data.replaceAll(/\s*/g, '')}`
+    this.iconEl.replaceChildren(img)
   }
 }
 
@@ -98,16 +110,24 @@ export default class FileCardList extends HTMLElement {
     this.headerEl.innerText = value
   }
 
+  get items() {
+    return this.listEl.children
+  }
+
   set items(value) {
     this.listEl.replaceChildren(...value)
   }
 
-  get items() {
-    this.listEl.children
-  }
-
   get selectedItem() {
     return this.listEl.querySelector('[selected]')
+  }
+
+  setImage(name, value) {
+    for (const item of this.items) {
+      if (item.name === name) {
+        item.image = value
+      }
+    }
   }
 }
 
@@ -168,6 +188,26 @@ export default class ExploreApp extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
+    this.initImages()
+  }
+
+  initImages() {
+    const src = __source
+    for (const block of readBlocks(src)) {
+      const match = src.slice(0, block.blockRange[0]).match(
+        /\n\s*\n\s*`([^`]+)`\s*\n\s*$/
+      )
+      if (match && match[1] === 'images.md') {
+        const blockSrc = src.slice(...block.contentRange)
+        for (const block of readBlocks(blockSrc)) {
+          const match = blockSrc.slice(0, block.blockRange[0]).match(
+            /\s*`([^`]+)`\s*$/
+          )
+          const imageSrc = blockSrc.slice(...block.contentRange)
+          this.dataSelect.setImage(match[1], imageSrc)
+        }
+      }
+    }
   }
 
   updateNotebookItems() {
@@ -225,16 +265,18 @@ function* readBlocks(input) {
 }
 
 async function run(src) {
+  globalThis.readBlocks = readBlocks
   for (const block of readBlocks(src)) {
     const match = src.slice(0, block.blockRange[0]).match(
       /\n\s*\n\s*`([^`]+)`\s*\n\s*$/
     )
-    if (match && match[1] !== 'entry.js') {
+    if (match && match[1].endsWith('.js') && match[1] !== 'entry.js') {
       const blockSrc = src.slice(...block.contentRange)
       await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
     }
   }
 }
 
-run(window.__source)
+run(__source)
 ```
+
