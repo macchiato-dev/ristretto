@@ -175,13 +175,25 @@ export default class ExploreApp extends HTMLElement {
     this.notebookSelect = document.createElement('file-card-list')
     this.notebookSelect.name = 'Notebook'
     this.updateNotebookItems()
-    this.shadowRoot.append(this.dataSelect, this.notebookSelect)
+    this.selectPane = document.createElement('div')
+    this.selectPane.append(this.dataSelect, this.notebookSelect)
+    this.selectPane.classList.add('select')
+    this.viewFrame = document.createElement('iframe')
+    this.viewPane = document.createElement('div')
+    this.viewPane.append(this.viewFrame)
+    this.shadowRoot.append(this.selectPane, this.viewPane)
   }
 
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
       :host {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr;
+        gap: 10px;
+      }
+      div.select {
         display: flex;
         flex-direction: column;
         padding: 10px;
