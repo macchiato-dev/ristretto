@@ -1,0 +1,201 @@
+# Build
+
+This builds Ristretto. It runs a Markdown file with Deno, using a wrapper that gives it access to specific things through postMessage, much like how Ristretto runs.
+
+Run it with this command:
+
+```
+deno --allow-read=. --allow-write=. --unstable-worker-options run-build.js`
+```
+
+`run-build.js`
+
+```js
+import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
+
+async function* readPaths(suffix = '.md', parent = []) {
+  const dirs = []
+  for await (const file of Deno.readDir(join('.', ...parent))) {
+    if (!file.name.startsWith('.')) {
+      if (file.isDirectory) {
+        dirs.push(file.name)
+      } else if (file.name.endsWith(suffix)) {
+        yield [...parent, file.name]
+      }
+    }
+  }
+  for (const dir of dirs) {
+    for await (const path of readPaths(suffix, [...parent, dir])) {
+      yield path
+    }
+  }
+}
+
+async function readFile(path) {
+  return await Deno.readFile(join('.', ...path))
+}
+
+async function writeFile(path, data) {
+  if (path.length === 1 && path[0] === 'notebook.md') {
+    await Deno.writeTextFile(join('.', ...path), new TextDecoder().decode(data))
+  } else {
+    throw new Error('Not in list of files permitted for writing')
+  }
+  await Deno.readFile(join('.', ...path))
+}
+
+async function handleMessage(e) {
+  const [cmd, ...args] = e.data
+  const port = e.ports[0]
+  try {
+    if (cmd === 'readPaths') {
+      port.postMessage(await Array.fromAsync(readPaths()))
+    } else if (cmd === 'readFile') {
+      const [path] = args
+      const data = await readFile(path)
+      port.postMessage(data, [data.buffer])
+    } else if (cmd === 'writeFile') {
+      const [path, data] = args
+      port.postMessage(await writeFile(path, data))
+    } else {
+      throw new Error(`Invalid command sent from worker: ${cmd}`)
+    }
+  } catch (err) {
+    console.error('Error providing output for worker', err)
+    port.postMessage(false)
+  }
+  port.close()
+}
+
+const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+`
+const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
+  type: 'module',
+  permissions: 'none',
+})
+worker.addEventListener('message', handleMessage)
+const data = await readFile(['build.md'])
+worker.postMessage(['notebook', data], [data.buffer])
+```
+
+`build.js`
+
+```js
+async function parentRequest(...data) {
+  const channel = new MessageChannel()
+  const result = await new Promise((resolve, _) => {
+    channel.port1.onmessage = (message) => {
+      channel.port1.close()
+      resolve(message.data)
+    }
+    postMessage(data, [channel.port2])
+  })
+  if (result === false) {
+    throw new Error(
+      `Received false from parent request ${JSON.stringify(data[0])} in worker`
+    )
+  }
+  return result
+}
+
+async function readPaths() {
+  return await parentRequest('readPaths')
+}
+
+async function readFile(path) {
+  return new TextDecoder().decode(await parentRequest('readFile', path))
+}
+
+async function writeFile(path, data) {
+  await parentRequest('writeFile', path, new TextEncoder().encode(data))
+}
+
+function arrEquals(a1, a2) {
+  return a1.length === a2.length && a1.map((v, i) => v === a2[i])
+}
+
+async function build() {
+  try {
+    console.log('reading paths')
+    const allPaths = await readPaths()
+    console.log('paths', allPaths)
+    const paths = [
+      ['explore.md'],
+      ...allPaths.filter(path => (
+        path.at('-1').endsWith('.md') &&
+        !arrEquals(path, ['README.md']) &&
+        !arrEquals(path, ['notebook.md']) &&
+        !arrEquals(path, ['explore.md']) &&
+        !arrEquals(path, ['images.md'])
+      )),
+      ['images.md'],
+    ]
+    let output = ''
+    for (const path of paths) {
+      output += await readFile(path) + "\n\n"
+    }
+    await writeFile(['notebook.md'], output)
+    close()
+  } catch (err) {
+    console.error(err)
+    close()
+  }
+}
+
+await build()
+```
+
+`entry.js`
+
+```js
+function* readBlocks(input) {
+  const re = /(?:^|\n)([ \t]*)(`{3,}|~{3,})([^\n]*\n)/
+  let index = 0
+  while (index < input.length) {
+    const open = input.substring(index).match(re)
+    if (!open) {
+      break
+    } else if (open[1].length > 0 || open[2][0] === '~') {
+      throw new Error(`Invalid open fence at ${index + open.index}`)
+    }
+    const contentStart = index + open.index + open[0].length
+    const close = input.substring(contentStart).match(
+      new RegExp(`\n([ ]{0,3})${open[2]}(\`*)[ \t]*\r?(?:\n|$)`)
+    )
+    if (!(close && close[1] === '')) {
+      throw new Error(`Missing or invalid close fence at ${index + open.index}`)
+    }
+    const contentRange = [contentStart, contentStart + close.index]
+    const blockRange = [index + open.index, contentRange.at(-1) + close[0].length]
+    yield { blockRange, contentRange, info: open[3].trim() }
+    index = blockRange.at(-1)
+  }
+}
+
+async function run(src) {
+  globalThis.readBlocks = readBlocks
+  for (const block of readBlocks(src)) {
+    const match = src.slice(0, block.blockRange[0]).match(
+      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+    )
+    if (
+      match && match[1].endsWith('.js') &&
+      match[1] !== 'run-build.js' && match[1] !== 'entry.js'
+    ) {
+      const blockSrc = src.slice(...block.contentRange)
+      await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
+    }
+  }
+}
+
+run(__source)
+```
