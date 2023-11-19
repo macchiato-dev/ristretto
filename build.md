@@ -120,7 +120,7 @@ async function writeFile(path, data) {
 }
 
 function arrEquals(a1, a2) {
-  return a1.length === a2.length && a1.map((v, i) => v === a2[i])
+  return a1.length === a2.length && a1.every((v, i) => v === a2[i])
 }
 
 async function build() {
@@ -133,7 +133,8 @@ async function build() {
         !arrEquals(path, ['README.md']) &&
         !arrEquals(path, ['notebook.md']) &&
         !arrEquals(path, ['explore.md']) &&
-        !arrEquals(path, ['images.md'])
+        !arrEquals(path, ['images.md']) &&
+        !arrEquals(path, ['build.md'])
       )).map(path => ([path, true])),
       [['images.md']],
     ]
@@ -141,11 +142,12 @@ async function build() {
     for (const [path, wrap] of paths) {
       const text = new TextDecoder().decode(await readFile(path))
       if (wrap) {
-        const quotes = `\``.repeat(Math.min(
+        const quotes = '`'.repeat(Math.max(
           (
             text
-            .findAll(new RegExp('^\\s*(`+)', 'm'))
-            .map(m => m[1])
+            .matchAll(new RegExp('^\\s*(`+)', 'gm'))
+            .map(m => m[1].length)
+            .toArray()
             .toSorted((a, b) => a - b)
             .at(-1) ?? 0
           ) + 1,
@@ -154,7 +156,7 @@ async function build() {
         if (path.some(part => part.includes('/'))) {
           throw new Error('/ found in path component')
         }
-        const strPath = '/'.join(path)
+        const strPath = path.join('/')
         output = (
           output.trimRight() +
           `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
@@ -164,7 +166,7 @@ async function build() {
       }
     }
     const data = new TextEncoder().encode(output.trimLeft())
-    await writeFile(['notebook.md'], )
+    await writeFile(['notebook.md'], data)
     close()
   } catch (err) {
     console.error(err)

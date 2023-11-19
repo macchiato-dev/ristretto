@@ -1,3 +1,5 @@
+# Palette
+
 `PaletteView.js`
 
 ```js
@@ -9,7 +11,7 @@ export default class PaletteView extends HTMLElement {
       const el = document.createElement('div')
       el.classList.add(`color${n}`)
       return el
-    })
+    })))
   }
 
   connectedCallback() {
@@ -33,26 +35,26 @@ export default class PaletteView extends HTMLElement {
         box-sizing: border-box;
       }
       .color1 {
-        color: #1aa452;
+        background-color: #1aa452;
       }
       .color2 {
-        color: #0f6bad;
+        background-color: #0f6bad;
       }
       .color3 {
-        color: #a47801;
+        background-color: #a47801;
       }
     `
     this.shadowRoot.append(style)
   }
 }
 
-customElements.add('palette-view', PaletteView)
+customElements.define('palette-view', PaletteView)
 ```
 
 `run.js`
 
 ```js
-async setup() {
+async function setup() {
   const paletteView = document.createElement('palette-view')
   document.body.replaceChildren(paletteView)
 }

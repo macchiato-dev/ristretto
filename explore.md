@@ -230,13 +230,13 @@ export default class ExploreApp extends HTMLElement {
     const src = __source
     for (const block of readBlocks(src)) {
       const match = src.slice(0, block.blockRange[0]).match(
-        /\n\s*\n\s*`([^`]+)`\s*\n\s*$/
+        new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
       )
       if (match && match[1] === 'images.md') {
         const blockSrc = src.slice(...block.contentRange)
         for (const block of readBlocks(blockSrc)) {
           const match = blockSrc.slice(0, block.blockRange[0]).match(
-            /\s*`([^`]+)`\s*$/
+            new RegExp('\\s*`([^`]+)`\\s*$')
           )
           const imageSrc = blockSrc.slice(...block.contentRange)
           this.dataSelect.setImage(match[1], imageSrc)
@@ -261,7 +261,51 @@ export default class ExploreApp extends HTMLElement {
   displayNotebook() {
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.viewFrame.srcdoc = 'Palette here'
+    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+    const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+    `.trim()
+    this.viewFrame.srcdoc = `
+<!doctype html>
+<html>
+<head>
+  <title></title>
+<script type="module">
+${runEntry}
+</script>
+</head>
+<body>
+</body>
+</html>
+`.trim()
+    this.viewFrame.addEventListener('load', () => {
+      const src = __source
+      let entrySrc, notebookSrc
+      for (const block of readBlocks(src)) {
+        const name = (src.slice(0, block.blockRange[0]).match(
+          new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+        ) ?? []).at(1)
+        if (name === 'entry.js') {
+          entrySrc = src.slice(...block.blockRange)
+        } else if (name === 'palette.md') {
+          notebookSrc = src.slice(...block.contentRange)
+        }
+      }
+      const messageText = `${notebookSrc}\n\n\`entry.js\`\n\n${entrySrc}\n`
+      const messageData = new TextEncoder().encode(messageText)
+      this.viewFrame.contentWindow.postMessage(
+        ['notebook', messageData],
+        '*',
+        [messageData.buffer]
+      )
+    })
     this.viewPane.replaceChildren(this.viewFrame)
   }
 }
@@ -310,7 +354,7 @@ async function run(src) {
   globalThis.readBlocks = readBlocks
   for (const block of readBlocks(src)) {
     const match = src.slice(0, block.blockRange[0]).match(
-      /\n\s*\n\s*`([^`]+)`\s*\n\s*$/
+      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
     )
     if (match && match[1].endsWith('.js') && match[1] !== 'entry.js') {
       const blockSrc = src.slice(...block.contentRange)
