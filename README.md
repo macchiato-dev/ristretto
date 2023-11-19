@@ -112,13 +112,14 @@ iframe {
 <script type="module">
 addEventListener('message', e => {
   if (e.data[0] === 'notebook') {
-    const frame = document.getElementById('frame')
-    frame.addEventListener('load', async () => {
+    const iframe = document.createElement('iframe')
+    iframe.sandbox = 'allow-scripts'
+    iframe.addEventListener('load', async () => {
       const data = e.data[1]
-      frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
+      iframe.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
     })
     const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
-    frame.srcdoc = `
+    iframe.srcdoc = `
 <!doctype html>
     <html>
       <head>
@@ -138,12 +139,12 @@ addEventListener('message', e => {
       </head>
     </html>
 `.trim().replace('-script', '/script')
+    document.body.replaceChildren(iframe)
   }
 })
 </script>
   </head>
   <body>
-    <iframe id="frame" sandbox="allow-scripts"></iframe>
   </body>
 </html>
 ```

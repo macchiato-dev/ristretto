@@ -171,20 +171,32 @@ export default class ExploreApp extends HTMLElement {
     })
     this.dataSelect.addEventListener('select-item', e => {
       this.updateNotebookItems()
+      this.displayNotebook()
     })
     this.notebookSelect = document.createElement('file-card-list')
     this.notebookSelect.name = 'Notebook'
     this.updateNotebookItems()
+    this.notebookSelect.addEventListener('select-item', e => {
+      this.displayNotebook()
+    })
     this.selectPane = document.createElement('div')
     this.selectPane.append(this.dataSelect, this.notebookSelect)
     this.selectPane.classList.add('select')
-    this.viewFrame = document.createElement('iframe')
     this.viewPane = document.createElement('div')
-    this.viewPane.append(this.viewFrame)
+    this.viewPane.classList.add('view-pane')
+    this.displayNotebook()
     this.shadowRoot.append(this.selectPane, this.viewPane)
   }
 
   connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    `
+    document.head.append(globalStyle)
     const style = document.createElement('style')
     style.textContent = `
       :host {
@@ -192,11 +204,22 @@ export default class ExploreApp extends HTMLElement {
         grid-template-columns: 1fr 1fr;
         grid-template-rows: 1fr;
         gap: 10px;
+        min-height: 100vh;
+        margin: 0;
+        padding: 0;
       }
       div.select {
         display: flex;
         flex-direction: column;
         padding: 10px;
+      }
+      div.view-pane {
+        display: flex;
+        flex-direction: column;
+      }
+      div.view-pane iframe {
+        flex-grow: 1;
+        border: none;
       }
     `
     this.shadowRoot.append(style)
@@ -233,6 +256,13 @@ export default class ExploreApp extends HTMLElement {
       }
       return el
     })
+  }
+
+  displayNotebook() {
+    this.viewFrame = document.createElement('iframe')
+    this.viewFrame.sandbox = 'allow-scripts'
+    this.viewFrame.srcdoc = 'Palette here'
+    this.viewPane.replaceChildren(this.viewFrame)
   }
 }
 
