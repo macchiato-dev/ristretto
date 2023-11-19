@@ -112,11 +112,11 @@ async function readPaths() {
 }
 
 async function readFile(path) {
-  return new TextDecoder().decode(await parentRequest('readFile', path))
+  return await parentRequest('readFile', path)
 }
 
 async function writeFile(path, data) {
-  await parentRequest('writeFile', path, new TextEncoder().encode(data))
+  await parentRequest('writeFile', path, data)
 }
 
 function arrEquals(a1, a2) {
@@ -125,25 +125,46 @@ function arrEquals(a1, a2) {
 
 async function build() {
   try {
-    console.log('reading paths')
     const allPaths = await readPaths()
-    console.log('paths', allPaths)
     const paths = [
-      ['explore.md'],
+      [['explore.md']],
       ...allPaths.filter(path => (
         path.at('-1').endsWith('.md') &&
         !arrEquals(path, ['README.md']) &&
         !arrEquals(path, ['notebook.md']) &&
         !arrEquals(path, ['explore.md']) &&
         !arrEquals(path, ['images.md'])
-      )),
-      ['images.md'],
+      )).map(path => ([path, true])),
+      [['images.md']],
     ]
     let output = ''
-    for (const path of paths) {
-      output += await readFile(path) + "\n\n"
+    for (const [path, wrap] of paths) {
+      const text = new TextDecoder().decode(await readFile(path))
+      if (wrap) {
+        const quotes = `\``.repeat(Math.min(
+          (
+            text
+            .findAll(new RegExp('^\\s*(`+)', 'm'))
+            .map(m => m[1])
+            .toSorted((a, b) => a - b)
+            .at(-1) ?? 0
+          ) + 1,
+          3
+        ))
+        if (path.some(part => part.includes('/'))) {
+          throw new Error('/ found in path component')
+        }
+        const strPath = '/'.join(path)
+        output = (
+          output.trimRight() +
+          `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
+        )
+      } else {
+        output = output.trimRight() + "\n\n" + text + "\n"
+      }
     }
-    await writeFile(['notebook.md'], output)
+    const data = new TextEncoder().encode(output.trimLeft())
+    await writeFile(['notebook.md'], )
     close()
   } catch (err) {
     console.error(err)
