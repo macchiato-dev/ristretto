@@ -1,9 +1,9 @@
-# Palette
+# Shapes
 
-`PaletteView.js`
+`ShapesView.js`
 
 ```js
-export default class PaletteView extends HTMLElement {
+export default class ShapesView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -40,34 +40,44 @@ export default class PaletteView extends HTMLElement {
       .colors {
         width: 80vmin;
         height: 80vmin;
-        display: grid;
-        grid-template-columns: 1fr;
-        grid-auto-rows: 1fr;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
       }
       .color1 {
+        width: 80px;
+        height: 80px;
         background-color: #1aa452;
       }
       .color2 {
+        width: 180px;
+        height: 180px;
+        border-radius: 100%;
         background-color: #0f6bad;
       }
       .color3 {
         background-color: #a47801;
+        border-radius: 100% 0 100% 100%;
+        width: 150px;
+        height: 150px;
       }
     `
     this.shadowRoot.append(style)
   }
 }
 
-customElements.define('palette-view', PaletteView)
+customElements.define('shapes-view', ShapesView)
 ```
 
 `run.js`
 
 ```js
 async function setup() {
-  const paletteView = document.createElement('palette-view')
-  document.body.replaceChildren(paletteView)
+  const shapesView = document.createElement('shapes-view')
+  document.body.replaceChildren(shapesView)
 }
 
 await setup()
 ```
+

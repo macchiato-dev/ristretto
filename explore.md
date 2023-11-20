@@ -294,7 +294,10 @@ ${runEntry}
         ) ?? []).at(1)
         if (name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
-        } else if (name === 'palette.md') {
+        } else if (
+          (name ?? null) !== null &&
+          name === this.notebookSelect.selectedItem?.name
+        ) {
           notebookSrc = src.slice(...block.contentRange)
         }
       }
@@ -307,6 +310,10 @@ ${runEntry}
       )
     })
     this.viewPane.replaceChildren(this.viewFrame)
+  }
+
+  get selectedNotebook() {
+    return this.notebookSelect
   }
 }
 
