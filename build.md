@@ -133,10 +133,8 @@ async function build() {
         !arrEquals(path, ['README.md']) &&
         !arrEquals(path, ['notebook.md']) &&
         !arrEquals(path, ['explore.md']) &&
-        !arrEquals(path, ['images.md']) &&
         !arrEquals(path, ['build.md'])
       )).map(path => ([path, true])),
-      [['images.md']],
     ]
     let output = ''
     for (const [path, wrap] of paths) {

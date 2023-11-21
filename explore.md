@@ -56,9 +56,15 @@ export default class FileCard extends HTMLElement {
     this.nameEl.innerText = name
   }
 
-  set image(data) {
+  get filename() {
+    return this.name.endsWith('.md') ? this.name : `${this.name}.md`
+  }
+
+  set image({name, data}) {
+    const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
+    const mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`
     const img = document.createElement('img')
-    img.src = `data:image/png;base64,${data.replaceAll(/\s*/g, '')}`
+    img.src = `data:${mime};base64,${data.replaceAll(/\s*/g, '')}`
     this.iconEl.replaceChildren(img)
   }
 }
@@ -120,14 +126,6 @@ export default class FileCardList extends HTMLElement {
 
   get selectedItem() {
     return this.listEl.querySelector('[selected]')
-  }
-
-  setImage(name, value) {
-    for (const item of this.items) {
-      if (item.name === name) {
-        item.image = value
-      }
-    }
   }
 }
 
@@ -228,18 +226,34 @@ export default class ExploreApp extends HTMLElement {
 
   initImages() {
     const src = __source
+    const items = Object.fromEntries(
+      [...this.dataSelect.items, ...this.notebookSelect.items].map(item => {
+        return [item.filename, item]
+      })
+    )
     for (const block of readBlocks(src)) {
-      const match = src.slice(0, block.blockRange[0]).match(
+      const name = src.slice(0, block.blockRange[0]).match(
         new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
-      )
-      if (match && match[1] === 'images.md') {
+      ).at(1)
+      const item = items[name]
+      if (item !== undefined) {
         const blockSrc = src.slice(...block.contentRange)
+        let thumbnail
         for (const block of readBlocks(blockSrc)) {
-          const match = blockSrc.slice(0, block.blockRange[0]).match(
+          const name = blockSrc.slice(0, block.blockRange[0]).match(
             new RegExp('\\s*`([^`]+)`\\s*$')
-          )
-          const imageSrc = blockSrc.slice(...block.contentRange)
-          this.dataSelect.setImage(match[1], imageSrc)
+          ).at(1)
+          if (
+            thumbnail === undefined && name && name.match(/\.(png|jpe?g|svg|webm)/) ||
+            name.startsWith('thumbnail.')
+          ) {
+            thumbnail = [name, block.contentRange]
+          }
+        }
+        if (thumbnail !== undefined) {
+          const name = thumbnail[0]
+          const data = blockSrc.slice(...thumbnail[1])
+          item.image = {name, data}
         }
       }
     }
