@@ -43,6 +43,7 @@ export default class PaletteView extends HTMLElement {
         display: grid;
         grid-template-columns: 1fr;
         grid-auto-rows: 1fr;
+        gap: 5vmin;
       }
       .color1 {
         background-color: #1aa452;
@@ -70,4 +71,32 @@ async function setup() {
 }
 
 await setup()
+```
+
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    svg {
+      background-color: #fff;
+    }
+    .color1 {
+      fill: #1aa452;
+    }
+    .color2 {
+      fill: #0f6bad;
+    }
+    .color3 {
+      fill: #a47801;
+    }
+  </style>
+
+  <rect x="0" y="0" width="128" height="128" stroke="#bbb" stroke-width="5" fill="transparent" />
+  <g transform="translate(17 15)">
+    <rect x="10" y="15" width="75" height="20" class="color1" />
+    <rect x="10" y="40" width="75" height="20" class="color2" />
+    <rect x="10" y="65" width="75" height="20" class="color3" />
+  </g>
+</svg>
 ```

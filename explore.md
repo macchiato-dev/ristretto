@@ -62,9 +62,10 @@ export default class FileCard extends HTMLElement {
 
   set image({name, data}) {
     const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
-    const mime = `image/${ext === 'jpg' ? 'jpeg' : ext}`
+    const mime = 'image/' + ({svg: 'svg+xml', jpg: 'jpeg'}[ext] ?? ext)
     const img = document.createElement('img')
-    img.src = `data:${mime};base64,${data.replaceAll(/\s*/g, '')}`
+    const urlData = ext === 'svg' ? btoa(data) : data.replaceAll(/\s+/g, '')
+    img.src = `data:${mime};base64,${urlData}`
     this.iconEl.replaceChildren(img)
   }
 }
@@ -221,13 +222,13 @@ export default class ExploreApp extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-    this.initImages()
+    this.initImages(this.dataSelect.items)
   }
 
-  initImages() {
+  initImages(items) {
     const src = __source
-    const items = Object.fromEntries(
-      [...this.dataSelect.items, ...this.notebookSelect.items].map(item => {
+    const itemsByFile = Object.fromEntries(
+      [...items].map(item => {
         return [item.filename, item]
       })
     )
@@ -235,7 +236,7 @@ export default class ExploreApp extends HTMLElement {
       const name = src.slice(0, block.blockRange[0]).match(
         new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
       ).at(1)
-      const item = items[name]
+      const item = itemsByFile[name]
       if (item !== undefined) {
         const blockSrc = src.slice(...block.contentRange)
         let thumbnail
@@ -270,6 +271,7 @@ export default class ExploreApp extends HTMLElement {
       }
       return el
     })
+    this.initImages(this.notebookSelect.items)
   }
 
   displayNotebook() {

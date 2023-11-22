@@ -41,26 +41,28 @@ export default class ShapesView extends HTMLElement {
         width: 80vmin;
         height: 80vmin;
         display: flex;
-        gap: 10px;
+        flex-wrap: wrap;
+        gap: 5px 30px;
         align-items: center;
-        justify-content: center;
+        justify-content: space-around;
       }
       .color1 {
-        width: 80px;
-        height: 80px;
+        width: 25vmin;
+        height: 25vmin;
         background-color: #1aa452;
       }
       .color2 {
-        width: 180px;
-        height: 180px;
+        width: 25vmin;
+        height: 25vmin;
         border-radius: 100%;
         background-color: #0f6bad;
       }
       .color3 {
-        background-color: #a47801;
-        border-radius: 100% 0 100% 100%;
-        width: 150px;
-        height: 150px;
+        background-color: transparent;
+        border-left: 15vmin solid transparent;
+        border-top: 15vmin solid transparent;
+        border-right: 15vmin solid #a47801;
+        border-bottom: 15vmin solid #a47801;
       }
     `
     this.shadowRoot.append(style)
@@ -81,3 +83,30 @@ async function setup() {
 await setup()
 ```
 
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    svg {
+      background-color: #fff;
+    }
+    .color1 {
+      fill: #1aa452;
+    }
+    .color2 {
+      fill: #0f6bad;
+    }
+    .color3 {
+      fill: #a47801;
+    }
+  </style>
+
+  <rect x="0" y="0" width="128" height="128" stroke="#bbb" stroke-width="5" fill="transparent" />
+  <g transform="translate(17 15)">
+    <rect x="10" y="10" width="35" height="35" class="color1" />
+    <circle cx="75" cy="27" r="18" class="color2" />
+    <polygon points="30,95 70,95 70,55" class="color3" />
+  </g>
+</svg>
+```
