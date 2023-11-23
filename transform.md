@@ -6,8 +6,8 @@
 ```svg
 <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
   <style>
-    * {
-      filter: sepia(.7); /* issue on Safari when applied directly */
+    svg {
+      filter: sepia(.7);  // filters on more specific elemtns are not showing in Safari
     }
   </style>
   <g transform="scale(1.4)">

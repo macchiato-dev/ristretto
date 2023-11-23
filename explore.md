@@ -245,7 +245,7 @@ export default class ExploreApp extends HTMLElement {
         const blockSrc = __source.slice(...block.contentRange)
         for (const innerBlock of this.blocksWithNames(blockSrc)) {
           if (parts.at(1) === innerBlock.name) {
-            return [block.name, blockSrc.slice(...innerBlock.contentRange)]
+            return [innerBlock.name, blockSrc.slice(...innerBlock.contentRange)]
           }
         }
       }
