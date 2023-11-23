@@ -60,13 +60,10 @@ export default class FileCard extends HTMLElement {
     return this.name.endsWith('.md') ? this.name : `${this.name}.md`
   }
 
-  set image({name, data}) {
-    const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
-    const mime = 'image/' + ({svg: 'svg+xml', jpg: 'jpeg'}[ext] ?? ext)
-    const img = document.createElement('img')
-    const urlData = ext === 'svg' ? btoa(data) : data.replaceAll(/\s+/g, '')
-    img.src = `data:${mime};base64,${urlData}`
-    this.iconEl.replaceChildren(img)
+  set image(data) {
+    this.iconEl.replaceChildren(Object.assign(
+      document.createElement('img'), {src: data}
+    ))
   }
 }
 
@@ -225,6 +222,36 @@ export default class ExploreApp extends HTMLElement {
     this.initImages(this.dataSelect.items)
   }
 
+  dataUrl(name, data) {
+    const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
+    const mime = 'image/' + ({svg: 'svg+xml', jpg: 'jpeg'}[ext] ?? ext)
+    const urlData = ext === 'svg' ? btoa(data) : data.replaceAll(/\s+/g, '')
+    return `data:${mime};base64,${urlData}`
+  }
+
+  *blocksWithNames(src) {
+    for (const block of readBlocks(src)) {
+      const name = src.slice(0, block.blockRange[0]).match(
+        new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+      ).at(1)
+      yield {...block, name}
+    }
+  }
+
+  findImage(path) {
+    const parts = path.split('/')
+    for (const block of this.blocksWithNames(__source)) {
+      if (parts.at(0) === block.name) {
+        const blockSrc = __source.slice(...block.contentRange)
+        for (const innerBlock of this.blocksWithNames(blockSrc)) {
+          if (parts.at(1) === innerBlock.name) {
+            return [block.name, blockSrc.slice(...innerBlock.contentRange)]
+          }
+        }
+      }
+    }
+  }
+
   initImages(items) {
     const src = __source
     const itemsByFile = Object.fromEntries(
@@ -253,8 +280,14 @@ export default class ExploreApp extends HTMLElement {
         }
         if (thumbnail !== undefined) {
           const name = thumbnail[0]
-          const data = blockSrc.slice(...thumbnail[1])
-          item.image = {name, data}
+          const data = blockSrc.slice(...thumbnail[1]).replaceAll(
+            new RegExp(`\\$\\{image\\('([^']+)'\\)\\}`, 'g'),
+            (_, m) => {
+              const img = this.findImage(m)
+              return img ? this.dataUrl(...img) : m
+            }
+          )
+          item.image = this.dataUrl(name, data)
         }
       }
     }
