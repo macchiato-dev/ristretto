@@ -5,13 +5,30 @@ This builds Ristretto. It runs a Markdown file with Deno, using a wrapper that g
 Run it with this command:
 
 ```
-deno --allow-read=. --allow-write=. --unstable-worker-options run-build.js`
+deno --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js`
 ```
 
 `run-build.js`
 
 ```js
 import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
+
+let writeReady = false
+
+async function initWrite() {
+  if (!writeReady) {
+    for (const dir of ['build', 'out']) {
+      try {
+        await Deno.stat(join('.', dir))
+      } catch (e) {
+        if (e instanceof Deno.errors.NotFound) {
+          await Deno.mkdir(join('.', dir))
+        }
+      }
+    }
+    writeReady = true
+  }
+}
 
 async function* readPaths(suffix = '.md', parent = []) {
   const dirs = []
@@ -36,10 +53,19 @@ async function readFile(path) {
 }
 
 async function writeFile(path, data) {
-  if (path.length === 1 && path[0] === 'notebook.md') {
-    await Deno.writeTextFile(join('.', ...path), new TextDecoder().decode(data))
+  await initWrite()
+  const [topDir, ...rest] = path
+  if (['build', 'out'].includes(topDir)) {
+    const writePath = join('.', topDir, ...rest)
+    if (writePath.match(/\.(md|html|json|js|svg)$/)) {
+      await Deno.writeTextFile(writePath, new TextDecoder().decode(data))
+    } else if (writePath.match(/\.(png|webm|jpe?g|ico)$/)) {
+      await Deno.writeFile(writePath, data)
+    } else {
+      throw new Error('File type not allowed')
+    }
   } else {
-    throw new Error('Not in list of files permitted for writing')
+    throw new Error('Access denied')
   }
   await Deno.readFile(join('.', ...path))
 }
@@ -164,7 +190,7 @@ async function build() {
       }
     }
     const data = new TextEncoder().encode(output.trimLeft())
-    await writeFile(['notebook.md'], data)
+    await writeFile(['out', 'notebook.md'], data)
     close()
   } catch (err) {
     console.error(err)

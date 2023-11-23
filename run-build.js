@@ -1,5 +1,22 @@
 import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
 
+let writeReady = false
+
+async function initWrite() {
+  if (!writeReady) {
+    for (const dir of ['build', 'out']) {
+      try {
+        await Deno.stat(join('.', dir))
+      } catch (e) {
+        if (e instanceof Deno.errors.NotFound) {
+          await Deno.mkdir(join('.', dir))
+        }
+      }
+    }
+    writeReady = true
+  }
+}
+
 async function* readPaths(suffix = '.md', parent = []) {
   const dirs = []
   for await (const file of Deno.readDir(join('.', ...parent))) {
@@ -23,10 +40,19 @@ async function readFile(path) {
 }
 
 async function writeFile(path, data) {
-  if (path.length === 1 && path[0] === 'notebook.md') {
-    await Deno.writeTextFile(join('.', ...path), new TextDecoder().decode(data))
+  await initWrite()
+  const [topDir, ...rest] = path
+  if (['build', 'out'].includes(topDir)) {
+    const writePath = join('.', topDir, ...rest)
+    if (writePath.match(/\.(md|html|json|js|svg)$/)) {
+      await Deno.writeTextFile(writePath, new TextDecoder().decode(data))
+    } else if (writePath.match(/\.(png|webm|jpe?g|ico)$/)) {
+      await Deno.writeFile(writePath, data)
+    } else {
+      throw new Error('File type not allowed')
+    }
   } else {
-    throw new Error('Not in list of files permitted for writing')
+    throw new Error('Access denied')
   }
   await Deno.readFile(join('.', ...path))
 }
