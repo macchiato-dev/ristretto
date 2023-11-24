@@ -156,6 +156,8 @@ async function build() {
       [['explore.md']],
       ...allPaths.filter(path => (
         path.at('-1').endsWith('.md') &&
+        path.at(0) !== 'build' &&
+        path.at(0) !== 'out' &&
         !arrEquals(path, ['README.md']) &&
         !arrEquals(path, ['notebook.md']) &&
         !arrEquals(path, ['explore.md']) &&
