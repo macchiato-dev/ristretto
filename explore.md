@@ -336,18 +336,18 @@ ${runEntry}
 `.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
-      let entrySrc, notebookSrc
-      for (const block of readBlocks(src)) {
-        const name = (src.slice(0, block.blockRange[0]).match(
-          new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
-        ) ?? []).at(1)
-        if (name === 'entry.js') {
+      let entrySrc, notebookSrc = ''
+      for (const block of readBlocksWithNames(src)) {
+        if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
         } else if (
-          (name ?? null) !== null &&
-          name === this.notebookSelect.selectedItem?.name
+          (block.name ?? null) !== null &&
+          (
+            block.name === this.dataSelect.selectedItem?.filename ||
+            block.name === this.notebookSelect.selectedItem?.name
+          )
         ) {
-          notebookSrc = src.slice(...block.contentRange)
+          notebookSrc += "\n\n" + src.slice(...block.contentRange)
         }
       }
       const messageText = `${notebookSrc}\n\n\`entry.js\`\n\n${entrySrc}\n`
@@ -406,13 +406,20 @@ function* readBlocks(input) {
   }
 }
 
-async function run(src) {
-  globalThis.readBlocks = readBlocks
-  for (const block of readBlocks(src)) {
-    const match = src.slice(0, block.blockRange[0]).match(
+function* readBlocksWithNames(input) {
+  for (const block of readBlocks(input)) {
+    const match = input.slice(0, block.blockRange[0]).match(
       new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
     )
-    if (match && match[1].endsWith('.js') && match[1] !== 'entry.js') {
+    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+  }
+}
+
+async function run(src) {
+  globalThis.readBlocks = readBlocks
+  globalThis.readBlocksWithNames = readBlocksWithNames
+  for (const block of readBlocksWithNames(src)) {
+    if (block.name && (block.name.endsWith('.js') && block.name !== 'entry.js')) {
       const blockSrc = src.slice(...block.contentRange)
       await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
     }

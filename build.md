@@ -5,7 +5,7 @@ This builds Ristretto. It runs a Markdown file with Deno, using a wrapper that g
 Run it with this command:
 
 ```
-deno --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js`
+deno run --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js
 ```
 
 `run-build.js`
