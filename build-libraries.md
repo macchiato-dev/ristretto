@@ -29,10 +29,23 @@ const commands = {
     return Deno.args
   },
   async clean() {
+    const commands = [
+      ['network', 'rm', 'ristretto-build-libraries'],
+    ]
+    const results = []
+    for (const command of commands) {
+      results.push(new Deno.Command('docker', {
+        args: command,
+      }).output()
+    }
+    return results
   },
   async buildImage() {
   },
   async createNetwork() {
+    return await new Deno.Command('docker', {
+      args: ['network', 'create', '--internal', 'ristretto-build-libraries'],
+    })
   },
   async createVolume() {
   },
