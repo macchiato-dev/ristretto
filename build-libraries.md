@@ -15,8 +15,6 @@ It uses a script that shells out to `docker` and runs on the Docker client (the 
 
 ## Run Container Build
 
-This must be run in the `build/build-libraries` directory.
-
 The Dockerfiles are included here, and if writing them fails, it throws an error.
 
 `run-container-build.js`
@@ -26,7 +24,7 @@ import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
 
 const commands = {
   getArgs() {
-    return Deno.args
+    return structuredClone(Deno.args)
   },
   async clean() {
     const commands = [
@@ -34,9 +32,9 @@ const commands = {
     ]
     const results = []
     for (const command of commands) {
-      results.push(new Deno.Command('docker', {
+      results.push(await new Deno.Command('docker', {
         args: command,
-      }).output()
+      }.output()))
     }
     return results
   },
@@ -85,7 +83,7 @@ const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
   permissions: 'none',
 })
 worker.addEventListener('message', handleMessage)
-const data = await readFile(['build.md'])
+const data = await readFile(['./build-libraries.md'])
 worker.postMessage(['notebook', data], [data.buffer])
 ```
 
