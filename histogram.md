@@ -1,0 +1,86 @@
+# Transform
+
+`TransformView.js`
+
+```js
+export default class TransformView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.imageEl = document.createElement('img')
+    this.imageEl.src = this.dataUrl
+    this.imageEl.load = e => {
+      this.showImage()
+    }
+    this.canvasEl = document.createElement('canvas')
+    this.shadowRoot.append(this.imageEl, this.canvasEl)
+  }
+
+  connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    `
+    document.head.append(globalStyle)
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        height: 100vh;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-around;
+      }
+      img {
+        display: none;
+      }
+      canvas {
+        height: 128px;
+        width: 128px;
+      }
+    `
+    this.shadowRoot.append(style)
+    this.showImage()
+  }
+
+  get dataUrl() {
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name === 'cat.png') {
+        const data = __source.slice(...block.contentRange)
+        return `data:image/png;base64,${data}`
+      }
+    }
+  }
+
+  showImage() {
+    const ctx = this.canvasEl.getContext('2d')
+    ctx.drawImage(this.imageEl, 0, 0, 128, 128, 0, 0, 128, 128)
+  }
+}
+
+customElements.define('transform-view', TransformView)
+```
+
+`run.js`
+
+```js
+async function setup() {
+  const transformView = document.createElement('transform-view')
+  document.body.replaceChildren(transformView)
+}
+
+await setup()
+```
+
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <g transform="scale(0.7)">
+    <image href="${image('cat.png.md/cat.png')}" width="128" height="128" />
+  </g>
+</svg>
+```
