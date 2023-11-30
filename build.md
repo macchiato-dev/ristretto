@@ -149,7 +149,7 @@ function arrEquals(a1, a2) {
   return a1.length === a2.length && a1.every((v, i) => v === a2[i])
 }
 
-async function build() {
+async function buildNotebook() {
   try {
     const allPaths = await readPaths()
     const paths = [
@@ -200,6 +200,28 @@ async function build() {
   }
 }
 
+async function buildScript(path, blockName, out) {
+  const src = new TextDecoder().decode(await readFile(path))
+  for (const block of readBlocksWithNames(src)) {
+    if (block.name === blockName) {
+      await writeFile(out)
+    }
+  }
+}
+
+async function buildScripts() {
+  await buildScript(
+    ['build-libraries.md'],
+    'run-container-build.js',
+    ['build', 'build-libraries', 'run-container-build.js']
+  )
+}
+
+async function build() {
+  await buildScripts()
+  await buildNotebook()
+}
+
 await build()
 ```
 
@@ -230,15 +252,22 @@ function* readBlocks(input) {
   }
 }
 
-async function run(src) {
-  globalThis.readBlocks = readBlocks
-  for (const block of readBlocks(src)) {
-    const match = src.slice(0, block.blockRange[0]).match(
+function* readBlocksWithNames(input) {
+  for (const block of readBlocks(input)) {
+    const match = input.slice(0, block.blockRange[0]).match(
       new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
     )
+    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+  }
+}
+
+async function run(src) {
+  globalThis.readBlocks = readBlocks
+  globalThis.readBlocksWithNames = readBlocksWithNames
+  for (const block of readBlocksWithNames(src)) {
     if (
-      match && match[1].endsWith('.js') &&
-      match[1] !== 'run-build.js' && match[1] !== 'entry.js'
+      block.name !== undefined && block.name.endsWith('.js') &&
+      block.name !== 'run-build.js' && block.name !== 'entry.js'
     ) {
       const blockSrc = src.slice(...block.contentRange)
       await import(`data:text/javascript;base64,${btoa(blockSrc)}`)

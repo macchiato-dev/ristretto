@@ -83,7 +83,7 @@ const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
   permissions: 'none',
 })
 worker.addEventListener('message', handleMessage)
-const data = await readFile(['./build-libraries.md'])
+const data = await Deno.readFile(['./build-libraries.md'])
 worker.postMessage(['notebook', data], [data.buffer])
 ```
 
