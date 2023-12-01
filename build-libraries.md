@@ -107,66 +107,10 @@ async function parentRequest(...data) {
   return result
 }
 
-async function readPaths() {
-  return await parentRequest('readPaths')
-}
-
-async function readFile(path) {
-  return await parentRequest('readFile', path)
-}
-
-async function writeFile(path, data) {
-  await parentRequest('writeFile', path, data)
-}
-
-function arrEquals(a1, a2) {
-  return a1.length === a2.length && a1.every((v, i) => v === a2[i])
-}
-
 async function build() {
   try {
-    const allPaths = await readPaths()
-    const paths = [
-      [['explore.md']],
-      ...allPaths.filter(path => (
-        path.at('-1').endsWith('.md') &&
-        path.at(0) !== 'build' &&
-        path.at(0) !== 'out' &&
-        !arrEquals(path, ['README.md']) &&
-        !arrEquals(path, ['notebook.md']) &&
-        !arrEquals(path, ['explore.md']) &&
-        !arrEquals(path, ['build.md'])
-      )).map(path => ([path, true])),
-    ]
-    let output = ''
-    for (const [path, wrap] of paths) {
-      const text = new TextDecoder().decode(await readFile(path))
-      if (wrap) {
-        const quotes = '`'.repeat(Math.max(
-          (
-            text
-            .matchAll(new RegExp('^\\s*(`+)', 'gm'))
-            .map(m => m[1].length)
-            .toArray()
-            .toSorted((a, b) => a - b)
-            .at(-1) ?? 0
-          ) + 1,
-          3
-        ))
-        if (path.some(part => part.includes('/'))) {
-          throw new Error('/ found in path component')
-        }
-        const strPath = path.join('/')
-        output = (
-          output.trimRight() +
-          `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
-        )
-      } else {
-        output = output.trimRight() + "\n\n" + text + "\n"
-      }
-    }
-    const data = new TextEncoder().encode(output.trimLeft())
-    await writeFile(['out', 'notebook.md'], data)
+    const args = await parentRequest('getArgs')
+    console.log(args)
     close()
   } catch (err) {
     console.error(err)
