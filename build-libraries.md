@@ -26,17 +26,19 @@ const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
-  async clean() {
-    const commands = [
-      ['network', 'rm', 'ristretto-build-libraries'],
-    ]
-    const results = []
-    for (const command of commands) {
-      results.push(await new Deno.Command('docker', {
-        args: command,
-      }.output()))
-    }
-    return results
+  clean: {
+    fn: async function* clean() {
+      const commands = [
+        ['network', 'rm', 'ristretto-build-libraries'],
+      ]
+      for (const command of commands) {
+        const output = await new Deno.Command('docker', {
+          args: command,
+        }).output()
+        yield output
+      }
+    },
+    multi: true,
   },
   async buildImage() {
   },
@@ -56,12 +58,19 @@ async function handleMessage(e) {
   const port = e.ports[0]
   try {
     if (cmd in commands) {
-      port.postMessage(await commands[cmd](...args))
+      if (commands[cmd].multi) {
+        for await (const result of commands[cmd].fn(...args)) {
+          port.postMessage(result)
+        }
+        port.postMessage(false)
+      } else {
+        port.postMessage(await commands[cmd](...args))
+      }
     } else {
       throw new Error('invalid command')
     }
   } catch (err) {
-    console.error('Error running `${cmd}`', err)
+    console.error(`Error running \`${cmd}\`:`, err)
     port.postMessage(false)
   }
   port.close()
@@ -83,7 +92,7 @@ const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
   permissions: 'none',
 })
 worker.addEventListener('message', handleMessage)
-const data = await Deno.readFile(['./build-libraries.md'])
+const data = await Deno.readFile(join('.', 'build-libraries.md'))
 worker.postMessage(['notebook', data], [data.buffer])
 ```
 
@@ -107,10 +116,58 @@ async function parentRequest(...data) {
   return result
 }
 
+async function* parentRequestMulti(...data) {
+  const channel = new MessageChannel()
+  const resolves = []
+  const promises = new Array(10).fill(0).map(() => (
+    new Promise((resolve, _) => resolves.push(resolve))
+  ))
+  channel.port1.onmessage = (message) => {
+    const resolve = resolves.pop()
+    resolve(message.data)
+  }
+  postMessage(data, [channel.port2])
+  while (true) {
+    const result = await Promise.race(promises)
+    if (result === false) {
+      channel.port1.close()
+      break
+    } else {
+      yield result
+    }
+    promises.push(new Promise((resolve, _) => resolves.push(resolve)))
+  }
+}
+
+function logOutput(output) {
+  if (output.stdout.byteLength > 0) {
+    console.log(new TextDecoder().decode(output.stdout))
+  }
+  if (output.stderr.byteLength > 0) {
+    console.log(new TextDecoder().decode(output.stderr))
+  }
+}
+
+const commands = {
+  async clean() {
+    for await (const output of parentRequestMulti('clean')) {
+      logOutput(output)
+    }
+  },
+}
+
 async function build() {
   try {
-    const args = await parentRequest('getArgs')
-    console.log(args)
+    const [cmd, ...args] = await parentRequest('getArgs')
+    if (cmd in commands) {
+      await commands[cmd](...args)
+    } else {
+      console.error(
+        ((cmd ?? undefined) === undefined) ?
+        'missing command' :
+        `invalid command: ${cmd}`
+      )
+    }
     close()
   } catch (err) {
     console.error(err)

@@ -204,7 +204,8 @@ async function buildScript(path, blockName, out) {
   const src = new TextDecoder().decode(await readFile(path))
   for (const block of readBlocksWithNames(src)) {
     if (block.name === blockName) {
-      await writeFile(out)
+      const data = new TextEncoder().encode(src.slice(...block.contentRange))
+      await writeFile(out, data)
     }
   }
 }
