@@ -60,9 +60,9 @@ async function handleMessage(e) {
     if (cmd in commands) {
       if (commands[cmd].multi) {
         for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage(result)
+          port.postMessage({value: result})
         }
-        port.postMessage(false)
+        port.postMessage({done: true})
       } else {
         port.postMessage(await commands[cmd](...args))
       }
@@ -116,27 +116,44 @@ async function parentRequest(...data) {
   return result
 }
 
-async function* parentRequestMulti(...data) {
-  const channel = new MessageChannel()
+function eventToIterator(subscribe, unsubscribe) {
   const resolves = []
-  const promises = new Array(10).fill(0).map(() => (
-    new Promise((resolve, _) => resolves.push(resolve))
-  ))
-  channel.port1.onmessage = (message) => {
-    const resolve = resolves.pop()
-    resolve(message.data)
-  }
-  postMessage(data, [channel.port2])
-  while (true) {
-    const result = await Promise.race(promises)
-    if (result === false) {
-      channel.port1.close()
-      break
+  const results = []
+  subscribe(result => {
+    if (resolves.length > 0) {
+      (resolves.shift())(result)
     } else {
-      yield result
+      results.push(result)
     }
-    promises.push(new Promise((resolve, _) => resolves.push(resolve)))
+  })
+  return {
+    [Symbol.asyncIterator]() {
+      return {
+        next() {
+          if (results.length > 0) {
+            return Promise.resolve(results.shift())
+          } else {
+            return new Promise((resolve, _) => {
+              resolves.push(resolve)
+            })
+          }
+        },
+        return() {
+          unsubscribe()
+        }
+      }
+    }
   }
+}
+
+function parentRequestMulti(...data) {
+  const channel = new MessageChannel()
+  const iterator = eventToIterator(
+    handler => { channel.port1.onmessage = ({data}) => handler(data) },
+    () => channel.port1.close()
+  )
+  postMessage(data, [channel.port2])
+  return iterator
 }
 
 function logOutput(output) {

@@ -38,9 +38,9 @@ async function handleMessage(e) {
     if (cmd in commands) {
       if (commands[cmd].multi) {
         for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage(result)
+          port.postMessage({value: result})
         }
-        port.postMessage(false)
+        port.postMessage({done: true})
       } else {
         port.postMessage(await commands[cmd](...args))
       }
