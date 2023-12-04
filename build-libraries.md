@@ -29,7 +29,8 @@ const commands = {
   clean: {
     fn: async function* clean() {
       const commands = [
-        ['network', 'rm', 'ristretto-build-libraries'],
+        ['network', 'rm', 'ristretto-build-libraries-internal'],
+        ['network', 'rm', 'ristretto-build-libraries-external'],
       ]
       for (const command of commands) {
         const output = await new Deno.Command('docker', {
@@ -42,14 +43,24 @@ const commands = {
   },
   async buildImage() {
   },
-  async createNetwork() {
-    return await new Deno.Command('docker', {
-      args: ['network', 'create', '--internal', 'ristretto-build-libraries'],
-    })
+  createNetworks: {
+    fn: async function* createNetworks() {
+      const commands = [
+        ['network', 'create', '--internal', 'ristretto-build-libraries-internal'],
+        ['network', 'create', 'ristretto-build-libraries-external'],
+      ]
+      for (const command of commands) {
+        const output = await new Deno.Command('docker', {
+          args: command,
+        }).output()
+        yield output
+      }
+    },
+    multi: true,
   },
-  async createVolume() {
+  async createVolumes() {
   },
-  async createContainer() {
+  async createContainers() {
   },
 }
 
@@ -168,6 +179,11 @@ function logOutput(output) {
 const commands = {
   async clean() {
     for await (const output of parentRequestMulti('clean')) {
+      logOutput(output)
+    }
+  },
+  async createNetworks() {
+    for await (const output of parentRequestMulti('createNetworks')) {
       logOutput(output)
     }
   },
