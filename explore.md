@@ -91,6 +91,10 @@ export default class FileCardList extends HTMLElement {
         display: flex;
         flex-direction: row;
         gap: 10px;
+        color: #bfcfcd;
+        background-color: #2b172a;
+        padding: 20px;
+        border-radius: 10px;
       }
     `
     this.shadowRoot.append(style)
@@ -190,6 +194,7 @@ export default class ExploreApp extends HTMLElement {
       body {
         margin: 0;
         padding: 0;
+        background-color: #55391b;
       }
     `
     document.head.append(globalStyle)
@@ -203,6 +208,7 @@ export default class ExploreApp extends HTMLElement {
         min-height: 100vh;
         margin: 0;
         padding: 0;
+        color: #bfcfcd;
       }
       div.select {
         display: flex;
@@ -212,10 +218,14 @@ export default class ExploreApp extends HTMLElement {
       div.view-pane {
         display: flex;
         flex-direction: column;
+        padding: 10px;
       }
       div.view-pane iframe {
         flex-grow: 1;
         border: none;
+        padding: 10px;
+        border-radius: 10px;
+        background-color: #2b172a;
       }
     `
     this.shadowRoot.append(style)

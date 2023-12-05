@@ -45,6 +45,7 @@ export default class TransformView extends HTMLElement {
       body {
         margin: 0;
         padding: 0;
+        color: rgb(191, 207, 205);
       }
     `
     document.head.append(globalStyle)
