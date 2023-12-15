@@ -17,6 +17,13 @@ It uses a script that shells out to `docker` and runs on the Docker client (the 
 
 The Dockerfiles are included here, and if writing them fails, it throws an error.
 
+`Dockerfile.proxy`
+
+```docker
+FROM ristretto-deno-node
+ADD proxy.js
+```
+
 `run-container-build.js`
 
 ```js
@@ -41,7 +48,20 @@ const commands = {
     },
     multi: true,
   },
-  async buildImage() {
+  buildImage: {
+    fn: async function* buildImage() {
+      const commands = [
+        ['build', '-t', 'ristretto-build-libraries-proxy', 'Dockerfile.proxy'],
+      ]
+      for (const command of commands) {
+        const output = await new Deno.Command('docker', {
+          args: command,
+          cwd: join('.', 'build', 'build-libraries'),
+        }).output()
+        yield output
+      }
+    },
+    multi: true,
   },
   createNetworks: {
     fn: async function* createNetworks() {
@@ -179,6 +199,11 @@ function logOutput(output) {
 const commands = {
   async clean() {
     for await (const output of parentRequestMulti('clean')) {
+      logOutput(output)
+    }
+  },
+  async buildImage() {
+    for await (const output of parentRequestMulti('buildImage')) {
       logOutput(output)
     }
   },

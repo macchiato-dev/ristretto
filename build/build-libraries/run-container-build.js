@@ -19,7 +19,20 @@ const commands = {
     },
     multi: true,
   },
-  async buildImage() {
+  buildImage: {
+    fn: async function* buildImage() {
+      const commands = [
+        ['build', '-t', 'ristretto-build-libraries-proxy', 'Dockerfile.proxy'],
+      ]
+      for (const command of commands) {
+        const output = await new Deno.Command('docker', {
+          args: command,
+          cwd: join('.', 'build', 'build-libraries'),
+        }).output()
+        yield output
+      }
+    },
+    multi: true,
   },
   createNetworks: {
     fn: async function* createNetworks() {

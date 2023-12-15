@@ -216,6 +216,16 @@ async function buildScripts() {
     'run-container-build.js',
     ['build', 'build-libraries', 'run-container-build.js']
   )
+  await buildScript(
+    ['build-libraries.md'],
+    'Dockerfile.proxy',
+    ['build', 'build-libraries', 'Dockerfile.proxy']
+  )
+  await buildScript(
+    ['build-libraries.md'],
+    'proxy.js',
+    ['build', 'build-libraries', 'proxy.js']
+  )
 }
 
 async function build() {
