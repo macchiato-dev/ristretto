@@ -51,7 +51,7 @@ const commands = {
   buildImage: {
     fn: async function* buildImage() {
       const commands = [
-        ['build', '-t', 'ristretto-build-libraries-proxy', 'Dockerfile.proxy'],
+        ['build', '-t', 'ristretto-build-libraries-proxy', '-f', 'Dockerfile.proxy', '.'],
       ]
       for (const command of commands) {
         const output = await new Deno.Command('docker', {

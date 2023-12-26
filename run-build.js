@@ -46,7 +46,7 @@ async function writeFile(path, data) {
     const writePath = join('.', topDir, ...rest)
     if (writePath.match(/\.(md|html|json|js|svg)$/)) {
       await Deno.writeTextFile(writePath, new TextDecoder().decode(data))
-    } else if (writePath.match(/\.(png|webm|jpe?g|ico)$/)) {
+    } else if (writePath.match(/\.(png|webm|jpe?g|ico)$|Dockerfile\.?/)) {
       await Deno.writeFile(writePath, data)
     } else {
       throw new Error('File type not allowed')

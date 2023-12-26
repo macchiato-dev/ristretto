@@ -1,0 +1,2 @@
+FROM ristretto-deno-node
+ADD proxy.js
