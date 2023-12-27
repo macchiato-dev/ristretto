@@ -20,8 +20,29 @@ The Dockerfiles are included here, and if writing them fails, it throws an error
 `Dockerfile.proxy`
 
 ```docker
-FROM ristretto-deno-node
-ADD proxy.js
+FROM ristretto-deno-node:latest
+ADD proxy.js /
+ENTRYPOINT []
+CMD ["/bin/deno", "run", "--allow-net", "proxy.js"]
+```
+
+`proxy.js`
+
+```js
+Deno.serve({ port: 3000 }, async request => {
+  const { pathname, search } = new URL(request.url)
+  const host = request.headers.get('Host')
+  const url = new URL(`./${pathname}`, `https://${host}`)
+  url.search = search
+  const headers = new Headers(request.headers)
+  headers.set('Host', url.hostname)
+  return fetch(url, {
+    method: request.method,
+    headers,
+    body: request.body,
+    redirect: 'manual',
+  })
+})
 ```
 
 `run-container-build.js`
@@ -51,7 +72,13 @@ const commands = {
   buildImage: {
     fn: async function* buildImage() {
       const commands = [
-        ['build', '-t', 'ristretto-build-libraries-proxy', '-f', 'Dockerfile.proxy', '.'],
+        [
+          'build',
+          '--platform', 'linux/amd64',
+          '-t', 'ristretto-build-libraries-proxy',
+          '-f', 'Dockerfile.proxy',
+          '.'
+        ],
       ]
       for (const command of commands) {
         const output = await new Deno.Command('docker', {

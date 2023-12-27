@@ -1,2 +1,4 @@
-FROM ristretto-deno-node
-ADD proxy.js
+FROM ristretto-deno-node:latest
+ADD proxy.js /
+ENTRYPOINT []
+CMD ["/bin/deno", "run", "--allow-net", "proxy.js"]
