@@ -57,7 +57,33 @@ const commands = {
   },
   async createVolumes() {
   },
-  async createContainers() {
+  async runNpm() {
+    // start the proxy
+    const createCmd = new Deno.Command('docker', {
+      args: [
+        'create', '--platform=linux/amd64', '--rm',
+        '--network=ristretto-build-libraries-internal',
+        '--network-alias=proxy',
+        'ristretto-build-libraries-proxy'
+      ]
+    })
+    const createOutput = await createCmd.output()
+    const proxyContainerId = new TextDecoder().decode(createOutput.stdout)
+    const connectCmd = new Deno.Command('docker', {
+      args: [
+        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+      ],
+    })
+    await connectCmd.output()
+    const startCommand = new Deno.Command('docker', {
+      args: ['start', proxyContainerId]
+    })
+    await startCmd.output()
+    // TODO: run npm in container with just access to internal with proxy set
+    const stopCommand = new Deno.Command('docker', {
+      args: ['stop', proxyContainerId]
+    })
+    await stopCmd.output()
   },
 }
 
