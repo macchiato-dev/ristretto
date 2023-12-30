@@ -57,33 +57,41 @@ const commands = {
   },
   async createVolumes() {
   },
-  async runNpm() {
-    // start the proxy
-    const createCmd = new Deno.Command('docker', {
-      args: [
-        'create', '--platform=linux/amd64', '--rm',
-        '--network=ristretto-build-libraries-internal',
-        '--network-alias=proxy',
-        'ristretto-build-libraries-proxy'
-      ]
-    })
-    const createOutput = await createCmd.output()
-    const proxyContainerId = new TextDecoder().decode(createOutput.stdout)
-    const connectCmd = new Deno.Command('docker', {
-      args: [
-        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
-      ],
-    })
-    await connectCmd.output()
-    const startCommand = new Deno.Command('docker', {
-      args: ['start', proxyContainerId]
-    })
-    await startCmd.output()
-    // TODO: run npm in container with just access to internal with proxy set
-    const stopCommand = new Deno.Command('docker', {
-      args: ['stop', proxyContainerId]
-    })
-    await stopCmd.output()
+  runBuild: {
+    fn: async function* runBuild() {
+      // start the proxy
+      const createCmd = new Deno.Command('docker', {
+        args: [
+          'create', '--platform=linux/amd64', '--rm',
+          '--network=ristretto-build-libraries-internal',
+          '--network-alias=proxy',
+          'ristretto-build-libraries-proxy'
+        ]
+      })
+      const createOutput = await createCmd.output()
+      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+      yield createOutput
+
+      const connectCmd = new Deno.Command('docker', {
+        args: [
+          'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+        ],
+      })
+      const connectOutput = await connectCmd.output()
+      yield connectOutput
+      const startCmd = new Deno.Command('docker', {
+        args: ['start', proxyContainerId]
+      })
+      const startOutput = await startCmd.output()
+      yield startOutput
+      // TODO: run npm in container with just access to internal with proxy set
+      const stopCmd = new Deno.Command('docker', {
+        args: ['stop', proxyContainerId]
+      })
+      // await stopCmd.output()
+      // yield { message: 'stopped container' }
+    },
+    multi: true
   },
 }
 
