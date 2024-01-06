@@ -30,17 +30,26 @@ CMD ["/bin/deno", "run", "--allow-net", "proxy.js"]
 
 ```js
 Deno.serve({ port: 3000 }, async request => {
-  const url = new URL(request.url)
-  url.search = search
-  const headers = new Headers(request.headers)
-  headers.set('Host', url.hostname)
-  return fetch(url, {
-    method: request.method,
-    headers,
-    body: request.body,
-    redirect: 'manual',
-  })
+  // This sends CONNECT. TODO: use other HTTP Server API that is connection based and store host to proxy requests
+  // CONNECT registry.npmjs.org:443
+  console.log({request})
+  // const url = new URL(request.url)
+  // url.search = search
+  // const headers = new Headers(request.headers)
+  // headers.set('Host', url.hostname)
+  // return fetch(url, {
+  //   method: request.method,
+  //   headers,
+  //   body: request.body,
+  //   redirect: 'manual',
+  // })
 })
+```
+
+To run a build container:
+
+```bash
+docker run -i -t --platform linux/amd64 --network=ristretto-build-libraries-internal ristretto-deno-node /bin/bash
 ```
 
 `run-container-build.js`
