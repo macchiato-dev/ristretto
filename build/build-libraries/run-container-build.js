@@ -62,7 +62,7 @@ const commands = {
       // start the proxy
       const createCmd = new Deno.Command('docker', {
         args: [
-          'create', '--platform=linux/amd64', '--rm',
+          'create', '--platform=linux/amd64',
           '--network=ristretto-build-libraries-internal',
           '--network-alias=proxy',
           'ristretto-build-libraries-proxy'

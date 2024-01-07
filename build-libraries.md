@@ -29,42 +29,34 @@ CMD ["/bin/deno", "run", "--allow-net", "proxy.js"]
 `proxy.js`
 
 ```js
-async function forward(readable, writable, {name}) {
-  for await (const chunk of readable) {
-    console.log(`Read ${chunk.byteLength} from ${name}`)
-    const result = writable.write(chunk)
-    console.log(`Write to ${name} returned ${result}`)
+async function readMessage(conn) {
+  let pos = 0
+  const arr = new Uint8Array(512)
+  let remaining
+  for await (const chunk of conn.readable) {
+    arr.set(chunk, pos)
+    pos += chunk.byteLength
+    console.log(`Received chunk of ${chunk.byteLength} bytes`)
+    const decoded = new TextDecoder().decode(arr.slice(0, pos))
+    console.log(`Decoded: ${decoded}`)
+    const match = decoded.match(/\r?\n\r?\n/)
+    if (match) {
+      const messageEnd = match.index + match[0].length
+      remaining = arr.slice(messageEnd, pos)
+      break
+    }
   }
-  console.log(`${name} returned`)
+  return remaining
 }
 
 async function handleHttp(conn) {
-  conn.setKeepAlive(true)
-  let serverUrl
-  let promise
-  const httpConn = Deno.serveHttp(conn)
-  const e = await httpConn.nextRequest()
-  console.log({headers: e.request.headers})
-  if (e.request.method === 'CONNECT') {
-    serverUrl = e.request.url
-    console.log({serverUrl})
-    // await e.respondWith(new Response(null, {
-    //   status: 200,
-    //   statusText: 'OK',
-    //   headers: {Connection: 'Keep-Alive'},
-    // }))
-    console.log({writableLocked: conn.writable.locked})
-    const writer = await conn.writable.getWriter()
-    const result = await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
-    const serverUrlInfo = new URL(serverUrl)
-    try {
-      const connectArgs = {hostname: serverUrlInfo.hostname, port: Number(serverUrlInfo.port)}
-      const outConn = await Deno.connect(connectArgs)
-      await Promise.allSettled([forward(conn.readable, outConn.writable), forward(outConn.readable, conn.writable)])
-    } catch (err) {
-      console.error('Error creating connection', err)
-    }
+  const remaining = await readMessage(conn)
+  const writer = await conn.writable.getWriter()
+  await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
+  for await (const chunk of conn.readable) {
+    console.log(`read chunk of ${chunk.byteLength} bytes after sending response`)
   }
+  console.log('done reading')
 }
 
 for await (const conn of Deno.listen({ port: 3000 })) {
@@ -145,7 +137,7 @@ const commands = {
       // start the proxy
       const createCmd = new Deno.Command('docker', {
         args: [
-          'create', '--platform=linux/amd64', '--rm',
+          'create', '--platform=linux/amd64',
           '--network=ristretto-build-libraries-internal',
           '--network-alias=proxy',
           'ristretto-build-libraries-proxy'
