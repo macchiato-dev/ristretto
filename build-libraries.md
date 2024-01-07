@@ -29,6 +29,15 @@ CMD ["/bin/deno", "run", "--allow-net", "proxy.js"]
 `proxy.js`
 
 ```js
+async function forward(readable, writable, {name}) {
+  for await (const chunk of readable) {
+    console.log(`Read ${chunk.byteLength} from ${name}`)
+    const result = writable.write(chunk)
+    console.log(`Write to ${name} returned ${result}`)
+  }
+  console.log(`${name} returned`)
+}
+
 async function handleHttp(conn) {
   conn.setKeepAlive(true)
   let serverUrl
@@ -39,20 +48,22 @@ async function handleHttp(conn) {
   if (e.request.method === 'CONNECT') {
     serverUrl = e.request.url
     console.log({serverUrl})
-    await e.respondWith(new Response(null, {
-      status: 200,
-      statusText: 'OK',
-      headers: {Connection: 'Keep-Alive'},
-    }))
-  }
-  const serverUrlInfo = new URL(serverUrl)
-  try {
-    const connectArgs = {hostname: serverUrlInfo.hostname, port: Number(serverUrlInfo.port)}
-    const outConn = await Deno.connect(connectArgs)
-    await conn.readable.pipeTo(outConn.writable)
-    await outConn.readable.pipeTo(conn.writable)
-  } catch (err) {
-    console.error('Error creating connection', err)
+    // await e.respondWith(new Response(null, {
+    //   status: 200,
+    //   statusText: 'OK',
+    //   headers: {Connection: 'Keep-Alive'},
+    // }))
+    console.log({writableLocked: conn.writable.locked})
+    const writer = await conn.writable.getWriter()
+    const result = await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
+    const serverUrlInfo = new URL(serverUrl)
+    try {
+      const connectArgs = {hostname: serverUrlInfo.hostname, port: Number(serverUrlInfo.port)}
+      const outConn = await Deno.connect(connectArgs)
+      await Promise.allSettled([forward(conn.readable, outConn.writable), forward(outConn.readable, conn.writable)])
+    } catch (err) {
+      console.error('Error creating connection', err)
+    }
   }
 }
 
