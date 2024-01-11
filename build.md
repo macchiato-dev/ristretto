@@ -202,11 +202,15 @@ async function buildNotebook() {
 
 async function buildScript(path, blockName, out) {
   const src = new TextDecoder().decode(await readFile(path))
-  for (const block of readBlocksWithNames(src)) {
-    if (block.name === blockName) {
-      const data = new TextEncoder().encode(src.slice(...block.contentRange))
-      await writeFile(out, data)
+  if (blockName === undefined) {
+    for (const block of readBlocksWithNames(src)) {
+      if (block.name === blockName) {
+        const data = new TextEncoder().encode(src.slice(...block.contentRange))
+        await writeFile(out, data)
+      }
     }
+  } else {
+    await writeFile(out, src)
   }
 }
 
@@ -225,6 +229,21 @@ async function buildScripts() {
     ['build-libraries.md'],
     'proxy.js',
     ['build', 'build-libraries', 'proxy.js']
+  )
+  await buildScript(
+    ['build-libraries.md'],
+    undefined,
+    ['build', 'build-libraries', 'build-libraries.md']
+  )
+  await buildScript(
+    ['build-libraries.md'],
+    'Dockerfile.build-in-container',
+    ['build', 'build-libraries', 'Dockerfile.build-in-container']
+  )
+  await buildScript(
+    ['build-libraries.md'],
+    'build-in-container.js',
+    ['build', 'build-libraries', 'build-in-container.js']
   )
   await buildScript(
     ['build-docker.md'],
