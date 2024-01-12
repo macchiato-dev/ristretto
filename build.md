@@ -202,7 +202,7 @@ async function buildNotebook() {
 
 async function buildScript(path, blockName, out) {
   const src = new TextDecoder().decode(await readFile(path))
-  if (blockName === undefined) {
+  if (blockName !== undefined) {
     for (const block of readBlocksWithNames(src)) {
       if (block.name === blockName) {
         const data = new TextEncoder().encode(src.slice(...block.contentRange))
@@ -210,7 +210,7 @@ async function buildScript(path, blockName, out) {
       }
     }
   } else {
-    await writeFile(out, src)
+    await writeFile(out, new TextEncoder().encode(src))
   }
 }
 

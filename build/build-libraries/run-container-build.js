@@ -70,7 +70,6 @@ const commands = {
       })
       const createOutput = await createCmd.output()
       const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
-      console.log({proxyContainerId})
       yield createOutput
 
       const connectCmd = new Deno.Command('docker', {
@@ -83,11 +82,16 @@ const commands = {
         args: ['start', proxyContainerId]
       })
       const startOutput = await startCmd.output()
-      // TODO: run npm in container with just access to internal with proxy set
-      const stopCmd = new Deno.Command('docker', {
-        args: ['stop', proxyContainerId]
-      })
-      await stopCmd.output()
+      // const buildCmd = new Deno.Command('docker', {
+      //   args: [
+      //     'run', '--platform=linux/amd64',
+      //     '--network=ristretto-build-libraries-internal',
+      //   ]
+      // })
+      // const stopCmd = new Deno.Command('docker', {
+      //   args: ['stop', proxyContainerId]
+      // })
+      // await stopCmd.output()
     },
     multi: true
   },
