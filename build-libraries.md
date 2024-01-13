@@ -11,7 +11,7 @@ With Docker/Podman it creates:
 - a container for the build with access to the internal container only
 - volumes for caching
 
-It uses a script that shells out to `docker` and runs on the Docker client (the host or a Docker-in-Docker container), and another script in the build container that shells out to `npm`. The script that shells out to `docker` is `run-container-build.js` and the script that shells out to `npm` is `run-module-build.js`. Each of these scripts are run with `deno permissions` that are by necessity fairly broad, because they allow running `docker` and `npm` with any argumens, but have some of the code running in a worker without these permissions, to make them smaller and easeir to audit, as well as to run manually.
+It uses a script that shells out to `docker` and runs on the Docker client (the host or a Docker-in-Docker container), and another script in the build container that shells out to `npm`. The script that shells out to `docker` is `run-container-build.js` and the script that shells out to `npm` is `run-build-in-container.js`. Each of these scripts are run with `deno permissions` that are by necessity fairly broad, because they allow running `docker` and `npm` with any arguments, but have some of the code running in a worker without these permissions, to make them smaller and easeir to audit, as well as to run manually.
 
 ## Build inside container
 
@@ -22,7 +22,7 @@ This build runs inside the container and is used to run npm.
 ```docker
 FROM ristretto-deno-node:latest
 ADD build-libraries.md /
-ADD run-build-in-container.js
+ADD run-build-in-container.js /
 ENTRYPOINT []
 CMD ["/bin/deno", "run", "--allow-net", "run-build-in-container.js"]
 ```
@@ -30,6 +30,13 @@ CMD ["/bin/deno", "run", "--allow-net", "run-build-in-container.js"]
 `run-build-in-container.js`
 
 ```js
+async function runNpm(args) {
+  const output = await new Deno.Command('npm', {
+    args,
+  }).output()
+  return {...output, command: `npm ${args.join(' ')}`}
+}
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
@@ -37,14 +44,10 @@ const commands = {
   install: {
     fn: async function* clean() {
       const commands = [
-        ['network', 'rm', 'ristretto-build-libraries-internal'],
-        ['network', 'rm', 'ristretto-build-libraries-external'],
+        ['install'],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
@@ -155,6 +158,9 @@ function parentRequestMulti(...data) {
 }
 
 function logOutput(output) {
+  if (output.command) {
+    console.log(`-- ${output.command}`)
+  }
   if (output.stdout.byteLength > 0) {
     console.log(new TextDecoder().decode(output.stdout))
   }
@@ -315,6 +321,14 @@ This gives access to the build script to run commands and access resources neede
 ```js
 import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
 
+async function runDocker(args) {
+  const output = await new Deno.Command('docker', {
+    args,
+    cwd: join('.', 'build', 'build-libraries'),
+  }).output()
+  return {...output, command: `docker ${args.join(' ')}`}
+}
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
@@ -326,16 +340,13 @@ const commands = {
         ['network', 'rm', 'ristretto-build-libraries-external'],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
   },
-  buildImage: {
-    fn: async function* buildImage() {
+  buildImages: {
+    fn: async function* buildImages() {
       const commands = [
         [
           'build',
@@ -344,13 +355,16 @@ const commands = {
           '-f', 'Dockerfile.proxy',
           '.'
         ],
+        [
+          'build',
+          '--platform', 'linux/amd64',
+          '-t', 'ristretto-build-libraries-build-in-container',
+          '-f', 'Dockerfile.build-in-container',
+          '.'
+        ],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-          cwd: join('.', 'build', 'build-libraries'),
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
@@ -362,10 +376,7 @@ const commands = {
         ['network', 'create', 'ristretto-build-libraries-external'],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
@@ -374,39 +385,31 @@ const commands = {
   },
   runBuild: {
     fn: async function* runBuild() {
-      // start the proxy
-      const createCmd = new Deno.Command('docker', {
-        args: [
-          'create', '--platform=linux/amd64',
-          '--network=ristretto-build-libraries-internal',
-          '--network-alias=proxy',
-          'ristretto-build-libraries-proxy'
-        ]
-      })
-      const createOutput = await createCmd.output()
-      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+      const createOutput = await runDocker([
+        'create', '--platform=linux/amd64',
+        '--network=ristretto-build-libraries-internal',
+        '--network-alias=proxy',
+        'ristretto-build-libraries-proxy'
+      ])
+      const proxyContainerId = new TextDecoder().decode(
+        createOutput.stdout
+      ).split("\n").filter(s => !s.startsWith('-- ')).at(0).trim()
       yield createOutput
 
-      const connectCmd = new Deno.Command('docker', {
-        args: [
-          'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
-        ],
-      })
-      const connectOutput = await connectCmd.output()
-      const startCmd = new Deno.Command('docker', {
-        args: ['start', proxyContainerId]
-      })
-      const startOutput = await startCmd.output()
-      // const buildCmd = new Deno.Command('docker', {
-      //   args: [
-      //     'run', '--platform=linux/amd64',
-      //     '--network=ristretto-build-libraries-internal',
-      //   ]
-      // })
-      // const stopCmd = new Deno.Command('docker', {
-      //   args: ['stop', proxyContainerId]
-      // })
-      // await stopCmd.output()
+      yield await runDocker([
+        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+      ])
+      yield await runDocker([
+        'start', proxyContainerId
+      ])
+      yield await runDocker([
+        'run', '--platform=linux/amd64',
+        '--network=ristretto-build-libraries-internal',
+        'ristretto-build-libraries-build-in-container',
+      ])
+      yield await runDocker([
+        ['stop', proxyContainerId]
+      ])
     },
     multi: true
   },
@@ -521,6 +524,9 @@ function parentRequestMulti(...data) {
 }
 
 function logOutput(output) {
+  if (output.command) {
+    console.log(`-- ${output.command}`)
+  }
   if (output.stdout.byteLength > 0) {
     console.log(new TextDecoder().decode(output.stdout))
   }
@@ -535,8 +541,8 @@ const commands = {
       logOutput(output)
     }
   },
-  async buildImage() {
-    for await (const output of parentRequestMulti('buildImage')) {
+  async buildImages() {
+    for await (const output of parentRequestMulti('buildImages')) {
       logOutput(output)
     }
   },

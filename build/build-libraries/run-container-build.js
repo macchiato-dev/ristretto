@@ -1,5 +1,13 @@
 import { join } from 'https://deno.land/std@0.207.0/path/mod.ts'
 
+async function runDocker(args) {
+  const output = await new Deno.Command('docker', {
+    args,
+    cwd: join('.', 'build', 'build-libraries'),
+  }).output()
+  return {...output, command: `docker ${args.join(' ')}`}
+}
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
@@ -11,16 +19,13 @@ const commands = {
         ['network', 'rm', 'ristretto-build-libraries-external'],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
   },
-  buildImage: {
-    fn: async function* buildImage() {
+  buildImages: {
+    fn: async function* buildImages() {
       const commands = [
         [
           'build',
@@ -29,13 +34,16 @@ const commands = {
           '-f', 'Dockerfile.proxy',
           '.'
         ],
+        [
+          'build',
+          '--platform', 'linux/amd64',
+          '-t', 'ristretto-build-libraries-build-in-container',
+          '-f', 'Dockerfile.build-in-container',
+          '.'
+        ],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-          cwd: join('.', 'build', 'build-libraries'),
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
@@ -47,10 +55,7 @@ const commands = {
         ['network', 'create', 'ristretto-build-libraries-external'],
       ]
       for (const command of commands) {
-        const output = await new Deno.Command('docker', {
-          args: command,
-        }).output()
-        yield output
+        yield await runDocker(command)
       }
     },
     multi: true,
@@ -59,39 +64,31 @@ const commands = {
   },
   runBuild: {
     fn: async function* runBuild() {
-      // start the proxy
-      const createCmd = new Deno.Command('docker', {
-        args: [
-          'create', '--platform=linux/amd64',
-          '--network=ristretto-build-libraries-internal',
-          '--network-alias=proxy',
-          'ristretto-build-libraries-proxy'
-        ]
-      })
-      const createOutput = await createCmd.output()
-      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+      const createOutput = await runDocker([
+        'create', '--platform=linux/amd64',
+        '--network=ristretto-build-libraries-internal',
+        '--network-alias=proxy',
+        'ristretto-build-libraries-proxy'
+      ])
+      const proxyContainerId = new TextDecoder().decode(
+        createOutput.stdout
+      ).split("\n").filter(s => !s.startsWith('-- ')).at(0).trim()
       yield createOutput
 
-      const connectCmd = new Deno.Command('docker', {
-        args: [
-          'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
-        ],
-      })
-      const connectOutput = await connectCmd.output()
-      const startCmd = new Deno.Command('docker', {
-        args: ['start', proxyContainerId]
-      })
-      const startOutput = await startCmd.output()
-      // const buildCmd = new Deno.Command('docker', {
-      //   args: [
-      //     'run', '--platform=linux/amd64',
-      //     '--network=ristretto-build-libraries-internal',
-      //   ]
-      // })
-      // const stopCmd = new Deno.Command('docker', {
-      //   args: ['stop', proxyContainerId]
-      // })
-      // await stopCmd.output()
+      yield await runDocker([
+        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+      ])
+      yield await runDocker([
+        'start', proxyContainerId
+      ])
+      yield await runDocker([
+        'run', '--platform=linux/amd64',
+        '--network=ristretto-build-libraries-internal',
+        'ristretto-build-libraries-build-in-container',
+      ])
+      yield await runDocker([
+        ['stop', proxyContainerId]
+      ])
     },
     multi: true
   },

@@ -242,8 +242,8 @@ async function buildScripts() {
   )
   await buildScript(
     ['build-libraries.md'],
-    'build-in-container.js',
-    ['build', 'build-libraries', 'build-in-container.js']
+    'run-build-in-container.js',
+    ['build', 'build-libraries', 'run-build-in-container.js']
   )
   await buildScript(
     ['build-docker.md'],
