@@ -10,13 +10,24 @@ const commands = {
     return structuredClone(Deno.args)
   },
   install: {
-    fn: async function* clean() {
-      const commands = [
-        ['install'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
+    fn: async function* install() {
+      yield await runNpm(['set', 'proxy=http://proxy:3000/'])
+      yield await runNpm(['init', '-y'])
+      yield await runNpm([
+        'add',
+        '@rollup/browser',
+        '@codemirror/autocomplete',
+        '@codemirror/commands',
+        '@codemirror/language',
+        '@codemirror/lint',
+        '@codemirror/search',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/lang-html',
+        '@codemirror/lang-css',
+        '@codemirror/lang-json',
+        '@codemirror/lang-javascript',
+      ])
     },
     multi: true,
   },
@@ -61,5 +72,5 @@ const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
   permissions: 'none',
 })
 worker.addEventListener('message', handleMessage)
-const data = await Deno.readFile(join('./build-libraries.md'))
+const data = await Deno.readFile('./build-libraries.md')
 worker.postMessage(['notebook', data], [data.buffer])

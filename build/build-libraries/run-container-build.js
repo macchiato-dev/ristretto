@@ -70,9 +70,7 @@ const commands = {
         '--network-alias=proxy',
         'ristretto-build-libraries-proxy'
       ])
-      const proxyContainerId = new TextDecoder().decode(
-        createOutput.stdout
-      ).split("\n").filter(s => !s.startsWith('-- ')).at(0).trim()
+      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
       yield createOutput
 
       yield await runDocker([
@@ -84,10 +82,10 @@ const commands = {
       yield await runDocker([
         'run', '--platform=linux/amd64',
         '--network=ristretto-build-libraries-internal',
-        'ristretto-build-libraries-build-in-container',
+        'ristretto-build-libraries-build-in-container'
       ])
       yield await runDocker([
-        ['stop', proxyContainerId]
+        'stop', proxyContainerId
       ])
     },
     multi: true

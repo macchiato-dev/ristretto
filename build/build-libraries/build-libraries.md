@@ -21,10 +21,11 @@ This build runs inside the container and is used to run npm.
 
 ```docker
 FROM ristretto-deno-node:latest
-ADD build-libraries.md /
-ADD run-build-in-container.js /
+WORKDIR /app
+ADD build-libraries.md /app
+ADD run-build-in-container.js /app
 ENTRYPOINT []
-CMD ["/bin/deno", "run", "--allow-net", "run-build-in-container.js"]
+CMD ["/bin/deno", "run", "--allow-net", "--allow-read=/app", "--allow-write=/app", "--allow-run=npm", "run-build-in-container.js", "build"]
 ```
 
 `run-build-in-container.js`
@@ -42,13 +43,24 @@ const commands = {
     return structuredClone(Deno.args)
   },
   install: {
-    fn: async function* clean() {
-      const commands = [
-        ['install'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
+    fn: async function* install() {
+      yield await runNpm(['set', 'proxy=http://proxy:3000/'])
+      yield await runNpm(['init', '-y'])
+      yield await runNpm([
+        'add',
+        '@rollup/browser',
+        '@codemirror/autocomplete',
+        '@codemirror/commands',
+        '@codemirror/language',
+        '@codemirror/lint',
+        '@codemirror/search',
+        '@codemirror/state',
+        '@codemirror/view',
+        '@codemirror/lang-html',
+        '@codemirror/lang-css',
+        '@codemirror/lang-json',
+        '@codemirror/lang-javascript',
+      ])
     },
     multi: true,
   },
@@ -93,7 +105,7 @@ const worker = new Worker(`data:text/javascript;base64,${btoa(runEntry)}`, {
   permissions: 'none',
 })
 worker.addEventListener('message', handleMessage)
-const data = await Deno.readFile(join('./build-libraries.md'))
+const data = await Deno.readFile('./build-libraries.md')
 worker.postMessage(['notebook', data], [data.buffer])
 ```
 
@@ -170,7 +182,7 @@ function logOutput(output) {
 }
 
 const commands = {
-  async install() {
+  async build() {
     for await (const output of parentRequestMulti('install')) {
       logOutput(output)
     }
@@ -391,9 +403,7 @@ const commands = {
         '--network-alias=proxy',
         'ristretto-build-libraries-proxy'
       ])
-      const proxyContainerId = new TextDecoder().decode(
-        createOutput.stdout
-      ).split("\n").filter(s => !s.startsWith('-- ')).at(0).trim()
+      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
       yield createOutput
 
       yield await runDocker([
@@ -405,10 +415,10 @@ const commands = {
       yield await runDocker([
         'run', '--platform=linux/amd64',
         '--network=ristretto-build-libraries-internal',
-        'ristretto-build-libraries-build-in-container',
+        'ristretto-build-libraries-build-in-container'
       ])
       yield await runDocker([
-        ['stop', proxyContainerId]
+        'stop', proxyContainerId
       ])
     },
     multi: true
