@@ -38,29 +38,34 @@ async function runNpm(args) {
   return {...output, command: `npm ${args.join(' ')}`}
 }
 
+const packages = [
+  '@rollup/browser',
+  '@codemirror/autocomplete',
+  '@codemirror/commands',
+  '@codemirror/language',
+  '@codemirror/lint',
+  '@codemirror/search',
+  '@codemirror/state',
+  '@codemirror/view',
+  '@codemirror/lang-html',
+  '@codemirror/lang-css',
+  '@codemirror/lang-json',
+  '@codemirror/lang-javascript',
+]
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
   install: {
     fn: async function* install() {
+      yield {command: 'Running npm'}
       yield await runNpm(['set', 'proxy=http://proxy:3000/'])
       yield await runNpm(['init', '-y'])
-      yield await runNpm([
-        'add',
-        '@rollup/browser',
-        '@codemirror/autocomplete',
-        '@codemirror/commands',
-        '@codemirror/language',
-        '@codemirror/lint',
-        '@codemirror/search',
-        '@codemirror/state',
-        '@codemirror/view',
-        '@codemirror/lang-html',
-        '@codemirror/lang-css',
-        '@codemirror/lang-json',
-        '@codemirror/lang-javascript',
-      ])
+      yield await runNpm(['install', ...packages])
+      const packageJson = await Deno.readTextFile('package.json')
+      const outputDoc = `\n\n---\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
+      yield {output: new TextEncoder().encode(outputDoc)}
     },
     multi: true,
   },
@@ -173,10 +178,10 @@ function logOutput(output) {
   if (output.command) {
     console.log(`-- ${output.command}`)
   }
-  if (output.stdout.byteLength > 0) {
+  if (output.stdout?.byteLength > 0) {
     console.log(new TextDecoder().decode(output.stdout))
   }
-  if (output.stderr.byteLength > 0) {
+  if (output.stderr?.byteLength > 0) {
     console.log(new TextDecoder().decode(output.stderr))
   }
 }
@@ -303,11 +308,14 @@ async function handleHttp(conn) {
         const message = decoded.slice(0, messageEnd)
         const remaining = arr.slice(new TextEncoder().encode(message).byteLength, pos)
         const proxyUrl = message.match(/CONNECT (\S+) HTTP/)[1].split(':')
-        const connectArgs = {hostname: proxyUrl[0], port: Number(proxyUrl[1])}
-        const outConn = await Deno.connect(connectArgs)
-        outConn.setKeepAlive(true)
+        const hostname = proxyUrl[0]
+        const port = Number(proxyUrl[1])
+        const connectArgs = {hostname, port}
         const writer = await conn.writable.getWriter()
         await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
+        console.log(`Connecting to hostname "${hostname}", port ${port}...`)
+        const outConn = await Deno.connect(connectArgs)
+        outConn.setKeepAlive(true)
         outWriter = await outConn.writable.getWriter()
         // TODO: send remaining
         forward(outConn, writer)
@@ -339,6 +347,65 @@ async function runDocker(args) {
     cwd: join('.', 'build', 'build-libraries'),
   }).output()
   return {...output, command: `docker ${args.join(' ')}`}
+}
+
+async function* runDockerStream(args) {
+  try {
+    yield {command: `docker ${args.join(' ')}`}
+    const command = new Deno.Command('docker', {
+      args,
+      cwd: join('.', 'build', 'build-libraries'),
+      stdin: 'piped',
+      stdout: 'piped',
+      stderr: 'piped'
+    })
+    const stdoutStream = new TextDecoderStream()
+    const stderrStream = new TextDecoderStream()
+    let chunks = {stdout: ['Starting\n'], stderr: []}
+    async function appendStdout() {
+      try {
+        for await (const chunk of stdoutStream.readable) {
+          chunks.stdout.push(chunk)
+        }
+      } catch (err) {
+        console.error('Error in appendStdout', err)
+      }
+    }
+    async function appendStderr() {
+      try {
+        for await (const chunk of stderrStream.readable) {
+          chunks.stderr.push(chunk)
+        }
+      } catch (err) {
+        console.error('Error in appendStderr', err)
+      }
+    }
+    appendStdout()
+    appendStderr()
+    const child = command.spawn()
+    child.stdin.close()
+    child.stdout.pipeTo(stdoutStream.writable)
+    child.stderr.pipeTo(stderrStream.writable)
+    let status
+    async function setStatus() {
+      status = await child.status
+    }
+    setStatus()
+    let open = true
+    while (status === undefined) {
+      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 500))
+      if (chunks.stdout.length > 0 || chunks.stderr.length > 0) {
+        const output = {
+          stdout: chunks.stdout.join(''),
+          stderr: chunks.stderr.join('')
+        }
+        yield output
+      }
+      chunks = {stdout: [], stderr: []}
+    }
+  } catch (err) {
+    console.error('Error running docker', err)
+  }
 }
 
 const commands = {
@@ -404,22 +471,31 @@ const commands = {
         'ristretto-build-libraries-proxy'
       ])
       const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+      yield {command: `proxyContainerId: ${JSON.stringify(proxyContainerId)}`}
       yield createOutput
 
-      yield await runDocker([
+      const connectOutput = await runDocker([
         'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
       ])
-      yield await runDocker([
+      yield connectOutput
+
+      const startOutput = await runDocker([
         'start', proxyContainerId
       ])
-      yield await runDocker([
+      yield startOutput
+
+      for await (const output of runDockerStream([
         'run', '--platform=linux/amd64',
         '--network=ristretto-build-libraries-internal',
         'ristretto-build-libraries-build-in-container'
-      ])
-      yield await runDocker([
+      ])) {
+        yield output
+      }
+
+      const stopOutput = await runDocker([
         'stop', proxyContainerId
       ])
+      yield stopOutput
     },
     multi: true
   },
@@ -533,16 +609,18 @@ function parentRequestMulti(...data) {
   return iterator
 }
 
+function logValue(value, prefix = '') {
+  if (typeof value === 'string') {
+    console.log(prefix + value)
+  } else if (value?.byteLength > 0) {
+    console.log(prefix + new TextDecoder().decode(value))
+  }
+}
+
 function logOutput(output) {
-  if (output.command) {
-    console.log(`-- ${output.command}`)
-  }
-  if (output.stdout.byteLength > 0) {
-    console.log(new TextDecoder().decode(output.stdout))
-  }
-  if (output.stderr.byteLength > 0) {
-    console.log(new TextDecoder().decode(output.stderr))
-  }
+  logValue(output.command, '-- ')
+  logValue(output.stdout)
+  logValue(output.stderr)
 }
 
 const commands = {

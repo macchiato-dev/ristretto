@@ -8,6 +8,65 @@ async function runDocker(args) {
   return {...output, command: `docker ${args.join(' ')}`}
 }
 
+async function* runDockerStream(args) {
+  try {
+    yield {command: `docker ${args.join(' ')}`}
+    const command = new Deno.Command('docker', {
+      args,
+      cwd: join('.', 'build', 'build-libraries'),
+      stdin: 'piped',
+      stdout: 'piped',
+      stderr: 'piped'
+    })
+    const stdoutStream = new TextDecoderStream()
+    const stderrStream = new TextDecoderStream()
+    let chunks = {stdout: ['Starting\n'], stderr: []}
+    async function appendStdout() {
+      try {
+        for await (const chunk of stdoutStream.readable) {
+          chunks.stdout.push(chunk)
+        }
+      } catch (err) {
+        console.error('Error in appendStdout', err)
+      }
+    }
+    async function appendStderr() {
+      try {
+        for await (const chunk of stderrStream.readable) {
+          chunks.stderr.push(chunk)
+        }
+      } catch (err) {
+        console.error('Error in appendStderr', err)
+      }
+    }
+    appendStdout()
+    appendStderr()
+    const child = command.spawn()
+    child.stdin.close()
+    child.stdout.pipeTo(stdoutStream.writable)
+    child.stderr.pipeTo(stderrStream.writable)
+    let status
+    async function setStatus() {
+      status = await child.status
+    }
+    setStatus()
+    let open = true
+    while (status === undefined) {
+      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 500))
+      if (chunks.stdout.length > 0 || chunks.stderr.length > 0) {
+        const output = {
+          stdout: chunks.stdout.join(''),
+          stderr: chunks.stderr.join('')
+        }
+        yield output
+      }
+      chunks = {stdout: [], stderr: []}
+    }
+  } catch (err) {
+    console.error('Error running docker', err)
+  }
+}
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
@@ -71,22 +130,31 @@ const commands = {
         'ristretto-build-libraries-proxy'
       ])
       const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+      yield {command: `proxyContainerId: ${JSON.stringify(proxyContainerId)}`}
       yield createOutput
 
-      yield await runDocker([
+      const connectOutput = await runDocker([
         'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
       ])
-      yield await runDocker([
+      yield connectOutput
+
+      const startOutput = await runDocker([
         'start', proxyContainerId
       ])
-      yield await runDocker([
+      yield startOutput
+
+      for await (const output of runDockerStream([
         'run', '--platform=linux/amd64',
         '--network=ristretto-build-libraries-internal',
         'ristretto-build-libraries-build-in-container'
-      ])
-      yield await runDocker([
+      ])) {
+        yield output
+      }
+
+      const stopOutput = await runDocker([
         'stop', proxyContainerId
       ])
+      yield stopOutput
     },
     multi: true
   },

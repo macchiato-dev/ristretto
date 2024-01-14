@@ -22,11 +22,14 @@ async function handleHttp(conn) {
         const message = decoded.slice(0, messageEnd)
         const remaining = arr.slice(new TextEncoder().encode(message).byteLength, pos)
         const proxyUrl = message.match(/CONNECT (\S+) HTTP/)[1].split(':')
-        const connectArgs = {hostname: proxyUrl[0], port: Number(proxyUrl[1])}
-        const outConn = await Deno.connect(connectArgs)
-        outConn.setKeepAlive(true)
+        const hostname = proxyUrl[0]
+        const port = Number(proxyUrl[1])
+        const connectArgs = {hostname, port}
         const writer = await conn.writable.getWriter()
         await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
+        console.log(`Connecting to hostname "${hostname}", port ${port}...`)
+        const outConn = await Deno.connect(connectArgs)
+        outConn.setKeepAlive(true)
         outWriter = await outConn.writable.getWriter()
         // TODO: send remaining
         forward(outConn, writer)

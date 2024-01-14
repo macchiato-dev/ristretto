@@ -5,29 +5,34 @@ async function runNpm(args) {
   return {...output, command: `npm ${args.join(' ')}`}
 }
 
+const packages = [
+  '@rollup/browser',
+  '@codemirror/autocomplete',
+  '@codemirror/commands',
+  '@codemirror/language',
+  '@codemirror/lint',
+  '@codemirror/search',
+  '@codemirror/state',
+  '@codemirror/view',
+  '@codemirror/lang-html',
+  '@codemirror/lang-css',
+  '@codemirror/lang-json',
+  '@codemirror/lang-javascript',
+]
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
   install: {
     fn: async function* install() {
+      yield {command: 'Running npm'}
       yield await runNpm(['set', 'proxy=http://proxy:3000/'])
       yield await runNpm(['init', '-y'])
-      yield await runNpm([
-        'add',
-        '@rollup/browser',
-        '@codemirror/autocomplete',
-        '@codemirror/commands',
-        '@codemirror/language',
-        '@codemirror/lint',
-        '@codemirror/search',
-        '@codemirror/state',
-        '@codemirror/view',
-        '@codemirror/lang-html',
-        '@codemirror/lang-css',
-        '@codemirror/lang-json',
-        '@codemirror/lang-javascript',
-      ])
+      yield await runNpm(['install', ...packages])
+      const packageJson = await Deno.readTextFile('package.json')
+      const outputDoc = `\n\n---\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
+      yield {output: new TextEncoder().encode(outputDoc)}
     },
     multi: true,
   },
