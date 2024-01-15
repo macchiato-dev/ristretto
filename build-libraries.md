@@ -328,8 +328,15 @@ async function handleHttp(conn) {
   }
 }
 
+// see if a plain old request can be sent
 for await (const conn of Deno.listen({ port: 3000 })) {
-  handleHttp(conn)
+  const buf = new ArrayBuffer(0, {maxByteLength: 50000})
+  for await (const chunk of conn.readable) {
+    const pos = buf.byteLength
+    buf.resize(pos + chunk.byteLength)
+    const arr = new Uint8Array(buf, pos, pos + chunk.byteLength)
+    arr.set(chunk)
+  }
 }
 ```
 
