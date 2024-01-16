@@ -9,6 +9,7 @@ async function handleHttp(conn) {
   let pos = 0
   const arr = new Uint8Array(512)
   let outWriter
+  // TODO: don't let reading of the stream be delayed by setting up the writer and network connection
   for await (const chunk of conn.readable) {
     if (outWriter === undefined) {
       arr.set(chunk, pos)
@@ -41,6 +42,31 @@ async function handleHttp(conn) {
   }
 }
 
+// see if a plain old request can be sent
 for await (const conn of Deno.listen({ port: 3000 })) {
-  handleHttp(conn)
+  const buf = new ArrayBuffer(0, {maxByteLength: 50000})
+  for await (const chunk of conn.readable) {
+    const pos = buf.byteLength
+    buf.resize(pos + chunk.byteLength)
+    const bufChunk = new Uint8Array(buf, pos, pos + chunk.byteLength)
+    bufChunk.set(chunk)
+    const bufArray = new Uint8Array(buf)
+    let i = -1
+    const charCode = '\n'.charCodeAt(0)
+    let messageSlice
+    let message
+    while (true) {
+      i = bufArray.indexOf(charCode, i + 1)
+      if (i === -1) {
+        break
+      }
+      messageSlice = bufArray.slice(0, i + 1)
+      message = new TextDecoder().decode(messageSlice)
+      // get this to properly parse it, breaking on non-newline if needed
+      if message.match(/CONNECT.*\n/) {
+        break
+      }
+    }
+    // set up connection and send rest, and then pass back and forth
+  }
 }
