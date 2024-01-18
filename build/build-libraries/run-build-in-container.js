@@ -26,13 +26,13 @@ const commands = {
   },
   install: {
     fn: async function* install() {
-      yield {command: 'Running npm'}
+      yield {stdout: `Installing packages:\n\n\`\`\`\n`}
       yield await runNpm(['set', 'proxy=http://proxy:3000/'])
       yield await runNpm(['init', '-y'])
       yield await runNpm(['install', ...packages])
       const packageJson = await Deno.readTextFile('package.json')
-      const outputDoc = `\n\n---\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
-      yield {output: new TextEncoder().encode(outputDoc)}
+      const outputDoc = `\n\`\`\`\n\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
+      yield {stdout: new TextEncoder().encode(outputDoc)}
     },
     multi: true,
   },

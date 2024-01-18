@@ -59,13 +59,13 @@ const commands = {
   },
   install: {
     fn: async function* install() {
-      yield {command: 'Running npm'}
+      yield {stdout: `Installing packages:\n\n\`\`\`\n`}
       yield await runNpm(['set', 'proxy=http://proxy:3000/'])
       yield await runNpm(['init', '-y'])
       yield await runNpm(['install', ...packages])
       const packageJson = await Deno.readTextFile('package.json')
-      const outputDoc = `\n\n---\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
-      yield {output: new TextEncoder().encode(outputDoc)}
+      const outputDoc = `\n\`\`\`\n\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
+      yield {stdout: new TextEncoder().encode(outputDoc)}
     },
     multi: true,
   },
@@ -174,16 +174,18 @@ function parentRequestMulti(...data) {
   return iterator
 }
 
+function logValue(value, prefix = '') {
+  if (typeof value === 'string') {
+    console.log(prefix + value)
+  } else if (value?.byteLength > 0) {
+    console.log(prefix + new TextDecoder().decode(value))
+  }
+}
+
 function logOutput(output) {
-  if (output.command) {
-    console.log(`-- ${output.command}`)
-  }
-  if (output.stdout?.byteLength > 0) {
-    console.log(new TextDecoder().decode(output.stdout))
-  }
-  if (output.stderr?.byteLength > 0) {
-    console.log(new TextDecoder().decode(output.stderr))
-  }
+  logValue(output.command, '-- ')
+  logValue(output.stdout)
+  logValue(output.stderr)
 }
 
 const commands = {
@@ -370,7 +372,7 @@ async function* runDockerStream(args) {
     })
     const stdoutStream = new TextDecoderStream()
     const stderrStream = new TextDecoderStream()
-    let chunks = {stdout: ['Starting\n'], stderr: []}
+    let chunks = {stdout: [], stderr: []}
     async function appendStdout() {
       try {
         for await (const chunk of stdoutStream.readable) {

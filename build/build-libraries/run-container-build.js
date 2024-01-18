@@ -20,7 +20,7 @@ async function* runDockerStream(args) {
     })
     const stdoutStream = new TextDecoderStream()
     const stderrStream = new TextDecoderStream()
-    let chunks = {stdout: ['Starting\n'], stderr: []}
+    let chunks = {stdout: [], stderr: []}
     async function appendStdout() {
       try {
         for await (const chunk of stdoutStream.readable) {
