@@ -20,7 +20,7 @@ async function* runDockerStream(args) {
     })
     const stdoutStream = new TextDecoderStream()
     const stderrStream = new TextDecoderStream()
-    let chunks = {stdout: [], stderr: []}
+    let chunks = []
     async function appendStdout() {
       try {
         for await (const chunk of stdoutStream.readable) {
@@ -52,15 +52,13 @@ async function* runDockerStream(args) {
     setStatus()
     let open = true
     while (status === undefined) {
-      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 500))
+      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 100))
       if (chunks.stdout.length > 0 || chunks.stderr.length > 0) {
-        const output = {
-          stdout: chunks.stdout.join(''),
-          stderr: chunks.stderr.join('')
-        }
-        yield output
+        yield Object.fromEntries(['stdout', 'stderr'].map(f => ([
+          f, chunks.filter(c => c[0] === 'stdout').map(c => c[1]).join('')
+        ])))
       }
-      chunks = {stdout: [], stderr: []}
+      chunks = []
     }
   } catch (err) {
     console.error('Error running docker', err)

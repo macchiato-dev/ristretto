@@ -372,11 +372,11 @@ async function* runDockerStream(args) {
     })
     const stdoutStream = new TextDecoderStream()
     const stderrStream = new TextDecoderStream()
-    let chunks = {stdout: [], stderr: []}
+    let chunks = []
     async function appendStdout() {
       try {
         for await (const chunk of stdoutStream.readable) {
-          chunks.stdout.push(chunk)
+          chunks.push(['stdout', chunk])
         }
       } catch (err) {
         console.error('Error in appendStdout', err)
@@ -403,16 +403,15 @@ async function* runDockerStream(args) {
     }
     setStatus()
     let open = true
-    while (status === undefined) {
-      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 500))
-      if (chunks.stdout.length > 0 || chunks.stderr.length > 0) {
-        const output = {
-          stdout: chunks.stdout.join(''),
-          stderr: chunks.stderr.join('')
-        }
-        yield output
+    while (true) {
+      await new Promise((resolve, _reject) => setTimeout(() => resolve(), 100))
+      if (chunks.length > 0) {
+        yield chunks
       }
-      chunks = {stdout: [], stderr: []}
+      chunks = []
+      if (status !== undefined) {
+        break
+      }
     }
   } catch (err) {
     console.error('Error running docker', err)
@@ -423,92 +422,78 @@ const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
-  clean: {
-    fn: async function* clean() {
-      const commands = [
-        ['network', 'rm', 'ristretto-build-libraries-internal'],
-        ['network', 'rm', 'ristretto-build-libraries-external'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  clean: async function* clean() {
+    const commands = [
+      ['network', 'rm', 'ristretto-build-libraries-internal'],
+      ['network', 'rm', 'ristretto-build-libraries-external'],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  buildImages: {
-    fn: async function* buildImages() {
-      const commands = [
-        [
-          'build',
-          '--platform', 'linux/amd64',
-          '-t', 'ristretto-build-libraries-proxy',
-          '-f', 'Dockerfile.proxy',
-          '.'
-        ],
-        [
-          'build',
-          '--platform', 'linux/amd64',
-          '-t', 'ristretto-build-libraries-build-in-container',
-          '-f', 'Dockerfile.build-in-container',
-          '.'
-        ],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  buildImages: async function* buildImages() {
+    const commands = [
+      [
+        'build',
+        '--platform', 'linux/amd64',
+        '-t', 'ristretto-build-libraries-proxy',
+        '-f', 'Dockerfile.proxy',
+        '.'
+      ],
+      [
+        'build',
+        '--platform', 'linux/amd64',
+        '-t', 'ristretto-build-libraries-build-in-container',
+        '-f', 'Dockerfile.build-in-container',
+        '.'
+      ],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  createNetworks: {
-    fn: async function* createNetworks() {
-      const commands = [
-        ['network', 'create', '--internal', 'ristretto-build-libraries-internal'],
-        ['network', 'create', 'ristretto-build-libraries-external'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  createNetworks: async function* createNetworks() {
+    const commands = [
+      ['network', 'create', '--internal', 'ristretto-build-libraries-internal'],
+      ['network', 'create', 'ristretto-build-libraries-external'],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  async createVolumes() {
-  },
-  runBuild: {
-    fn: async function* runBuild() {
-      const createOutput = await runDocker([
-        'create', '--platform=linux/amd64',
-        '--network=ristretto-build-libraries-internal',
-        '--network-alias=proxy',
-        'ristretto-build-libraries-proxy'
-      ])
-      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
-      yield {command: `proxyContainerId: ${JSON.stringify(proxyContainerId)}`}
-      yield createOutput
+  runBuild: async function* runBuild() {
+    const createOutput = await runDocker([
+      'create', '--platform=linux/amd64',
+      '--network=ristretto-build-libraries-internal',
+      '--network-alias=proxy',
+      'ristretto-build-libraries-proxy'
+    ])
+    const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+    yield {command: `proxyContainerId: ${JSON.stringify(proxyContainerId)}`}
+    yield createOutput
 
-      const connectOutput = await runDocker([
-        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
-      ])
-      yield connectOutput
+    const connectOutput = await runDocker([
+      'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+    ])
+    yield connectOutput
 
-      const startOutput = await runDocker([
-        'start', proxyContainerId
-      ])
-      yield startOutput
+    const startOutput = await runDocker([
+      'start', proxyContainerId
+    ])
+    yield startOutput
 
-      for await (const output of runDockerStream([
-        'run', '--platform=linux/amd64',
-        '--network=ristretto-build-libraries-internal',
-        'ristretto-build-libraries-build-in-container'
-      ])) {
-        yield output
-      }
+    for await (const output of runDockerStream([
+      'run', '--platform=linux/amd64',
+      '--network=ristretto-build-libraries-internal',
+      'ristretto-build-libraries-build-in-container'
+    ])) {
+      yield output
+    }
 
-      const stopOutput = await runDocker([
-        'stop', proxyContainerId
-      ])
-      yield stopOutput
-    },
-    multi: true
+    const stopOutput = await runDocker([
+      'stop', proxyContainerId
+    ])
+    yield stopOutput
   },
 }
 
@@ -516,15 +501,15 @@ async function handleMessage(e) {
   const [cmd, ...args] = e.data
   const port = e.ports[0]
   try {
-    if (cmd in commands) {
-      if (commands[cmd].multi) {
-        for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage({value: result})
-        }
-        port.postMessage({done: true})
-      } else {
-        port.postMessage(await commands[cmd](...args))
+    if (cmd === 'getArgs') {
+      // single command
+      const result = await commands[cmd](...args)
+      port.postMessage(result)
+    } else if (cmd in commands) {
+      for await (const result of commands[cmd](...args)) {
+        port.postMessage({value: result})
       }
+      port.postMessage({done: true})
     } else {
       throw new Error('invalid command')
     }
