@@ -1,8 +1,12 @@
 async function runNpm(args) {
   const output = await new Deno.Command('npm', {
     args,
-  }).output()
-  return {...output, command: `npm ${args.join(' ')}`}
+  })
+  return [
+    ['stdout', `-- npm ${args.join(' ')}`],
+    ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
+    ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
+  ]
 }
 
 const packages = [
@@ -32,7 +36,7 @@ const commands = {
       yield await runNpm(['install', ...packages])
       const packageJson = await Deno.readTextFile('package.json')
       const outputDoc = `\n\`\`\`\n\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
-      yield {stdout: new TextEncoder().encode(outputDoc)}
+      yield ['stdout', new TextEncoder().encode(outputDoc)]
     },
     multi: true,
   },
@@ -45,7 +49,7 @@ async function handleMessage(e) {
     if (cmd in commands) {
       if (commands[cmd].multi) {
         for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage({value: result})
+          port.postMessage(result)
         }
         port.postMessage({done: true})
       } else {
@@ -55,8 +59,8 @@ async function handleMessage(e) {
       throw new Error('invalid command')
     }
   } catch (err) {
-    console.error(`Error running \`${cmd}\`:`, err)
-    port.postMessage(false)
+    console.error(`Error running \`${cmd}\``, err)
+    port.postMessage({error: true})
   }
   port.close()
 }

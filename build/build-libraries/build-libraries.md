@@ -34,8 +34,12 @@ CMD ["/bin/deno", "run", "--allow-net", "--allow-read=/app", "--allow-write=/app
 async function runNpm(args) {
   const output = await new Deno.Command('npm', {
     args,
-  }).output()
-  return {...output, command: `npm ${args.join(' ')}`}
+  })
+  return [
+    ['stdout', `-- npm ${args.join(' ')}`],
+    ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
+    ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
+  ]
 }
 
 const packages = [
@@ -65,7 +69,7 @@ const commands = {
       yield await runNpm(['install', ...packages])
       const packageJson = await Deno.readTextFile('package.json')
       const outputDoc = `\n\`\`\`\n\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
-      yield {stdout: new TextEncoder().encode(outputDoc)}
+      yield ['stdout', new TextEncoder().encode(outputDoc)]
     },
     multi: true,
   },
@@ -78,7 +82,7 @@ async function handleMessage(e) {
     if (cmd in commands) {
       if (commands[cmd].multi) {
         for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage({value: result})
+          port.postMessage(result)
         }
         port.postMessage({done: true})
       } else {
@@ -88,8 +92,8 @@ async function handleMessage(e) {
       throw new Error('invalid command')
     }
   } catch (err) {
-    console.error(`Error running \`${cmd}\`:`, err)
-    port.postMessage(false)
+    console.error(`Error running \`${cmd}\``, err)
+    port.postMessage({error: true})
   }
   port.close()
 }
@@ -134,6 +138,14 @@ async function parentRequest(...data) {
   return result
 }
 
+function iterResult(result) {
+  if (result?.done) {
+    return {done: true}
+  } else {
+    return {value: result}
+  }
+}
+
 function eventToIterator(subscribe, unsubscribe) {
   const resolves = []
   const results = []
@@ -149,10 +161,10 @@ function eventToIterator(subscribe, unsubscribe) {
       return {
         next() {
           if (results.length > 0) {
-            return Promise.resolve(results.shift())
+            return Promise.resolve(iterResult(results.shift()))
           } else {
             return new Promise((resolve, _) => {
-              resolves.push(resolve)
+              resolves.push(value => { resolve(iterResult(value)) })
             })
           }
         },
@@ -164,36 +176,44 @@ function eventToIterator(subscribe, unsubscribe) {
   }
 }
 
-function parentRequestMulti(...data) {
+async function* parentRequestMulti(...data) {
   const channel = new MessageChannel()
   const iterator = eventToIterator(
     handler => { channel.port1.onmessage = ({data}) => handler(data) },
     () => channel.port1.close()
   )
   postMessage(data, [channel.port2])
-  return iterator
-}
-
-function logValue(value, prefix = '') {
-  if (typeof value === 'string') {
-    console.log(prefix + value)
-  } else if (value?.byteLength > 0) {
-    console.log(prefix + new TextDecoder().decode(value))
+  for await (const message of iterator) {
+    if (Array.isArray(message) && Array.isArray(message[0]) && typeof message[0][0] === 'string') {
+      yield message
+    } else if (Array.isArray(message)) {
+      for (const outputItem of message) {
+        yield outputItem
+      }
+    } else if (message?.error) {
+      throw new Error('Received error from request to parent')
+    } else {
+      console.error('unexpected message', message)
+      throw new Error(`Received an unexpected message from request to parent`)
+    }
   }
 }
 
-function logOutput(output) {
-  logValue(output.command, '-- ')
-  logValue(output.stdout)
-  logValue(output.stderr)
+async function logOutput(output) {
+  const stream = output[0] === 'stdout' ? Deno.stdout : Deno.stderr
+  await stream.write(
+    typeof output[1] === 'string' ?
+    new TextEncoder().encode(output[1] + "\n") :
+    output[1]
+  )
 }
 
 const commands = {
   async build() {
     for await (const output of parentRequestMulti('install')) {
-      logOutput(output)
+      await logOutput(output)
     }
-  },
+  }
 }
 
 async function build() {
@@ -357,12 +377,16 @@ async function runDocker(args) {
     args,
     cwd: join('.', 'build', 'build-libraries'),
   }).output()
-  return {...output, command: `docker ${args.join(' ')}`}
+  return [
+    ['stdout', `npm ${args.join(' ')}`],
+    ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
+    ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
+  ]
 }
 
 async function* runDockerStream(args) {
   try {
-    yield {command: `docker ${args.join(' ')}`}
+    yield ['stdout', `-- docker ${args.join(' ')}`]
     const command = new Deno.Command('docker', {
       args,
       cwd: join('.', 'build', 'build-libraries'),
@@ -376,7 +400,7 @@ async function* runDockerStream(args) {
     async function appendStdout() {
       try {
         for await (const chunk of stdoutStream.readable) {
-          chunks.stdout.push(chunk)
+          chunks.push(['stdout', chunk])
         }
       } catch (err) {
         console.error('Error in appendStdout', err)
@@ -403,17 +427,19 @@ async function* runDockerStream(args) {
     }
     setStatus()
     let open = true
-    while (status === undefined) {
+    while (true) {
       await new Promise((resolve, _reject) => setTimeout(() => resolve(), 100))
-      if (chunks.stdout.length > 0 || chunks.stderr.length > 0) {
-        yield Object.fromEntries(['stdout', 'stderr'].map(f => ([
-          f, chunks.filter(c => c[0] === 'stdout').map(c => c[1]).join('')
-        ])))
+      if (chunks.length > 0) {
+        yield chunks
       }
       chunks = []
+      if (status !== undefined) {
+        break
+      }
     }
   } catch (err) {
-    console.error('Error running docker', err)
+    yield ['stderr', `Error running docker: ${err}`]
+    yield {error: true}
   }
 }
 
@@ -421,92 +447,78 @@ const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
-  clean: {
-    fn: async function* clean() {
-      const commands = [
-        ['network', 'rm', 'ristretto-build-libraries-internal'],
-        ['network', 'rm', 'ristretto-build-libraries-external'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  clean: async function* clean() {
+    const commands = [
+      ['network', 'rm', 'ristretto-build-libraries-internal'],
+      ['network', 'rm', 'ristretto-build-libraries-external'],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  buildImages: {
-    fn: async function* buildImages() {
-      const commands = [
-        [
-          'build',
-          '--platform', 'linux/amd64',
-          '-t', 'ristretto-build-libraries-proxy',
-          '-f', 'Dockerfile.proxy',
-          '.'
-        ],
-        [
-          'build',
-          '--platform', 'linux/amd64',
-          '-t', 'ristretto-build-libraries-build-in-container',
-          '-f', 'Dockerfile.build-in-container',
-          '.'
-        ],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  buildImages: async function* buildImages() {
+    const commands = [
+      [
+        'build',
+        '--platform', 'linux/amd64',
+        '-t', 'ristretto-build-libraries-proxy',
+        '-f', 'Dockerfile.proxy',
+        '.'
+      ],
+      [
+        'build',
+        '--platform', 'linux/amd64',
+        '-t', 'ristretto-build-libraries-build-in-container',
+        '-f', 'Dockerfile.build-in-container',
+        '.'
+      ],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  createNetworks: {
-    fn: async function* createNetworks() {
-      const commands = [
-        ['network', 'create', '--internal', 'ristretto-build-libraries-internal'],
-        ['network', 'create', 'ristretto-build-libraries-external'],
-      ]
-      for (const command of commands) {
-        yield await runDocker(command)
-      }
-    },
-    multi: true,
+  createNetworks: async function* createNetworks() {
+    const commands = [
+      ['network', 'create', '--internal', 'ristretto-build-libraries-internal'],
+      ['network', 'create', 'ristretto-build-libraries-external'],
+    ]
+    for (const command of commands) {
+      yield await runDocker(command)
+    }
   },
-  async createVolumes() {
-  },
-  runBuild: {
-    fn: async function* runBuild() {
-      const createOutput = await runDocker([
-        'create', '--platform=linux/amd64',
-        '--network=ristretto-build-libraries-internal',
-        '--network-alias=proxy',
-        'ristretto-build-libraries-proxy'
-      ])
-      const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
-      yield {command: `proxyContainerId: ${JSON.stringify(proxyContainerId)}`}
-      yield createOutput
+  runBuild: async function* runBuild() {
+    const createOutput = await runDocker([
+      'create', '--platform=linux/amd64',
+      '--network=ristretto-build-libraries-internal',
+      '--network-alias=proxy',
+      'ristretto-build-libraries-proxy'
+    ])
+    const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+    yield ['stdout', `-- proxyContainerId: ${JSON.stringify(proxyContainerId)}`]
+    yield createOutput
 
-      const connectOutput = await runDocker([
-        'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
-      ])
-      yield connectOutput
+    const connectOutput = await runDocker([
+      'network', 'connect', 'ristretto-build-libraries-external', proxyContainerId
+    ])
+    yield connectOutput
 
-      const startOutput = await runDocker([
-        'start', proxyContainerId
-      ])
-      yield startOutput
+    const startOutput = await runDocker([
+      'start', proxyContainerId
+    ])
+    yield startOutput
 
-      for await (const output of runDockerStream([
-        'run', '--platform=linux/amd64',
-        '--network=ristretto-build-libraries-internal',
-        'ristretto-build-libraries-build-in-container'
-      ])) {
-        yield output
-      }
+    for await (const output of runDockerStream([
+      'run', '--platform=linux/amd64',
+      '--network=ristretto-build-libraries-internal',
+      'ristretto-build-libraries-build-in-container'
+    ])) {
+      yield output
+    }
 
-      const stopOutput = await runDocker([
-        'stop', proxyContainerId
-      ])
-      yield stopOutput
-    },
-    multi: true
+    const stopOutput = await runDocker([
+      'stop', proxyContainerId
+    ])
+    yield stopOutput
   },
 }
 
@@ -514,21 +526,21 @@ async function handleMessage(e) {
   const [cmd, ...args] = e.data
   const port = e.ports[0]
   try {
-    if (cmd in commands) {
-      if (commands[cmd].multi) {
-        for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage({value: result})
-        }
-        port.postMessage({done: true})
-      } else {
-        port.postMessage(await commands[cmd](...args))
+    if (cmd === 'getArgs') {
+      // single command
+      const result = await commands[cmd](...args)
+      port.postMessage(result)
+    } else if (cmd in commands) {
+      for await (const result of commands[cmd](...args)) {
+        port.postMessage(result)
       }
+      port.postMessage({done: true})
     } else {
       throw new Error('invalid command')
     }
   } catch (err) {
-    console.error(`Error running \`${cmd}\`:`, err)
-    port.postMessage(false)
+    console.error(`Error running \`${cmd}\``, err)
+    port.postMessage({error: true})
   }
   port.close()
 }
@@ -578,6 +590,14 @@ async function parentRequest(...data) {
   return result
 }
 
+function iterResult(result) {
+  if (result?.done) {
+    return {done: true}
+  } else {
+    return {value: result}
+  }
+}
+
 function eventToIterator(subscribe, unsubscribe) {
   const resolves = []
   const results = []
@@ -593,10 +613,10 @@ function eventToIterator(subscribe, unsubscribe) {
       return {
         next() {
           if (results.length > 0) {
-            return Promise.resolve(results.shift())
+            return Promise.resolve(iterResult(results.shift()))
           } else {
             return new Promise((resolve, _) => {
-              resolves.push(resolve)
+              resolves.push(value => { resolve(iterResult(value)) })
             })
           }
         },
@@ -608,49 +628,57 @@ function eventToIterator(subscribe, unsubscribe) {
   }
 }
 
-function parentRequestMulti(...data) {
+async function* parentRequestMulti(...data) {
   const channel = new MessageChannel()
   const iterator = eventToIterator(
     handler => { channel.port1.onmessage = ({data}) => handler(data) },
     () => channel.port1.close()
   )
   postMessage(data, [channel.port2])
-  return iterator
-}
-
-function logValue(value, prefix = '') {
-  if (typeof value === 'string') {
-    console.log(prefix + value)
-  } else if (value?.byteLength > 0) {
-    console.log(prefix + new TextDecoder().decode(value))
+  for await (const message of iterator) {
+    if (Array.isArray(message) && typeof message[0] === 'string') {
+      yield message
+    } else if (Array.isArray(message)) {
+      for (const outputItem of message) {
+        yield outputItem
+      }
+    } else if (message?.error) {
+      throw new Error('Received error from request to parent')
+    } else {
+      console.error('unexpected message', message)
+      throw new Error('Received an unexpected message from request to parent')
+    }
   }
 }
 
-function logOutput(output) {
-  logValue(output.command, '-- ')
-  logValue(output.stdout)
-  logValue(output.stderr)
+async function logOutput(output) {
+  const stream = output[0] === 'stdout' ? Deno.stdout : Deno.stderr
+  await stream.write(
+    typeof output[1] === 'string' ?
+    new TextEncoder().encode(output[1] + "\n") :
+    output[1]
+  )
 }
 
 const commands = {
   async clean() {
     for await (const output of parentRequestMulti('clean')) {
-      logOutput(output)
+      await logOutput(output)
     }
   },
   async buildImages() {
     for await (const output of parentRequestMulti('buildImages')) {
-      logOutput(output)
+      await logOutput(output)
     }
   },
   async createNetworks() {
     for await (const output of parentRequestMulti('createNetworks')) {
-      logOutput(output)
+      await logOutput(output)
     }
   },
   async runBuild() {
     for await (const output of parentRequestMulti('runBuild')) {
-      logOutput(output)
+      await logOutput(output)
     }
   },
 }
