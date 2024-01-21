@@ -6,7 +6,7 @@ async function runDocker(args) {
     cwd: join('.', 'build', 'build-libraries'),
   }).output()
   return [
-    ['stdout', `npm ${args.join(' ')}`],
+    ['stdout', `-- docker ${args.join(' ')}`],
     ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
     ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
   ]
@@ -37,7 +37,7 @@ async function* runDockerStream(args) {
     async function appendStderr() {
       try {
         for await (const chunk of stderrStream.readable) {
-          chunks.stderr.push(chunk)
+          chunks.push(['stderr', chunk])
         }
       } catch (err) {
         console.error('Error in appendStderr', err)
@@ -60,10 +60,10 @@ async function* runDockerStream(args) {
       if (chunks.length > 0) {
         yield chunks
       }
-      chunks = []
       if (status !== undefined) {
         break
       }
+      chunks = []
     }
   } catch (err) {
     yield ['stderr', `Error running docker: ${err}`]
@@ -121,7 +121,10 @@ const commands = {
       '--network-alias=proxy',
       'ristretto-build-libraries-proxy'
     ])
-    const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+    const commandOutput = createOutput.find(v => (
+      v[0] === 'stdout' && !(typeof v[1] === 'string' && v[1].startsWith('-- '))
+    ))
+    const proxyContainerId = new TextDecoder().decode(commandOutput[1]).trim()
     yield ['stdout', `-- proxyContainerId: ${JSON.stringify(proxyContainerId)}`]
     yield createOutput
 
@@ -135,13 +138,28 @@ const commands = {
     ])
     yield startOutput
 
+    const outFile = await Deno.open(
+      './build/build-libraries/library-source.md',
+      {write: true, create: true, truncate: true}
+    )
+    const outWriter = outFile.writable.getWriter()
     for await (const output of runDockerStream([
       'run', '--platform=linux/amd64',
       '--network=ristretto-build-libraries-internal',
       'ristretto-build-libraries-build-in-container'
     ])) {
       yield output
+      for (const outputItem of (typeof output[0] === 'string' ? [output] : output)) {
+        if (outputItem[0] === 'stdout') {
+          await outWriter.write(
+            typeof outputItem[1] === 'string' ?
+            new TextEncoder().encode(outputItem[1] + "\n") :
+            outputItem[1]
+          )
+        }
+      }
     }
+    outFile.close()
 
     const stopOutput = await runDocker([
       'stop', proxyContainerId

@@ -34,12 +34,20 @@ CMD ["/bin/deno", "run", "--allow-net", "--allow-read=/app", "--allow-write=/app
 async function runNpm(args) {
   const output = await new Deno.Command('npm', {
     args,
-  })
-  return [
+  }).output()
+  const result = [
     ['stdout', `-- npm ${args.join(' ')}`],
     ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
     ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
   ]
+  if (output.code === 0) {
+    return result
+  } else {
+    return [
+      ...result,
+      ['stderr', `-- Received nonzero exit code: ${output.code}`]
+    ]
+  }
 }
 
 const packages = [
@@ -57,21 +65,36 @@ const packages = [
   '@codemirror/lang-javascript',
 ]
 
+async function* getFiles(path) {
+  for await (const entry of Deno.readDir(path)) {
+    if (entry.isDirectory) {
+      const dirPath = `${path}${entry.name}/`
+      for await (const childPath of getFiles(dirPath)) {
+        yield childPath
+      }
+    } else if (entry.name.match(/\.(js|json|mjs)$/i) && entry.name !== './run-container-build.js') {
+      yield `${path}${entry.name}`
+    }
+  }
+}
+
 const commands = {
   getArgs() {
     return structuredClone(Deno.args)
   },
-  install: {
-    fn: async function* install() {
-      yield {stdout: `Installing packages:\n\n\`\`\`\n`}
-      yield await runNpm(['set', 'proxy=http://proxy:3000/'])
-      yield await runNpm(['init', '-y'])
-      yield await runNpm(['install', ...packages])
-      const packageJson = await Deno.readTextFile('package.json')
-      const outputDoc = `\n\`\`\`\n\n\`package.json\`\n\n\`\`\`\n${packageJson}\`\`\`\n`
+  install: async function* install() {
+    yield ['stdout', new TextEncoder().encode(`Installing packages:\n\n\`\`\`\n`)]
+    const setOutput = await runNpm(['set', 'proxy=http://proxy:3000/'])
+    yield setOutput
+    const initOutput = await runNpm(['init', '-y'])
+    yield initOutput
+    const installOutput = await runNpm(['install', ...packages])
+    yield installOutput
+    for await (const path of getFiles('./')) {
+      const content = await Deno.readTextFile(path)
+      const outputDoc = `\n\`\`\`\n\n\`${path.slice(2)}\`\n\n\`\`\`\n${content + (content.endsWith("\n") ? '' : "\n")}\`\`\`\n`
       yield ['stdout', new TextEncoder().encode(outputDoc)]
-    },
-    multi: true,
+    }
   },
 }
 
@@ -79,15 +102,15 @@ async function handleMessage(e) {
   const [cmd, ...args] = e.data
   const port = e.ports[0]
   try {
-    if (cmd in commands) {
-      if (commands[cmd].multi) {
-        for await (const result of commands[cmd].fn(...args)) {
-          port.postMessage(result)
-        }
-        port.postMessage({done: true})
-      } else {
-        port.postMessage(await commands[cmd](...args))
+    if (cmd === 'getArgs') {
+      // single command
+      const result = await commands[cmd](...args)
+      port.postMessage(result)
+    } else if (cmd in commands) {
+      for await (const result of commands[cmd](...args)) {
+        port.postMessage(result)
       }
+      port.postMessage({done: true})
     } else {
       throw new Error('invalid command')
     }
@@ -184,7 +207,7 @@ async function* parentRequestMulti(...data) {
   )
   postMessage(data, [channel.port2])
   for await (const message of iterator) {
-    if (Array.isArray(message) && Array.isArray(message[0]) && typeof message[0][0] === 'string') {
+    if (Array.isArray(message) && typeof message[0] === 'string') {
       yield message
     } else if (Array.isArray(message)) {
       for (const outputItem of message) {
@@ -194,7 +217,7 @@ async function* parentRequestMulti(...data) {
       throw new Error('Received error from request to parent')
     } else {
       console.error('unexpected message', message)
-      throw new Error(`Received an unexpected message from request to parent`)
+      throw new Error('Received an unexpected message from request to parent')
     }
   }
 }
@@ -307,53 +330,61 @@ This is an HTTP proxy that reads a host and port from CONNECT, responds, and tun
 
 ```js
 async function forward(outConn, writer) {
-  for await (const chunk of outConn.readable) {
-    console.log(`read chunk of ${chunk.byteLength} bytes from outbound connection`)
-    try {
-      await writer.write(chunk)
-    } catch (err) {
-      console.error('Error writing to outbound connection')
+  try {
+    for await (const chunk of outConn.readable) {
+      console.log(`read chunk of ${chunk.byteLength} bytes from outbound connection`)
+      try {
+        await writer.write(chunk)
+      } catch (err) {
+        console.error('Error writing to inbound connection')
+      }
     }
+  } catch (err) {
+    console.error('Error forwarding from outbound to inbound connection')
   }
 }
 
 async function handleHttp(conn) {
-  let pos = 0
-  const arr = new Uint8Array(512)
-  let outWriter
-  // TODO: don't let reading of the stream be delayed by setting up the writer and network connection
-  for await (const chunk of conn.readable) {
-    if (outWriter === undefined) {
-      arr.set(chunk, pos)
-      pos += chunk.byteLength
-      console.log(`Received chunk of ${chunk.byteLength} bytes`)
-      const decoded = new TextDecoder().decode(arr.slice(0, pos))
-      console.log(`Decoded: ${decoded}`)
-      const match = decoded.match(/\r?\n\r?\n/)
-      if (match) {
-        const messageEnd = match.index + match[0].length
-        const message = decoded.slice(0, messageEnd)
-        const remaining = arr.slice(new TextEncoder().encode(message).byteLength, pos)
-        const proxyUrl = message.match(/CONNECT (\S+) HTTP/)[1].split(':')
-        const hostname = proxyUrl[0]
-        const port = Number(proxyUrl[1])
-        const connectArgs = {hostname, port}
-        const writer = await conn.writable.getWriter()
-        await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
-        console.log(`Connecting to hostname "${hostname}", port ${port}...`)
-        const outConn = await Deno.connect(connectArgs)
-        outWriter = await outConn.writable.getWriter()
-        // TODO: send remaining
-        forward(outConn, writer)
-      }
-    } else {
-      console.log(`read chunk of ${chunk.byteLength} bytes after sending response`)
-      try {
-        await outWriter.write(chunk)
-      } catch (err) {
-        console.error('Error writing to outbound connection', err)
+  try {
+    let pos = 0
+    const arr = new Uint8Array(512)
+    let outWriter
+    // TODO: don't let reading of the stream be delayed by setting up the writer and network connection
+    for await (const chunk of conn.readable) {
+      if (outWriter === undefined) {
+        arr.set(chunk, pos)
+        pos += chunk.byteLength
+        console.log(`Received chunk of ${chunk.byteLength} bytes`)
+        const decoded = new TextDecoder().decode(arr.slice(0, pos))
+        console.log(`Decoded: ${decoded}`)
+        const match = decoded.match(/\r?\n\r?\n/)
+        if (match) {
+          const messageEnd = match.index + match[0].length
+          const message = decoded.slice(0, messageEnd)
+          const remaining = arr.slice(new TextEncoder().encode(message).byteLength, pos)
+          const proxyUrl = message.match(/CONNECT (\S+) HTTP/)[1].split(':')
+          const hostname = proxyUrl[0]
+          const port = Number(proxyUrl[1])
+          const connectArgs = {hostname, port}
+          const writer = await conn.writable.getWriter()
+          await writer.write(new Uint8Array(new TextEncoder().encode('HTTP/1.1 200 Connection established\r\n\r\n')))
+          console.log(`Connecting to hostname "${hostname}", port ${port}...`)
+          const outConn = await Deno.connect(connectArgs)
+          outWriter = await outConn.writable.getWriter()
+          // TODO: send remaining
+          forward(outConn, writer)
+        }
+      } else {
+        console.log(`read chunk of ${chunk.byteLength} bytes after sending response`)
+        try {
+          await outWriter.write(chunk)
+        } catch (err) {
+          console.error('Error writing to outbound connection', err)
+        }
       }
     }
+  } catch (err) {
+    console.error('error in HTTP handler')
   }
 }
 
@@ -378,7 +409,7 @@ async function runDocker(args) {
     cwd: join('.', 'build', 'build-libraries'),
   }).output()
   return [
-    ['stdout', `npm ${args.join(' ')}`],
+    ['stdout', `-- docker ${args.join(' ')}`],
     ...(output.stdout?.byteLength > 0 ? [['stdout', output.stdout]] : []),
     ...(output.stderr?.byteLength > 0 ? [['stderr', output.stderr]] : []),
   ]
@@ -409,7 +440,7 @@ async function* runDockerStream(args) {
     async function appendStderr() {
       try {
         for await (const chunk of stderrStream.readable) {
-          chunks.stderr.push(chunk)
+          chunks.push(['stderr', chunk])
         }
       } catch (err) {
         console.error('Error in appendStderr', err)
@@ -432,10 +463,10 @@ async function* runDockerStream(args) {
       if (chunks.length > 0) {
         yield chunks
       }
-      chunks = []
       if (status !== undefined) {
         break
       }
+      chunks = []
     }
   } catch (err) {
     yield ['stderr', `Error running docker: ${err}`]
@@ -493,7 +524,10 @@ const commands = {
       '--network-alias=proxy',
       'ristretto-build-libraries-proxy'
     ])
-    const proxyContainerId = new TextDecoder().decode(createOutput.stdout).trim()
+    const commandOutput = createOutput.find(v => (
+      v[0] === 'stdout' && !(typeof v[1] === 'string' && v[1].startsWith('-- '))
+    ))
+    const proxyContainerId = new TextDecoder().decode(commandOutput[1]).trim()
     yield ['stdout', `-- proxyContainerId: ${JSON.stringify(proxyContainerId)}`]
     yield createOutput
 
@@ -507,13 +541,28 @@ const commands = {
     ])
     yield startOutput
 
+    const outFile = await Deno.open(
+      './build/build-libraries/library-source.md',
+      {write: true, create: true, truncate: true}
+    )
+    const outWriter = outFile.writable.getWriter()
     for await (const output of runDockerStream([
       'run', '--platform=linux/amd64',
       '--network=ristretto-build-libraries-internal',
       'ristretto-build-libraries-build-in-container'
     ])) {
       yield output
+      for (const outputItem of (typeof output[0] === 'string' ? [output] : output)) {
+        if (outputItem[0] === 'stdout') {
+          await outWriter.write(
+            typeof outputItem[1] === 'string' ?
+            new TextEncoder().encode(outputItem[1] + "\n") :
+            outputItem[1]
+          )
+        }
+      }
     }
+    outFile.close()
 
     const stopOutput = await runDocker([
       'stop', proxyContainerId
