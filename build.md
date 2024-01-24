@@ -216,6 +216,11 @@ async function buildScript(path, blockName, out) {
 
 async function buildScripts() {
   await buildScript(
+    ['build-docker.md'],
+    'Dockerfile',
+    ['build', 'build-docker', 'Dockerfile']
+  )
+  await buildScript(
     ['build-libraries.md'],
     'run-container-build.js',
     ['build', 'build-libraries', 'run-container-build.js']
@@ -246,9 +251,9 @@ async function buildScripts() {
     ['build', 'build-libraries', 'run-build-in-container.js']
   )
   await buildScript(
-    ['build-docker.md'],
-    'Dockerfile',
-    ['build', 'build-docker', 'Dockerfile']
+    ['bundle-libraries.md'],
+    'run-bundle-libraries.js',
+    ['build', 'build-libraries', 'run-bundle-libraries.js']
   )
 }
 

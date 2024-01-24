@@ -72,7 +72,7 @@ async function* getFiles(path) {
       for await (const childPath of getFiles(dirPath)) {
         yield childPath
       }
-    } else if (entry.name.match(/\.(js|json|mjs)$/i) && entry.name !== './run-container-build.js') {
+    } else if (entry.name.match(/\.(js|json|mjs)$/i) && entry.name !== './run-build-in-container.js') {
       yield `${path}${entry.name}`
     }
   }
