@@ -64,9 +64,28 @@ async function parentRequest(...data) {
   return result
 }
 
+// https://developer.mozilla.org/en-US/docs/Glossary/Base64#the_unicode_problem
+async function toBase64(bytes) {
+  return await new Promise((resolve, reject) => {
+    const reader = Object.assign(new FileReader(), {
+      onload() { resolve(reader.result) },
+      onerror() { reject(reader.error) }
+    })
+    reader.readAsDataURL(new File([bytes], "", { type: 'application/octet-stream' }))
+  })
+}
+
+async function bundle(librarySource) {
+  const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
+  const rollupBlock = blocks.find(block => block.name === 'node_modules/@rollup/browser/dist/es/rollup.browser.js')
+  const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
+  await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
+}
+
 async function build() {
   try {
-    // const librarySource = await parentRequest('getLibrarySource')
+    const librarySource = await parentRequest('getLibrarySource')
+    const output = await bundle(librarySource)
     close()
   } catch (err) {
     console.error(err)

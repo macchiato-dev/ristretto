@@ -144,7 +144,7 @@ const commands = {
     )
     const outWriter = outFile.writable.getWriter()
     for await (const output of runDockerStream([
-      'run', '--platform=linux/amd64',
+      'run', '--tty=false', '--platform=linux/amd64',
       '--network=ristretto-build-libraries-internal',
       'ristretto-build-libraries-build-in-container'
     ])) {
@@ -153,7 +153,7 @@ const commands = {
         if (outputItem[0] === 'stdout') {
           await outWriter.write(
             typeof outputItem[1] === 'string' ?
-            new TextEncoder().encode(outputItem[1] + "\n") :
+            new TextEncoder().encode(outputItem[1]) :
             outputItem[1]
           )
         }

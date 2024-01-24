@@ -90,10 +90,12 @@ const commands = {
     yield initOutput
     const installOutput = await runNpm(['install', ...packages])
     yield installOutput
+    yield ['stdout', new TextEncoder().encode(`\n\n\`\`\`\n\n\n\n`)]
     for await (const path of getFiles('./')) {
-      const content = await Deno.readTextFile(path)
-      const outputDoc = `\n\`\`\`\n\n\`${path.slice(2)}\`\n\n\`\`\`\n${content + (content.endsWith("\n") ? '' : "\n")}\`\`\`\n`
-      yield ['stdout', new TextEncoder().encode(outputDoc)]
+      const content = await Deno.readFile(path)
+      yield ['stdout', new TextEncoder().encode(`\n\n\`${path.slice(2)}\`\n\n\`\`\`\`\`\n`)]
+      yield ['stdout', content]
+      yield ['stdout', new TextEncoder().encode(`${(content.at(-1) === 10 ? '' : "\n")}\`\`\`\`\`\n\n`)]
     }
   },
 }
@@ -547,7 +549,7 @@ const commands = {
     )
     const outWriter = outFile.writable.getWriter()
     for await (const output of runDockerStream([
-      'run', '--platform=linux/amd64',
+      'run', '--tty=false', '--platform=linux/amd64',
       '--network=ristretto-build-libraries-internal',
       'ristretto-build-libraries-build-in-container'
     ])) {
@@ -556,7 +558,7 @@ const commands = {
         if (outputItem[0] === 'stdout') {
           await outWriter.write(
             typeof outputItem[1] === 'string' ?
-            new TextEncoder().encode(outputItem[1] + "\n") :
+            new TextEncoder().encode(outputItem[1]) :
             outputItem[1]
           )
         }

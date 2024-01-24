@@ -57,10 +57,12 @@ const commands = {
     yield initOutput
     const installOutput = await runNpm(['install', ...packages])
     yield installOutput
+    yield ['stdout', new TextEncoder().encode(`\n\n\`\`\`\n\n\n\n`)]
     for await (const path of getFiles('./')) {
-      const content = await Deno.readTextFile(path)
-      const outputDoc = `\n\`\`\`\n\n\`${path.slice(2)}\`\n\n\`\`\`\n${content + (content.endsWith("\n") ? '' : "\n")}\`\`\`\n`
-      yield ['stdout', new TextEncoder().encode(outputDoc)]
+      const content = await Deno.readFile(path)
+      yield ['stdout', new TextEncoder().encode(`\n\n\`${path.slice(2)}\`\n\n\`\`\`\`\`\n`)]
+      yield ['stdout', content]
+      yield ['stdout', new TextEncoder().encode(`${(content.at(-1) === 10 ? '' : "\n")}\`\`\`\`\`\n\n`)]
     }
   },
 }
