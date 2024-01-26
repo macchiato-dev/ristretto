@@ -79,7 +79,8 @@ async function bundle(librarySource) {
   const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
   const rollupBlock = blocks.find(block => block.name === 'node_modules/@rollup/browser/dist/es/rollup.browser.js')
   const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
-  await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
+  const rollup = await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
+  console.log(rollup)
 }
 
 async function build() {
