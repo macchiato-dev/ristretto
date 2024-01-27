@@ -96,6 +96,12 @@ const commands = {
   async getLibrarySource() {
     return await Deno.readTextFile('./build/build-libraries/library-source.md')
   },
+  async loadBundle() {
+    return await Deno.readTextFile('./codemirror-bundle.md')
+  },
+  async saveBundle(text) {
+    await Deno.writeTextFile('./codemirror-bundle.md', text)
+  },
 }
 
 async function handleMessage(e) {
@@ -216,14 +222,22 @@ async function bundle(librarySource) {
   const {rollup} = await import(`data:text/javascript;base64,${rollupContent}`)
   const bundle = await rollup({input, plugins})
   const {output} = await bundle.generate({format: 'es'})
-  const code = output[0].code
-  console.log(code)
+  return output[0].code
+}
+
+async function updateBundle(bundleNotebook, bundleSource) {
+  const blocks = await Array.fromAsync(readBlocksWithNames(bundleNotebook))
+  const range = blocks.find(({name}) => name === 'codemirror-bundle.js').contentRange
+  return bundleNotebook.slice(0, range[0]) + bundleSource.replace(/\n$/, '') + bundleNotebook.slice(range[1])
 }
 
 async function build() {
   try {
     const librarySource = await parentRequest('getLibrarySource')
     const output = await bundle(librarySource)
+    const bundleNotebookInput = await parentRequest('loadBundle')
+    const bundleNotebookOutput = await updateBundle(bundleNotebookInput, output)
+    await parentRequest('saveBundle', bundleNotebookOutput)
     close()
   } catch (err) {
     console.error(err)

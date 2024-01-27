@@ -2,6 +2,12 @@ const commands = {
   async getLibrarySource() {
     return await Deno.readTextFile('./build/build-libraries/library-source.md')
   },
+  async loadBundle() {
+    return await Deno.readTextFile('./codemirror-bundle.md')
+  },
+  async saveBundle(text) {
+    await Deno.writeTextFile('./codemirror-bundle.md', text)
+  },
 }
 
 async function handleMessage(e) {
