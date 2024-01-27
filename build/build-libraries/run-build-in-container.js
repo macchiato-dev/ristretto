@@ -18,7 +18,7 @@ async function runNpm(args) {
 }
 
 const packages = [
-  '@rollup/browser',
+  '@rollup/browser@3.29.1',
   '@codemirror/autocomplete',
   '@codemirror/commands',
   '@codemirror/language',

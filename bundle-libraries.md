@@ -75,12 +75,37 @@ async function toBase64(bytes) {
   })
 }
 
+async function getLoaderPlugin() {
+  const scripts = {
+    'bundle-source.js': `export const hello = 'test'`,
+  }
+  return {
+    name: 'loader',
+    resolveId: async source => {
+      if (source in scripts) {
+        return source
+      }
+    },
+    load: async id => {
+      if (id in scripts) {
+        return scripts[id]
+      }
+    }
+  }
+}
+
 async function bundle(librarySource) {
   const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
   const rollupBlock = blocks.find(block => block.name === 'node_modules/@rollup/browser/dist/es/rollup.browser.js')
-  const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
-  const rollup = await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
-  console.log(rollup)
+  const rollupString = librarySource.slice(...rollupBlock.contentRange)
+  const rollupStringPatched = rollupString.replaceAll(/(['"])bindings_wasm_bg.wasm(['"])/g, '$1http://example.com/$1')
+  const rollupContent = await toBase64(rollupStringPatched)
+  const {rollup} = await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
+  const input = 'bundle-source.js'
+  const loaderPlugin = await getLoaderPlugin()
+  const plugins = [loaderPlugin]
+  const bundle = await rollup({input, plugins})
+  console.log({bundle})
 }
 
 async function build() {
