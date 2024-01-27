@@ -2,6 +2,93 @@
 
 This takes the downloaded libraries in `library-source.md` and bundles them using rollup.
 
+`bundle-source.js`
+
+```js
+import {
+  keymap, highlightSpecialChars, 
+  drawSelection, highlightActiveLine, dropCursor,
+  rectangularSelection, crosshairCursor,
+  lineNumbers, highlightActiveLineGutter,
+  EditorView
+} from '@codemirror/view'
+import {
+  EditorState,
+  Compartment,
+  StateEffect
+} from '@codemirror/state'
+import {
+  defaultHighlightStyle,
+  syntaxHighlighting,
+  indentOnInput, 
+  bracketMatching,
+  foldGutter,
+  foldKeymap
+} from '@codemirror/language'
+import {
+  defaultKeymap,
+  history,
+  historyKeymap
+} from '@codemirror/commands'
+import {
+  searchKeymap,
+  highlightSelectionMatches
+} from '@codemirror/search'
+import {
+  autocompletion,
+  completionKeymap,
+  closeBrackets,
+  closeBracketsKeymap
+} from '@codemirror/autocomplete'
+import {lintKeymap} from '@codemirror/lint'
+import { javascriptLanguage } from '@codemirror/lang-javascript'
+import { cssLanguage } from '@codemirror/lang-css'
+import { jsonLanguage } from '@codemirror/lang-json'
+import { htmlLanguage } from '@codemirror/lang-html'
+
+window.CodeMirrorBasic = {
+  // @codemirror/view
+  keymap, highlightSpecialChars, 
+  drawSelection, highlightActiveLine, dropCursor,
+  rectangularSelection, crosshairCursor,
+  lineNumbers, highlightActiveLineGutter,
+  EditorView,
+  // @codemirror/state
+  EditorState,
+  Compartment,
+  StateEffect,
+  // @codemirror/language
+  defaultHighlightStyle,
+  syntaxHighlighting,
+  indentOnInput, 
+  bracketMatching,
+  foldGutter,
+  foldKeymap,
+  // @codemirror/commands
+  defaultKeymap,
+  history,
+  historyKeymap,
+  // @codemirror/search
+  searchKeymap,
+  highlightSelectionMatches,
+  // @codemirror/autocomplete
+  autocompletion,
+  completionKeymap,
+  closeBrackets,
+  closeBracketsKeymap,
+  // @codemirror/lint
+  lintKeymap,
+  // @codemirror/lang-javascript
+  javascriptLanguage,
+  // @codemirror/lang-css
+  cssLanguage,
+  // @codemirror/lang-json
+  jsonLanguage,
+  // @codemirror/lang-html
+  htmlLanguage,
+}
+```
+
 `run-bundle-libraries.js`
 
 ```js
@@ -68,22 +155,55 @@ async function parentRequest(...data) {
 async function toBase64(bytes) {
   return await new Promise((resolve, reject) => {
     const reader = Object.assign(new FileReader(), {
-      onload() { resolve(reader.result) },
+      onload() { resolve(reader.result.split(',')[1]) },
       onerror() { reject(reader.error) }
     })
     reader.readAsDataURL(new File([bytes], "", { type: 'application/octet-stream' }))
   })
 }
 
-async function getLoaderPlugin() {
-  const scripts = {
-    'bundle-source.js': `export const hello = 'test'`,
+async function bundle(librarySource) {
+  const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
+  const localBlocks = await Array.fromAsync(readBlocksWithNames(__source))
+  const nodeModules = Object.fromEntries(
+    blocks
+    .filter(block => (block.name ?? '').startsWith('node_modules/'))
+    .map(block => ([block.name.replace(/^node_modules\//, ''), block]))
+  )
+  const otherBlocks = Object.fromEntries(
+    blocks
+    .filter(block => !(block.name ?? '').startsWith('node_modules/'))
+    .map(block => ([block.name, block]))
+  )
+  const pkgLock = JSON.parse(librarySource.slice(...otherBlocks['package-lock.json'].contentRange))
+  const rollupBlock = nodeModules['@rollup/browser/dist/es/rollup.browser.js']
+  const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
+  const bundleSourceBlock = localBlocks.find(({name}) => name === 'bundle-source.js')
+  const bundleSourceContent = __source.slice(...bundleSourceBlock.contentRange)
+  const scripts = {'bundle-source.js': bundleSourceContent}
+  for (const key of Object.keys(pkgLock.packages).filter(name => name.startsWith('node_modules'))) {
+    const name = key.replace(/^node_modules\//, '')
+    const packageJsonPath = `${name}/package.json`
+    const packageBlock = nodeModules[packageJsonPath]
+    const pkg = JSON.parse(librarySource.slice(...packageBlock.contentRange))
+    const path = pkg.exports?.import ?? pkg.module
+    const mainPath = `${name}/${path.replace(/\.\//, '')}`
+    const mainBlock = nodeModules[mainPath]
+    if (mainPath?.length && mainBlock) {
+      const mainContent = librarySource.slice(...mainBlock.contentRange)
+      scripts[name] = mainContent
+    } else {
+      console.error(`Missing block: ${packageJsonPath} - ${path} - ${mainPath}`)
+    }
   }
-  return {
+  const input = 'bundle-source.js'
+  const loaderPlugin = {
     name: 'loader',
     resolveId: async source => {
       if (source in scripts) {
         return source
+      } else {
+        console.log(`Missing script: ${source}`)
       }
     },
     load: async id => {
@@ -92,20 +212,12 @@ async function getLoaderPlugin() {
       }
     }
   }
-}
-
-async function bundle(librarySource) {
-  const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
-  const rollupBlock = blocks.find(block => block.name === 'node_modules/@rollup/browser/dist/es/rollup.browser.js')
-  const rollupString = librarySource.slice(...rollupBlock.contentRange)
-  const rollupStringPatched = rollupString.replaceAll(/(['"])bindings_wasm_bg.wasm(['"])/g, '$1http://example.com/$1')
-  const rollupContent = await toBase64(rollupStringPatched)
-  const {rollup} = await import(`data:text/javascript;base64,${rollupContent.split(',')[1]}`)
-  const input = 'bundle-source.js'
-  const loaderPlugin = await getLoaderPlugin()
   const plugins = [loaderPlugin]
+  const {rollup} = await import(`data:text/javascript;base64,${rollupContent}`)
   const bundle = await rollup({input, plugins})
-  console.log({bundle})
+  const {output} = await bundle.generate({format: 'es'})
+  const code = output[0].code
+  console.log(code)
 }
 
 async function build() {
