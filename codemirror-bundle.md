@@ -5,7 +5,7 @@ This is a CodeMirror bundle, built with [build-libraries](./build-libraries.md) 
 
 `codemirror-bundle.js`
 
-```js
+````js
 /**
 The data structure for documents. @nonabstract
 */
@@ -26849,4 +26849,4 @@ window.CodeMirrorBasic = {
   // @codemirror/lang-html
   htmlLanguage,
 };
-```
+````

@@ -142,14 +142,14 @@ export default class ExploreApp extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.dataTemplates = [
-      'colors.json', 'cat.png', 'example-notebook.md'
+      'colors.json', 'image.png', 'example-notebook.md'
     ]
     this.notebookTemplates = {
       'colors.json': [
         'palette.md',
         'shapes.md',
       ],
-      'cat.png': [
+      'image.png': [
         'transform.md',
         'histogram.md',
       ],
@@ -347,17 +347,18 @@ ${runEntry}
     this.viewFrame.addEventListener('load', () => {
       const src = __source
       let entrySrc, notebookSrc = ''
+      const notebookFiles = [this.dataSelect.selectedItem?.filename, this.notebookSelect.selectedItem?.name]
+      const notebookEditorFiles = ['codemirror-bundle.md', 'loader.md']
       for (const block of readBlocksWithNames(src)) {
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
-        } else if (
-          (block.name ?? null) !== null &&
-          (
-            block.name === this.dataSelect.selectedItem?.filename ||
-            block.name === this.notebookSelect.selectedItem?.name
-          )
-        ) {
+        } else if (notebookFiles.includes(block.name)) {
           notebookSrc += "\n\n" + src.slice(...block.contentRange)
+        } else if (
+          notebookEditorFiles.includes(block.name) &&
+          this.dataSelect.selectedItem?.filename === 'example-notebook.md'
+        ) {
+          notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
         }
       }
       const messageText = `${notebookSrc}\n\n\`entry.js\`\n\n${entrySrc}\n`

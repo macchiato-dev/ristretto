@@ -64,7 +64,7 @@ export default class TransformView extends HTMLElement {
 
   get dataUrl() {
     for (const block of readBlocksWithNames(__source)) {
-      if (block.name === 'cat.png') {
+      if (block.name === 'image.png') {
         const data = __source.slice(...block.contentRange)
         return `data:image/png;base64,${data}`
       }
@@ -96,7 +96,7 @@ await setup()
     }
   </style>
   <g transform="scale(1.4)">
-    <image href="${image('cat.png.md/cat.png')}" width="128" height="128" />
+    <image href="${image('image.png.md/image.png')}" width="128" height="128" />
   </g>
 </svg>
 ```
