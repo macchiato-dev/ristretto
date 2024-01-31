@@ -1,63 +1,12 @@
 # List
 
-`app.js`
+`forms/button-group.js`
 
 ```js
-import { FileGroup } from "/editor/file-group.js"
-import { FileView } from "/editor/file-view.js"
-import { TextEdit } from "/editor/text-edit.js"
-import { CodeEdit } from "/editor/code-edit.js"
-import { ButtonGroup } from "/forms/button-group.js"
-import { Dropdown } from "/menu/dropdown.js"
-import { Builder } from "/loader/builder.js"
-
-customElements.define(
-  'm-editor-file-group', FileGroup
-)
-customElements.define(
-  'm-editor-file-view', FileView
-)
-customElements.define(
-  'm-editor-text-edit', TextEdit
-)
-customElements.define(
-  'm-editor-code-edit', CodeEdit
-)
-customElements.define(
-  'm-forms-button-group', ButtonGroup
-)
-customElements.define(
-  'm-menu-dropdown', Dropdown
-)
-
-class EditorApp extends HTMLElement {
+export class ButtonGroup extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.loaded = false
-    this.el = document.createElement(
-      'm-editor-file-group'
-    )
-    addEventListener('message', event => {
-      const message = event.data
-      if (Array.isArray(message)) {
-        if (message[0] === 'doc' && !this.loaded) {
-          this.load(message[1], message[2])
-        } else if (message[0] === 'request-html') {
-          const files = this.el.files.map(
-            ({name, data}) => ({name, data})
-          )
-          this.display(files)
-        }
-      }
-    })
-    parent.postMessage(['ready'], '*')
-    this.shadowRoot.addEventListener('code-input', (e) => {
-      this.handleInput()
-    })
-    this.shadowRoot.addEventListener('input', (e) => {
-      this.handleInput()
-    })
   }
 
   connectedCallback() {
@@ -65,140 +14,159 @@ class EditorApp extends HTMLElement {
     style.textContent = `
       :host {
         display: flex;
+        flex-direction: row-reverse;
+        gap: 5px;
+      }
+      button {
+        font-size: 16px;
+        font-family: sans-serif;
+        font-weight: normal;
+        background: #111;
+        color: #eee;
+        margin: 0;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 3px;
+      }
+    `
+    this.shadowRoot.appendChild(style)
+  }
+
+  addButton(text, cls, handler) {
+    const el = document.createElement('button')
+    el.innerText = text
+    el.classList.add(cls)
+    el.addEventListener('click', handler)
+    this.shadowRoot.appendChild(el)
+    return el
+  }
+
+  addPrimary(text, handler) {
+    this.primary = this.addButton(
+      text, 'primary', handler
+    )
+  }
+
+  addCancel(text, handler) {
+    this.cancel = this.addButton(
+      text, 'cancel', handler
+    )
+  }
+}
+```
+
+`menu/dropdown.js`
+
+```js
+export class Dropdown extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.dialogEl = document.createElement('dialog')
+    this.dialogEl.addEventListener('click', e => {
+      const rect = this.dialogEl.getBoundingClientRect()
+      const clickedInDialog = (
+        rect.top <= e.clientY &&
+        e.clientY <= rect.top + rect.height &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.left + rect.width
+      )
+      const isDialog = e.target === this.dialogEl
+      if (isDialog && !clickedInDialog) {
+        this.close()
+      }
+    })
+    this.shadowRoot.appendChild(this.dialogEl)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      dialog {
+        min-width: 200px;
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+      }
+      dialog {
+        background: #222;
+        color: #ddd;
+        padding: 3px;
+        margin-top: var(--anchor-bottom);
+        margin-right: calc(
+          100% - var(--anchor-right)
+        );
+        margin-left: auto;
+        margin-bottom: auto;
+        position: static;
+      }
+      dialog[open] {
+        display: flex;
         flex-direction: column;
-        align-items: stretch;
-        margin: 8px;
+      }
+      dialog::backdrop {
+        opacity: 0;
+        top: 0;
+        left: 0;
+        margin: 0;
+        padding: 0;
+        height: var(--window-height);
+        height: var(--window-width);
+      }
+      button {
+        background: #222;
+        font-size: 16px;
+        border: none;
+        color: inherit;
+        padding: 8px 10px;
+        text-align: left;
       }
     `
     this.shadowRoot.append(style)
   }
 
-  async load(doc, settings) {
-    const files = JSON.parse(doc).files
-    this.display(files)
-    this.el.codeMirror = !!(settings?.codeMirror)
-    if (this.el.codeMirror) {
-      await this.loadCodeMirror()
-    }
-    for (const file of files) {
-      this.el.addFile(file)
-    }
-    this.loaded = true
-    this.shadowRoot.appendChild(this.el)
-  }
-
-  save(e) {
-    const files = this.el.files.map(
-      ({name, data, collapsed}) =>
-      ({name, data, collapsed})
+  open(anchor) {
+    const rect = anchor.getBoundingClientRect()
+    const style = this.shadowRoot.host.style
+    style.setProperty(
+      '--anchor-right', `${rect.right}px`
     )
-    const data = JSON.stringify({
-      type: 'm-file-group',
-      files,
-    })
-    parent.postMessage(['save', data], '*')
-  }
-
-  display(files) {
-    const builder = new Builder(files)
-    const html = builder.build(files)
-    parent.postMessage(['html', html], '*')
-  }
-
-  handleInput(e) {
-    this.lastInputEvent = e
-    if (!this.inputTimeout) {
-      this.save(this.lastInputEvent)
-      this.lastInputEvent = undefined
-      this.inputTimeout = setTimeout(() => {
-        this.inputTimeout = undefined
-        if (this.lastInputEvent) {
-          this.handleInput(this.lastInputEvent)
-        }
-      }, 100)
-    }
-  }
-
-  async sha(ab) {
-    const hash = await crypto.subtle.digest(
-      "SHA-256", ab
+    style.setProperty(
+      '--anchor-bottom',
+      `${window.scrollY + rect.bottom - 3}px`
     )
-    return 'sha256-' + btoa(
-      String.fromCharCode(
-        ...new Uint8Array(hash)
-      )
+    style.setProperty(
+      '--window-height', `${window.height}px`
     )
+    style.setProperty(
+      '--window-width', `${window.width}px`
+    )
+    this.dialogEl.showModal()
   }
 
-  async checkIntegrity(text, integrity) {
-    const ab = new TextEncoder().encode(text)
-    const sha = await this.sha(ab)
-    if (sha !== integrity) {
-      throw new Error(
-        'failed integrity check: ' +
-        `${sha} !== ${integrity}`
-      )
-    }
-    return ab
+  close() {
+    this.dialogEl.close()
   }
 
-  req(method, path, value = undefined) {
-    return new Promise((resolve, reject) => {
-      const ch = new MessageChannel()
-      const port = ch.port1
-      port.onmessage = e => {
-        resolve(e.data)
-        port.close()
+  clear() {
+    this.dialogEl.replaceChildren()
+  }
+
+  add(text, handler = undefined) {
+    const btn = document.createElement('button')
+    btn.innerText = text
+    this.dialogEl.appendChild(btn)
+    btn.addEventListener('click', () => {
+      this.close()
+      if (handler !== undefined) {
+        handler()
       }
-      window.parent.postMessage(
-        (
-          method === 'get' ?
-          [method, path] :
-          [method, path, value]
-        ),
-        '*',
-        [ch.port2]
-      )
     })
   }
-
-  async loadCodeMirror() {
-    const resp = await this.req(
-      'load', '/editor-lib-codemirror/codemirror-bundle.js'
-    )
-    const passed = await this.checkIntegrity(
-      resp.body,
-      'sha256-5RlM/RBsaGHWVkn1pTnI7jUm9KPsI+SLglUwtbWroEA=',
-    )
-    if (!passed) {
-      throw new Error('Failed integrity check')
-    }
-    const s = document.createElement('script')
-    s.type = 'module'
-    s.textContent = resp.body
-    document.head.append(s)
-    await new Promise(res => setTimeout(() => res(), 50))
-  }
 }
-
-customElements.define(
-  'm-editor-app', EditorApp
-)
-
-class Setup {
-  async run() {
-    document.body.appendChild(
-      document.createElement(
-        'm-editor-app'
-      )
-    )
-  }
-}
-
-new Setup().run()
 ```
 
-`code-edit.js`
+`editor/code-edit.js`
 
 ```js
 export class CodeEdit extends HTMLElement {
@@ -336,7 +304,7 @@ export class CodeEdit extends HTMLElement {
 }
 ```
 
-`file-group.js`
+`editor/file-group.js`
 
 ```js
 export class FileGroup extends HTMLElement {
@@ -451,7 +419,7 @@ export class FileGroup extends HTMLElement {
 }
 ```
 
-`file-view.js`
+`editor/file-view.js`
 
 ```js
 export class FileView extends HTMLElement {
@@ -672,7 +640,7 @@ export class FileView extends HTMLElement {
 }
 ```
 
-`text-edit.js`
+`editor/text-edit.js`
 
 ```js
 export class TextEdit extends HTMLElement {
@@ -736,6 +704,162 @@ export class TextEdit extends HTMLElement {
 }
 ```
 
+`app.js`
+
+```js
+import { FileGroup } from "/editor/file-group.js"
+import { FileView } from "/editor/file-view.js"
+import { TextEdit } from "/editor/text-edit.js"
+import { CodeEdit } from "/editor/code-edit.js"
+import { ButtonGroup } from "/forms/button-group.js"
+import { Dropdown } from "/menu/dropdown.js"
+
+customElements.define(
+  'm-editor-file-group', FileGroup
+)
+customElements.define(
+  'm-editor-file-view', FileView
+)
+customElements.define(
+  'm-editor-text-edit', TextEdit
+)
+customElements.define(
+  'm-editor-code-edit', CodeEdit
+)
+customElements.define(
+  'm-forms-button-group', ButtonGroup
+)
+customElements.define(
+  'm-menu-dropdown', Dropdown
+)
+
+class EditorApp extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.loaded = false
+    this.el = document.createElement(
+      'm-editor-file-group'
+    )
+    this.load()
+    this.shadowRoot.addEventListener('code-input', (e) => {
+      this.handleInput()
+    })
+    this.shadowRoot.addEventListener('input', (e) => {
+      this.handleInput()
+    })
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        margin: 8px;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  async load() {
+    const files = [{name: 'test.js', data: "console.log('Hello, World.')"}]
+    this.el.codeMirror = true
+    for (const file of files) {
+      this.el.addFile(file)
+    }
+    this.loaded = true
+    this.shadowRoot.appendChild(this.el)
+  }
+
+  save(e) {
+    const files = this.el.files.map(
+      ({name, data, collapsed}) =>
+      ({name, data, collapsed})
+    )
+    const data = JSON.stringify({
+      type: 'm-file-group',
+      files,
+    })
+    parent.postMessage(['save', data], '*')
+  }
+
+  handleInput(e) {
+    this.lastInputEvent = e
+    if (!this.inputTimeout) {
+      this.save(this.lastInputEvent)
+      this.lastInputEvent = undefined
+      this.inputTimeout = setTimeout(() => {
+        this.inputTimeout = undefined
+        if (this.lastInputEvent) {
+          this.handleInput(this.lastInputEvent)
+        }
+      }, 100)
+    }
+  }
+
+  async sha(ab) {
+    const hash = await crypto.subtle.digest(
+      "SHA-256", ab
+    )
+    return 'sha256-' + btoa(
+      String.fromCharCode(
+        ...new Uint8Array(hash)
+      )
+    )
+  }
+
+  async checkIntegrity(text, integrity) {
+    const ab = new TextEncoder().encode(text)
+    const sha = await this.sha(ab)
+    if (sha !== integrity) {
+      throw new Error(
+        'failed integrity check: ' +
+        `${sha} !== ${integrity}`
+      )
+    }
+    return ab
+  }
+
+  req(method, path, value = undefined) {
+    return new Promise((resolve, reject) => {
+      const ch = new MessageChannel()
+      const port = ch.port1
+      port.onmessage = e => {
+        resolve(e.data)
+        port.close()
+      }
+      window.parent.postMessage(
+        (
+          method === 'get' ?
+          [method, path] :
+          [method, path, value]
+        ),
+        '*',
+        [ch.port2]
+      )
+    })
+  }
+}
+
+customElements.define(
+  'm-editor-app', EditorApp
+)
+
+class Setup {
+  async run() {
+    document.body.appendChild(
+      document.createElement(
+        'm-editor-app'
+      )
+    )
+  }
+}
+
+new Setup().run()
+```
+
 `NotebookView.js`
 
 ```js
@@ -769,7 +893,6 @@ export default class NotebookView extends HTMLElement {
     style.textContent = `
       :host {
         display: flex;
-        height: 100vh;
         flex-direction: column;
         align-items: stretch;
         justify-content: space-around;
@@ -802,7 +925,27 @@ export default class NotebookView extends HTMLElement {
         break
       }
     }
-    this.initEditor()
+    const {Builder} = await import(`data:text/javascript;base64,${btoa(builderSource)}`)
+    const files = []
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
+        files.push({name: block.name, data: __source.slice(...block.contentRange)})
+      }
+    }
+    const builder = new Builder(files)
+    const {styles, scripts} = builder.build()
+    console.log({styles, scripts})
+    for (const styleText of styles) {
+      const style = document.createElement('style')
+      style.textContent = styleText
+      document.head.append(style)
+    }
+    for (const scriptText of scripts) {
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.textContent = scriptText
+      document.head.append(script)
+    }
   }
 
   initEditor() {
@@ -873,6 +1016,56 @@ async function setup() {
 }
 
 await setup()
+```
+
+`entry.js`
+
+```js
+function* readBlocks(input) {
+  const re = /(?:^|\n)([ \t]*)(`{3,}|~{3,})([^\n]*\n)/
+  let index = 0
+  while (index < input.length) {
+    const open = input.substring(index).match(re)
+    if (!open) {
+      break
+    } else if (open[1].length > 0 || open[2][0] === '~') {
+      throw new Error(`Invalid open fence at ${index + open.index}`)
+    }
+    const contentStart = index + open.index + open[0].length
+    const close = input.substring(contentStart).match(
+      new RegExp(`\n([ ]{0,3})${open[2]}(\`*)[ \t]*\r?(?:\n|$)`)
+    )
+    if (!(close && close[1] === '')) {
+      throw new Error(`Missing or invalid close fence at ${index + open.index}`)
+    }
+    const contentRange = [contentStart, contentStart + close.index]
+    const blockRange = [index + open.index, contentRange.at(-1) + close[0].length]
+    yield { blockRange, contentRange, info: open[3].trim() }
+    index = blockRange.at(-1)
+  }
+}
+
+function* readBlocksWithNames(input) {
+  for (const block of readBlocks(input)) {
+    const match = input.slice(0, block.blockRange[0]).match(
+      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+    )
+    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+  }
+}
+
+async function run(src) {
+  globalThis.readBlocks = readBlocks
+  globalThis.readBlocksWithNames = readBlocksWithNames
+  for (const block of readBlocksWithNames(src)) {
+    if (['NotebookView.js', 'run.js'].includes(block.name)) {
+      const blockSrc = src.slice(...block.contentRange)
+      await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
+    }
+  }
+}
+
+run(__source)
 ```
 
 `thumbnail.svg`

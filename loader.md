@@ -23,8 +23,6 @@ export class Builder {
   }
 
   buildModule(file) {
-    const script = document.createElement('script')
-    script.setAttribute('type', 'module')
     let initAppend = ""
     let append = ""
     const data = file.data.replaceAll(
@@ -52,10 +50,9 @@ export class Builder {
         return `const ${vars} = ${ref}`
       }
     )
-    script.textContent = (
-      "\n" + data + initAppend + append + "\n"
+    return (
+      data + initAppend + append
     )
-    return script.outerHTML
   }
 
   buildReplace(filesMap) {
@@ -109,14 +106,9 @@ export class Builder {
     )).map(file => (
       this.buildStyle(file)
     ))
-    let html = (
-      'index.html' in filesMap ?
-      filesMap['index.html'] :
-      defaultHtml
-    )
     return {
-      styles: styles.join("\n") + "\n",
-      scripts: intro + "\n" + modules.join("\n")
+      styles,
+      scripts: [intro, ...modules],
     }
   }
 }

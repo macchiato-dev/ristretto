@@ -349,6 +349,7 @@ ${runEntry}
       let entrySrc, notebookSrc = ''
       const notebookFiles = [this.dataSelect.selectedItem?.filename, this.notebookSelect.selectedItem?.name]
       const notebookEditorFiles = ['codemirror-bundle.md', 'loader.md']
+      let hasEntry = false
       for (const block of readBlocksWithNames(src)) {
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
@@ -359,9 +360,10 @@ ${runEntry}
           this.dataSelect.selectedItem?.filename === 'example-notebook.md'
         ) {
           notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
+          hasEntry = true
         }
       }
-      const messageText = `${notebookSrc}\n\n\`entry.js\`\n\n${entrySrc}\n`
+      const messageText = notebookSrc + (hasEntry ? '' : `\n\n\`entry.js\`\n\n${entrySrc}\n`)
       const messageData = new TextEncoder().encode(messageText)
       this.viewFrame.contentWindow.postMessage(
         ['notebook', messageData],
