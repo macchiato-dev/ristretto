@@ -337,30 +337,36 @@ ${runEntry}
 `.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
-      let entrySrc, notebookSrc = ''
-      const notebookFiles = [this.dataSelect.selectedItem?.filename, this.notebookSelect.selectedItem?.name]
-      const notebookEditorFiles = ['codemirror-bundle.md', 'loader.md']
-      let hasEntry = false
+      let entrySrc = undefined, notebookSrc = ''
+      const notebookFile = this.notebookSelect.selectedItem?.name
+      const notebookFiles = [this.dataSelect.selectedItem?.filename, notebookFile]
+      let deps = []
       for (const block of readBlocksWithNames(src)) {
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
         } else if (notebookFiles.includes(block.name)) {
           const blockSrc = src.slice(...block.contentRange)
-          for (const subBlock of readBlocksWithNames(blockSrc)) {
-            if (subBlock.name === 'notebook.json') {
-              console.log('found notebook.json')
+          if (block.name === notebookFile) {
+            for (const subBlock of readBlocksWithNames(blockSrc)) {
+              if (subBlock.name === 'notebook.json') {
+                const blockData = JSON.parse(blockSrc.slice(...subBlock.contentRange))
+                deps = blockData.deps
+              } else if (subBlock.name === 'entry.js') {
+                entrySrc = blockSrc.slice(...subBlock.blockRange)
+              }
             }
           }
           notebookSrc += "\n\n" + blockSrc
-        } else if (
-          notebookEditorFiles.includes(block.name) &&
-          this.dataSelect.selectedItem?.filename === 'example-notebook.md'
-        ) {
-          notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
-          hasEntry = true
         }
       }
-      const messageText = notebookSrc + (hasEntry ? '' : `\n\n\`entry.js\`\n\n${entrySrc}\n`)
+      for (const block of readBlocksWithNames(src)) {
+        if (entrySrc === undefined && block.name === 'entry.js') {
+          entrySrc = src.slice(...block.blockRange)
+        } else if (deps.includes(block.name)) {
+          notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
+        }
+      }
+      const messageText = notebookSrc + `\n\n\`entry.js\`\n\n${entrySrc}\n`
       const messageData = new TextEncoder().encode(messageText)
       this.viewFrame.contentWindow.postMessage(
         ['notebook', messageData],

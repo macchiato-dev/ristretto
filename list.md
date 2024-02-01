@@ -5,6 +5,7 @@
 ```json
 {
   "deps": [
+    "loader.md",
     "codemirror-bundle.md"
   ]
 }
