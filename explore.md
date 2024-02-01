@@ -239,18 +239,9 @@ export default class ExploreApp extends HTMLElement {
     return `data:${mime};base64,${urlData}`
   }
 
-  *blocksWithNames(src) {
-    for (const block of readBlocks(src)) {
-      const name = src.slice(0, block.blockRange[0]).match(
-        new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
-      ).at(1)
-      yield {...block, name}
-    }
-  }
-
   findImage(path) {
     const parts = path.split('/')
-    for (const block of this.blocksWithNames(__source)) {
+    for (const block of readBlocksWithNames(__source)) {
       if (parts.at(0) === block.name) {
         const blockSrc = __source.slice(...block.contentRange)
         for (const innerBlock of this.blocksWithNames(blockSrc)) {
