@@ -354,7 +354,13 @@ ${runEntry}
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
         } else if (notebookFiles.includes(block.name)) {
-          notebookSrc += "\n\n" + src.slice(...block.contentRange)
+          const blockSrc = src.slice(...block.contentRange)
+          for (const subBlock of readBlocksWithNames(blockSrc)) {
+            if (subBlock.name === 'notebook.json') {
+              console.log('found notebook.json')
+            }
+          }
+          notebookSrc += "\n\n" + blockSrc
         } else if (
           notebookEditorFiles.includes(block.name) &&
           this.dataSelect.selectedItem?.filename === 'example-notebook.md'

@@ -1,5 +1,15 @@
 # List
 
+`notebook.json`
+
+```json
+{
+  "deps": [
+    "codemirror-bundle.md"
+  ]
+}
+```
+
 `forms/button-group.js`
 
 ```js
@@ -934,7 +944,6 @@ export default class NotebookView extends HTMLElement {
     }
     const builder = new Builder(files)
     const {styles, scripts} = builder.build()
-    console.log({styles, scripts})
     for (const styleText of styles) {
       const style = document.createElement('style')
       style.textContent = styleText
