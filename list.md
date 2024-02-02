@@ -13,7 +13,7 @@
 }
 ```
 
-`editor/code-edit.js`
+`code-edit.js`
 
 ```js
 export class CodeEdit extends HTMLElement {
@@ -151,7 +151,7 @@ export class CodeEdit extends HTMLElement {
 }
 ```
 
-`editor/file-group.js`
+`file-group.js`
 
 ```js
 export class FileGroup extends HTMLElement {
@@ -266,7 +266,7 @@ export class FileGroup extends HTMLElement {
 }
 ```
 
-`editor/file-view.js`
+`file-view.js`
 
 ```js
 export class FileView extends HTMLElement {
@@ -487,7 +487,7 @@ export class FileView extends HTMLElement {
 }
 ```
 
-`editor/text-edit.js`
+`text-edit.js`
 
 ```js
 export class TextEdit extends HTMLElement {
@@ -551,36 +551,10 @@ export class TextEdit extends HTMLElement {
 }
 ```
 
-`app.js`
+`list-editor.js`
 
 ```js
-import { FileGroup } from "/editor/file-group.js"
-import { FileView } from "/editor/file-view.js"
-import { TextEdit } from "/editor/text-edit.js"
-import { CodeEdit } from "/editor/code-edit.js"
-import { ButtonGroup } from "/forms/button-group.js"
-import { Dropdown } from "/menu/dropdown.js"
-
-customElements.define(
-  'm-editor-file-group', FileGroup
-)
-customElements.define(
-  'm-editor-file-view', FileView
-)
-customElements.define(
-  'm-editor-text-edit', TextEdit
-)
-customElements.define(
-  'm-editor-code-edit', CodeEdit
-)
-customElements.define(
-  'm-forms-button-group', ButtonGroup
-)
-customElements.define(
-  'm-menu-dropdown', Dropdown
-)
-
-class EditorApp extends HTMLElement {
+export class ListEditor extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -645,60 +619,64 @@ class EditorApp extends HTMLElement {
       }, 100)
     }
   }
+}
+```
 
-  async sha(ab) {
-    const hash = await crypto.subtle.digest(
-      "SHA-256", ab
+`app-view.js`
+
+```js
+export class AppView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.loaded = false
+    this.editor = document.createElement(
+      'm-list-editor'
     )
-    return 'sha256-' + btoa(
-      String.fromCharCode(
-        ...new Uint8Array(hash)
-      )
-    )
+    this.shadowRoot.appendChild(this.editor)
   }
 
-  async checkIntegrity(text, integrity) {
-    const ab = new TextEncoder().encode(text)
-    const sha = await this.sha(ab)
-    if (sha !== integrity) {
-      throw new Error(
-        'failed integrity check: ' +
-        `${sha} !== ${integrity}`
-      )
-    }
-    return ab
-  }
-
-  req(method, path, value = undefined) {
-    return new Promise((resolve, reject) => {
-      const ch = new MessageChannel()
-      const port = ch.port1
-      port.onmessage = e => {
-        resolve(e.data)
-        port.close()
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        margin: 8px;
       }
-      window.parent.postMessage(
-        (
-          method === 'get' ?
-          [method, path] :
-          [method, path, value]
-        ),
-        '*',
-        [ch.port2]
-      )
-    })
+    `
+    this.shadowRoot.append(style)
   }
 }
+```
 
-customElements.define(
-  'm-editor-app', EditorApp
-)
+`app.js`
+
+```js
+import { AppView } from "/app-view.js"
+import { ListEditor } from "/list-editor.js"
+import { FileGroup } from "/file-group.js"
+import { FileView } from "/file-view.js"
+import { TextEdit } from "/text-edit.js"
+import { CodeEdit } from "/code-edit.js"
+import { ButtonGroup } from "/forms/button-group.js"
+import { Dropdown } from "/menu/dropdown.js"
+
+customElements.define('m-app-view', AppView)
+customElements.define('m-list-editor', ListEditor)
+customElements.define('m-editor-file-group', FileGroup)
+customElements.define('m-editor-file-view', FileView)
+customElements.define('m-editor-text-edit', TextEdit)
+customElements.define('m-editor-code-edit', CodeEdit)
+customElements.define('m-forms-button-group', ButtonGroup)
+customElements.define('m-menu-dropdown', Dropdown)
 
 class Setup {
   async run() {
     document.body.appendChild(
       document.createElement(
-        'm-editor-app'
+        'm-app-view'
       )
     )
   }
@@ -780,6 +758,7 @@ export default class NotebookView extends HTMLElement {
     const importNotebooks = Object.keys(importFiles)
     const files = []
     for (const block of readBlocksWithNames(__source)) {
+      console.log(block)
       if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
         files.push({name: block.name, data: __source.slice(...block.contentRange)})
       }
@@ -806,49 +785,6 @@ export default class NotebookView extends HTMLElement {
       script.textContent = scriptText
       document.head.append(script)
     }
-  }
-
-  initEditor() {
-    const cm = window.CodeMirrorBasic
-    const basicSetup = [
-      cm.lineNumbers(),
-      cm.highlightActiveLineGutter(),
-      cm.highlightSpecialChars(),
-      cm.history(),
-      cm.foldGutter(),
-      cm.drawSelection(),
-      cm.dropCursor(),
-      cm.EditorState.allowMultipleSelections.of(true),
-      cm.indentOnInput(),
-      cm.syntaxHighlighting(
-        cm.defaultHighlightStyle, {fallback: true}
-      ),
-      cm.bracketMatching(),
-      cm.closeBrackets(),
-      cm.autocompletion(),
-      cm.rectangularSelection(),
-      cm.crosshairCursor(),
-      cm.highlightActiveLine(),
-      cm.highlightSelectionMatches(),
-      cm.keymap.of([
-        ...cm.closeBracketsKeymap,
-        ...cm.defaultKeymap,
-        ...cm.searchKeymap,
-        ...cm.historyKeymap,
-        ...cm.foldKeymap,
-        ...cm.completionKeymap,
-        ...cm.lintKeymap
-      ]),
-    ]
-    this.view = new cm.EditorView({
-      doc: '',
-      extensions: [
-        basicSetup,
-        cm.javascriptLanguage
-      ],
-      root: this.shadowRoot,
-    })
-    this.shadowRoot.append(this.view.dom)
   }
 
   getSubBlockContent(blockName, subBlockName) {
