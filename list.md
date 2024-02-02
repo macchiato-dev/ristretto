@@ -6,174 +6,10 @@
 {
   "deps": [
     "loader.md",
+    "menu.md",
+    "forms.md",
     "codemirror-bundle.md"
   ]
-}
-```
-
-`forms/button-group.js`
-
-```js
-export class ButtonGroup extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: row-reverse;
-        gap: 5px;
-      }
-      button {
-        font-size: 16px;
-        font-family: sans-serif;
-        font-weight: normal;
-        background: #111;
-        color: #eee;
-        margin: 0;
-        border: none;
-        padding: 5px 10px;
-        border-radius: 3px;
-      }
-    `
-    this.shadowRoot.appendChild(style)
-  }
-
-  addButton(text, cls, handler) {
-    const el = document.createElement('button')
-    el.innerText = text
-    el.classList.add(cls)
-    el.addEventListener('click', handler)
-    this.shadowRoot.appendChild(el)
-    return el
-  }
-
-  addPrimary(text, handler) {
-    this.primary = this.addButton(
-      text, 'primary', handler
-    )
-  }
-
-  addCancel(text, handler) {
-    this.cancel = this.addButton(
-      text, 'cancel', handler
-    )
-  }
-}
-```
-
-`menu/dropdown.js`
-
-```js
-export class Dropdown extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.dialogEl = document.createElement('dialog')
-    this.dialogEl.addEventListener('click', e => {
-      const rect = this.dialogEl.getBoundingClientRect()
-      const clickedInDialog = (
-        rect.top <= e.clientY &&
-        e.clientY <= rect.top + rect.height &&
-        rect.left <= e.clientX &&
-        e.clientX <= rect.left + rect.width
-      )
-      const isDialog = e.target === this.dialogEl
-      if (isDialog && !clickedInDialog) {
-        this.close()
-      }
-    })
-    this.shadowRoot.appendChild(this.dialogEl)
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      dialog {
-        min-width: 200px;
-        border: 1px solid rgba(0, 0, 0, 0.3);
-        border-radius: 6px;
-        box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
-      }
-      dialog {
-        background: #222;
-        color: #ddd;
-        padding: 3px;
-        margin-top: var(--anchor-bottom);
-        margin-right: calc(
-          100% - var(--anchor-right)
-        );
-        margin-left: auto;
-        margin-bottom: auto;
-        position: static;
-      }
-      dialog[open] {
-        display: flex;
-        flex-direction: column;
-      }
-      dialog::backdrop {
-        opacity: 0;
-        top: 0;
-        left: 0;
-        margin: 0;
-        padding: 0;
-        height: var(--window-height);
-        height: var(--window-width);
-      }
-      button {
-        background: #222;
-        font-size: 16px;
-        border: none;
-        color: inherit;
-        padding: 8px 10px;
-        text-align: left;
-      }
-    `
-    this.shadowRoot.append(style)
-  }
-
-  open(anchor) {
-    const rect = anchor.getBoundingClientRect()
-    const style = this.shadowRoot.host.style
-    style.setProperty(
-      '--anchor-right', `${rect.right}px`
-    )
-    style.setProperty(
-      '--anchor-bottom',
-      `${window.scrollY + rect.bottom - 3}px`
-    )
-    style.setProperty(
-      '--window-height', `${window.height}px`
-    )
-    style.setProperty(
-      '--window-width', `${window.width}px`
-    )
-    this.dialogEl.showModal()
-  }
-
-  close() {
-    this.dialogEl.close()
-  }
-
-  clear() {
-    this.dialogEl.replaceChildren()
-  }
-
-  add(text, handler = undefined) {
-    const btn = document.createElement('button')
-    btn.innerText = text
-    this.dialogEl.appendChild(btn)
-    btn.addEventListener('click', () => {
-      this.close()
-      if (handler !== undefined) {
-        handler()
-      }
-    })
-  }
 }
 ```
 
@@ -937,13 +773,27 @@ export default class NotebookView extends HTMLElement {
       }
     }
     const {Builder} = await import(`data:text/javascript;base64,${btoa(builderSource)}`)
+    const importFiles = {
+      'forms.md': ['button-group.js'],
+      'menu.md': ['dropdown.js'],
+    }
+    const importNotebooks = Object.keys(importFiles)
     const files = []
     for (const block of readBlocksWithNames(__source)) {
       if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
         files.push({name: block.name, data: __source.slice(...block.contentRange)})
       }
+      if (importNotebooks.includes(block.name)) {
+        const blockSource = __source.slice(...block.contentRange)
+        const parent = block.name.match(/(^.*)\.md$/)[1]
+        for (const subBlock of readBlocksWithNames(blockSource)) {
+          if (importFiles[block.name].includes(subBlock.name)) {
+            files.push({name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)})
+          }
+        }
+      }
     }
-    const builder = new Builder(files)
+    const builder = new Builder([...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')])
     const {styles, scripts} = builder.build()
     for (const styleText of styles) {
       const style = document.createElement('style')
