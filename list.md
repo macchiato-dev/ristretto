@@ -563,12 +563,6 @@ export class ListEditor extends HTMLElement {
       'm-editor-file-group'
     )
     this.load()
-    this.shadowRoot.addEventListener('code-input', (e) => {
-      this.handleInput()
-    })
-    this.shadowRoot.addEventListener('input', (e) => {
-      this.handleInput()
-    })
   }
 
   connectedCallback() {
@@ -593,9 +587,44 @@ export class ListEditor extends HTMLElement {
     this.loaded = true
     this.shadowRoot.appendChild(this.el)
   }
+}
+```
+
+`app-view.js`
+
+```js
+export class AppView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.loaded = false
+    this.editor = document.createElement('m-list-editor')
+    this.viewPane = document.createElement('iframe')
+    this.shadowRoot.appendChild(this.editor, this.viewPane)
+    this.shadowRoot.addEventListener('code-input', (e) => {
+      this.handleInput()
+    })
+    this.shadowRoot.addEventListener('input', (e) => {
+      this.handleInput()
+    })
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        margin: 8px;
+      }
+    `
+    this.shadowRoot.append(style)
+    this.renderView()
+  }
 
   save(e) {
-    const files = this.el.files.map(
+    const files = this.editor.el.files.map(
       ({name, data, collapsed}) =>
       ({name, data, collapsed})
     )
@@ -619,34 +648,12 @@ export class ListEditor extends HTMLElement {
       }, 100)
     }
   }
-}
-```
 
-`app-view.js`
-
-```js
-export class AppView extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.loaded = false
-    this.editor = document.createElement(
-      'm-list-editor'
-    )
-    this.shadowRoot.appendChild(this.editor)
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        margin: 8px;
-      }
-    `
-    this.shadowRoot.append(style)
+  renderView() {
+    const viewPane = document.createElement('iframe')
+    this.shadowRoot.appendChild(viewPane)
+    this.viewPane.remove()
+    this.viewPane = viewPane
   }
 }
 ```
@@ -758,7 +765,6 @@ export default class NotebookView extends HTMLElement {
     const importNotebooks = Object.keys(importFiles)
     const files = []
     for (const block of readBlocksWithNames(__source)) {
-      console.log(block)
       if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
         files.push({name: block.name, data: __source.slice(...block.contentRange)})
       }
