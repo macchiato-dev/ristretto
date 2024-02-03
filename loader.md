@@ -1,6 +1,6 @@
 # Loader
 
-`builder.js`
+`loader.js`
 
 ```js
 const defaultIntro = `
@@ -11,7 +11,7 @@ window.Macchiato = {
 
 `.trim()
 
-export class Builder {
+export class Loader {
   constructor(files) {
     this.files = files
   }
@@ -103,9 +103,21 @@ export class Builder {
     )).map(file => (
       this.buildStyle(file)
     ))
-    return {
-      styles,
-      scripts: [intro, ...modules],
+    this.styles = styles
+    this.scripts = [intro, ...modules]
+  }
+
+  render(document) {
+    for (const styleText of this.styles) {
+      const style = document.createElement('style')
+      style.textContent = styleText
+      document.head.append(style)
+    }
+    for (const scriptText of this.scripts) {
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.textContent = scriptText
+      document.head.append(script)
     }
   }
 }

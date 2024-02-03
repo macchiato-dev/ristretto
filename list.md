@@ -751,7 +751,7 @@ export default class NotebookView extends HTMLElement {
 
   async loadEditor() {
     const codeMirrorSource = this.getSubBlockContent('codemirror-bundle.md', 'codemirror-bundle.js')
-    const builderSource = this.getSubBlockContent('loader.md', 'builder.js')
+    const loaderSource = this.getSubBlockContent('loader.md', 'loader.js')
     const codeMirrorScript = document.createElement('script')
     codeMirrorScript.type = 'module'
     codeMirrorScript.textContent = codeMirrorSource
@@ -763,7 +763,7 @@ export default class NotebookView extends HTMLElement {
         break
       }
     }
-    const {Builder} = await import(`data:text/javascript;base64,${btoa(builderSource)}`)
+    const {Loader} = await import(`data:text/javascript;base64,${btoa(loaderSource)}`)
     const importFiles = {
       'forms.md': ['button-group.js'],
       'menu.md': ['dropdown.js'],
@@ -784,19 +784,9 @@ export default class NotebookView extends HTMLElement {
         }
       }
     }
-    const builder = new Builder([...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')])
-    const {styles, scripts} = builder.build()
-    for (const styleText of styles) {
-      const style = document.createElement('style')
-      style.textContent = styleText
-      document.head.append(style)
-    }
-    for (const scriptText of scripts) {
-      const script = document.createElement('script')
-      script.type = 'module'
-      script.textContent = scriptText
-      document.head.append(script)
-    }
+    const loader = new Loader([...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')])
+    loader.build()
+    loader.render(document)
   }
 
   getSubBlockContent(blockName, subBlockName) {
