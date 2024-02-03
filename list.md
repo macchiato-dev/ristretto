@@ -599,8 +599,9 @@ export class AppView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.loaded = false
     this.editor = document.createElement('m-list-editor')
-    this.viewPane = document.createElement('iframe')
-    this.shadowRoot.appendChild(this.editor, this.viewPane)
+    this.viewFrame = document.createElement('iframe')
+    this.viewFrame.sandbox = 'allow-scripts'
+    this.shadowRoot.appendChild(this.editor, this.viewFrame)
     this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
@@ -656,10 +657,86 @@ export class AppView extends HTMLElement {
   }
 
   renderView() {
-    const viewPane = document.createElement('iframe')
-    this.shadowRoot.appendChild(viewPane)
-    this.viewPane.remove()
-    this.viewPane = viewPane
+    const viewFrame = document.createElement('iframe')
+    viewFrame.sandbox = 'allow-scripts'
+    this.shadowRoot.appendChild(viewFrame)
+    this.viewFrame.remove()
+    this.viewFrame = viewFrame
+    this.displayNotebook()
+  }
+
+  getBlockContent(blockName, subBlockName = undefined) {
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name === blockName) {
+        const blockSource = __source.slice(...block.contentRange)
+        if (subBlockName === undefined) {
+          return blockSource
+        } else {
+          for (const subBlock of readBlocksWithNames(blockSource)) {
+            if (subBlock.name === subBlockName)
+            return blockSource.slice(...subBlock.contentRange)
+          }
+        }
+      }
+    }
+  }
+
+  displayNotebook() {
+    const dataSrc = ''
+    const notebookSrc = `
+generated
+
+\`entry.js\`
+
+\`\`\`
+${this.getBlockContent('loader.md', 'entry.js')}
+\`\`\`
+
+\`loader.md\`
+
+\`\`\`\`
+${this.getBlockContent('loader.md')}
+\`\`\`\`
+
+\`app.js\`
+
+\`\`\`js
+document.body.innerText = 'test'
+\`\`\`
+`
+    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+    const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+    `.trim()
+    this.viewFrame.srcdoc = `
+<!doctype html>
+<html>
+<head>
+  <title></title>
+<script type="module">
+${runEntry}
+</script>
+</head>
+<body>
+</body>
+</html>
+`.trim()
+    this.viewFrame.addEventListener('load', () => {
+      const messageText = `\n\n${notebookSrc}\n\n`
+      const messageData = new TextEncoder().encode(messageText)
+      this.viewFrame.contentWindow.postMessage(
+        ['notebook', messageData],
+        '*',
+        [messageData.buffer]
+      )
+    })
   }
 }
 ```
@@ -750,45 +827,26 @@ export default class NotebookView extends HTMLElement {
   }
 
   async loadEditor() {
-    const codeMirrorSource = this.getSubBlockContent('codemirror-bundle.md', 'codemirror-bundle.js')
-    const loaderSource = this.getSubBlockContent('loader.md', 'loader.js')
-    const codeMirrorScript = document.createElement('script')
-    codeMirrorScript.type = 'module'
-    codeMirrorScript.textContent = codeMirrorSource
-    document.head.appendChild(codeMirrorScript)
+    const loaderSource = this.getBlockContent('loader.md', 'loader.js')
     const {Loader} = await import(`data:text/javascript;base64,${btoa(loaderSource)}`)
-    const importFiles = {
-      'forms.md': ['button-group.js'],
-      'menu.md': ['dropdown.js'],
-    }
-    const importNotebooks = Object.keys(importFiles)
-    const files = []
-    for (const block of readBlocksWithNames(__source)) {
-      if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
-        files.push({name: block.name, data: __source.slice(...block.contentRange)})
-      }
-      if (importNotebooks.includes(block.name)) {
-        const blockSource = __source.slice(...block.contentRange)
-        const parent = block.name.match(/(^.*)\.md$/)[1]
-        for (const subBlock of readBlocksWithNames(blockSource)) {
-          if (importFiles[block.name].includes(subBlock.name)) {
-            files.push({name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)})
-          }
-        }
-      }
-    }
-    const loader = new Loader([...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')])
+    const loader = new Loader(__source)
+    loader.read()
     loader.build()
+    loader.loadLibraries(document)
     loader.render(document)
   }
 
-  getSubBlockContent(blockName, subBlockName) {
+  getBlockContent(blockName, subBlockName = undefined) {
     for (const block of readBlocksWithNames(__source)) {
       if (block.name === blockName) {
         const blockSource = __source.slice(...block.contentRange)
-        for (const subBlock of readBlocksWithNames(blockSource)) {
-          if (subBlock.name === subBlockName)
-          return blockSource.slice(...subBlock.contentRange)
+        if (subBlockName === undefined) {
+          return blockSource
+        } else {
+          for (const subBlock of readBlocksWithNames(blockSource)) {
+            if (subBlock.name === subBlockName)
+            return blockSource.slice(...subBlock.contentRange)
+          }
         }
       }
     }
