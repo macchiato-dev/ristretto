@@ -756,13 +756,6 @@ export default class NotebookView extends HTMLElement {
     codeMirrorScript.type = 'module'
     codeMirrorScript.textContent = codeMirrorSource
     document.head.appendChild(codeMirrorScript)
-    for (let i=0; i < 50; i++) {
-      const delay = i
-      await new Promise(r => setTimeout(r, delay))
-      if (window.CodeMirrorBasic) {
-        break
-      }
-    }
     const {Loader} = await import(`data:text/javascript;base64,${btoa(loaderSource)}`)
     const importFiles = {
       'forms.md': ['button-group.js'],
