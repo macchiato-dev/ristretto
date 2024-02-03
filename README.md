@@ -24,9 +24,7 @@ The code setting up the Content-Security-Policy and the sandboxed iFrame is very
 - a middle iframe, `frame.html`, which takes care of setting up the sandboxed iframe, and has a Content-Security-Policy that prevents all network requests - the ones it needs are accessed through the parent iframe via postMessage
 - a sandboxed `srcdoc` iframe under which the notebook code is run – This has `allow-scripts` but not `allow-same-origin`, so notebook code can run but it can't access localStorage, so each tab is kept separate
 
-This is the first version, which doesn't allow anything except copying and pasting, and navigating directly to URLs on the same origin.
-
-A short-term goal is to allow the user to upload and download files, and navigate with confirmation. In the meantime, some of this can be done with copying and pasting.
+This doesn't allow anything except copying and pasting. Navigating to URLs is also blocked through a Content Security Policy. This way, a page can't trick a user into clicking on a link. To load data from a file, use copy and paste. This can also work for binary data through Base64. Another container will provide a way to upload and download files directly.
 
 A Content-Security-Policy can be set through a header or through a meta tag. When headers can be reliably set, a header is preferred. However, this is run on the Pages platforms of code hosts, so the code and how it gets updated is more transparent.
 
@@ -34,7 +32,7 @@ All the sandbox does to load the code is have the outer frame download a giant M
 
 The inner `srcdoc` sandboxed iframe can have sandboxed iframes within it, to keep parts of the notebooks separate. How deeply nested they can be depends on the browser.
 
-It also uses postMessage to allow the notebook to set the title of the web page, and in the future will allow the code to do other things like initiate upload, download, and navigation, with user interaction.
+It also uses postMessage to allow the notebook to set the title of the web page.
 
 ### The Notebook Collection
 

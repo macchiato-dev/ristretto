@@ -22,13 +22,13 @@ export class Builder {
     return style.outerHTML
   }
 
-  buildModule(file) {
+  buildModule(name, data) {
     let initAppend = ""
     let append = ""
-    const data = file.data.replaceAll(
+    const out = data.replaceAll(
       /^\s*export\s+(?:class|function|async\s+function|const)\s+(\S+)/gms,
       (match, p1) => {
-        const path = JSON.stringify(file.name)
+        const path = JSON.stringify(name)
         const mref = `Macchiato.modules[${path}]`
         const pref = `[${JSON.stringify(p1)}]`
         initAppend = `\n\n${mref} = {}`
@@ -51,7 +51,7 @@ export class Builder {
       }
     )
     return (
-      data + initAppend + append
+      out + initAppend + append
     )
   }
 
@@ -77,9 +77,9 @@ export class Builder {
       )
     )
     const replace = this.buildReplace(filesMap)
-    const intro = this.buildModule({
-      name: '_intro.js',
-      data: replace({
+    const intro = this.buildModule(
+      '_intro.js',
+      replace({
         name: '_intro.js',
         data: (
           '_intro.js' in filesMap ? 
@@ -88,18 +88,15 @@ export class Builder {
         ),
         files: this.files,
       })
-    })
+    )
     const modules = this.files.filter(({name}) => (
       name.endsWith('.js') && 
       !name.startsWith('_')
     )).map(file => (
-      this.buildModule({
-        ...file,
-        data: replace({
-          ...file,
-          files: this.files,
-        }),
-      })
+      this.buildModule(
+        file.name,
+        replace({...file, files: this.files}),
+      )
     ))
     const styles = this.files.filter(({name}) => (
       name.endsWith('.css')
