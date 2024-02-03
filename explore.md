@@ -205,7 +205,7 @@ export default class ExploreApp extends HTMLElement {
         grid-template-columns: 1fr 1fr;
         grid-template-rows: 1fr;
         gap: 10px;
-        min-height: 100vh;
+        height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
@@ -214,6 +214,7 @@ export default class ExploreApp extends HTMLElement {
         display: flex;
         flex-direction: column;
         padding: 10px;
+        overflow-y: auto;
       }
       div.view-pane {
         display: flex;
@@ -244,7 +245,7 @@ export default class ExploreApp extends HTMLElement {
     for (const block of readBlocksWithNames(__source)) {
       if (parts.at(0) === block.name) {
         const blockSrc = __source.slice(...block.contentRange)
-        for (const innerBlock of this.blocksWithNames(blockSrc)) {
+        for (const innerBlock of readBlocksWithNames(blockSrc)) {
           if (parts.at(1) === innerBlock.name) {
             return [innerBlock.name, blockSrc.slice(...innerBlock.contentRange)]
           }
@@ -337,23 +338,20 @@ ${runEntry}
 `.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
-      let entrySrc = undefined, notebookSrc = ''
+      let dataSrc = '', entrySrc = undefined, notebookSrc = ''
       const notebookFile = this.notebookSelect.selectedItem?.name
-      const notebookFiles = [this.dataSelect.selectedItem?.filename, notebookFile]
-      let deps = []
+      const dataFile = this.dataSelect.selectedItem?.filename
+      let config = {deps: []}
       for (const block of readBlocksWithNames(src)) {
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
-        } else if (notebookFiles.includes(block.name)) {
+        } else if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
-          if (block.name === notebookFile) {
-            for (const subBlock of readBlocksWithNames(blockSrc)) {
-              if (subBlock.name === 'notebook.json') {
-                const blockData = JSON.parse(blockSrc.slice(...subBlock.contentRange))
-                deps = blockData.deps
-              } else if (subBlock.name === 'entry.js') {
-                entrySrc = blockSrc.slice(...subBlock.blockRange)
-              }
+          for (const subBlock of readBlocksWithNames(blockSrc)) {
+            if (subBlock.name === 'notebook.json') {
+              config = {...config, ...JSON.parse(blockSrc.slice(...subBlock.contentRange))}
+            } else if (subBlock.name === 'entry.js') {
+              entrySrc = blockSrc.slice(...subBlock.blockRange)
             }
           }
           notebookSrc += "\n\n" + blockSrc
@@ -362,11 +360,16 @@ ${runEntry}
       for (const block of readBlocksWithNames(src)) {
         if (entrySrc === undefined && block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
-        } else if (deps.includes(block.name)) {
+        } else if (config.deps.includes(block.name)) {
           notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
         }
       }
-      const messageText = notebookSrc + `\n\n\`entry.js\`\n\n${entrySrc}\n`
+      for (const block of readBlocksWithNames(src)) {
+        if (block.name === dataFile) {
+          dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+        }
+      }
+      const messageText = `\n\n\`entry.js\`\n\n${entrySrc}\n\n---\n\n${dataSrc}\n\n---\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
       this.viewFrame.contentWindow.postMessage(
         ['notebook', messageData],

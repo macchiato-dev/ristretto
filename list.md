@@ -613,10 +613,16 @@ export class AppView extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = `
       :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        margin: 8px;
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        grid-template-columns: 1fr;
+        height: 100vh;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        border: none;
       }
     `
     this.shadowRoot.append(style)
