@@ -40,7 +40,7 @@ export class Loader {
     const importNotebooks = Object.keys(importFiles)
     const files = []
     for (const block of readBlocksWithNames(this.src)) {
-      if (block.name.endsWith('.js') && !['NotebookView.js', 'run.js'].includes(block.name)) {
+      if (block.name && block.name.endsWith('.js') && !['entry.js', 'run.js', 'NotebookView.js'].includes(block.name)) {
         files.push({name: block.name, data: this.src.slice(...block.contentRange)})
       }
       if (importNotebooks.includes(block.name)) {

@@ -127,9 +127,11 @@ export class CodeEdit extends HTMLElement {
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
         cm.EditorView.updateListener.of(e => {
-          this.dispatchEvent(new CustomEvent(
-            'code-input', {bubbles: true, composed: true}
-          ))
+          if (e.docChanged) {
+            this.dispatchEvent(new CustomEvent(
+              'code-input', {bubbles: true, composed: true}
+            ))
+          }
         }),
       ],
       root: this.shadowRoot,
@@ -562,7 +564,6 @@ export class ListEditor extends HTMLElement {
     this.el = document.createElement(
       'm-editor-file-group'
     )
-    this.load()
   }
 
   connectedCallback() {
@@ -578,8 +579,7 @@ export class ListEditor extends HTMLElement {
     this.shadowRoot.append(style)
   }
 
-  async load() {
-    const files = [{name: 'test.js', data: "console.log('Hello, World.')"}]
+  async load(files) {
     this.el.codeMirror = true
     for (const file of files) {
       this.el.addFile(file)
@@ -597,6 +597,7 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
+    this.notebook = this.getBlockContent('notebook.md')
     this.loaded = false
     this.editor = document.createElement('m-list-editor')
     this.viewFrame = document.createElement('iframe')
@@ -619,6 +620,9 @@ export class AppView extends HTMLElement {
         grid-template-columns: 1fr;
         height: 100vh;
       }
+      m-list-editor {
+        overflow-y: auto;
+      }
       iframe {
         width: 100%;
         height: 100%;
@@ -628,24 +632,27 @@ export class AppView extends HTMLElement {
     `
     this.shadowRoot.append(style)
     this.renderView()
+    this.editor.load(this.readNotebookFiles(this.notebook))
   }
 
-  save(e) {
-    const files = this.editor.el.files.map(
-      ({name, data, collapsed}) =>
-      ({name, data, collapsed})
-    )
-    const data = JSON.stringify({
-      type: 'm-file-group',
-      files,
-    })
-    parent.postMessage(['save', data], '*')
+  readNotebookFiles(notebook) {
+    const result = []
+    for (const block of readBlocksWithNames(notebook)) {
+      result.push({name: block.name, data: notebook.slice(...block.contentRange)})
+    }
+    return result
+  }
+
+  update(e) {
+    this.renderView()
   }
 
   handleInput(e) {
     this.lastInputEvent = e
     if (!this.inputTimeout) {
-      this.save(this.lastInputEvent)
+      setTimeout(() => {
+        this.update(this.lastInputEvent)
+      }, 10)
       this.lastInputEvent = undefined
       this.inputTimeout = setTimeout(() => {
         this.inputTimeout = undefined
@@ -681,8 +688,34 @@ export class AppView extends HTMLElement {
     }
   }
 
+  updateNotebook(notebook, files) {
+    let result = ''
+    let position = 0
+    const remaining = [...files]
+    for (const block of readBlocksWithNames(notebook)) {
+      result += notebook.slice(position, block.blockRange[0])
+      const index = remaining.findIndex(({name}) => name === block.name)
+      const file = remaining[index]
+      remaining.splice(index, 1)
+      if (file) {
+        const fence = `\`\`\``
+        result += `\`${block.name}\`\n\n${fence}\n${file.data}\n${fence}\n`
+        position = block.blockRange[1]
+      } else {
+        result += `\n\n`
+      }
+    }
+    result += notebook.slice(position)
+    for (const file of remaining) {
+      const fence = `\`\`\``
+      result += `\n\n\`${file.name}\`\n\n${fence}\n${file.data}\n${fence}\n\n`
+    }
+    return result 
+  }
+
   displayNotebook() {
     const dataSrc = ''
+    const notebookContent = this.updateNotebook(this.notebook, this.editor.el.files)
     const notebookSrc = `
 generated
 
@@ -698,11 +731,8 @@ ${this.getBlockContent('loader.md', 'entry.js')}
 ${this.getBlockContent('loader.md')}
 \`\`\`\`
 
-\`app.js\`
+${notebookContent}
 
-\`\`\`js
-document.body.innerText = 'test'
-\`\`\`
 `
     const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
     const runEntry = `
@@ -736,7 +766,7 @@ ${runEntry}
         '*',
         [messageData.buffer]
       )
-    })
+    }, {once: true})
   }
 }
 ```
@@ -897,9 +927,9 @@ function* readBlocks(input) {
 function* readBlocksWithNames(input) {
   for (const block of readBlocks(input)) {
     const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
     )
-    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
   }
 }
 
