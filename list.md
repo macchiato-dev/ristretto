@@ -9,7 +9,11 @@
     "menu.md",
     "forms.md",
     "codemirror-bundle.md"
-  ]
+  ],
+  "importFiles": {
+    "forms.md": ["button-group.js"],
+    "menu.md": ["dropdown.js"]
+  }
 }
 ```
 

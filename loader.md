@@ -32,11 +32,23 @@ export class Loader {
     }
   }
 
-  read() {
-    const importFiles = {
-      'forms.md': ['button-group.js'],
-      'menu.md': ['dropdown.js'],
+  getConfig() {
+    const configBlock = this.getBlockContent('notebook.json')
+    const defaultConfig = {importFiles: {}}
+    if (configBlock) {
+      try {
+        return JSON.parse(configBlock)
+      } catch (err) {
+        return defaultConfig
+      }
+    } else {
+      return defaultConfig
     }
+  }
+
+  read() {
+    const config = this.getConfig()
+    const importFiles = config.importFiles
     const importNotebooks = Object.keys(importFiles)
     const files = []
     for (const block of readBlocksWithNames(this.src)) {
