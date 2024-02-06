@@ -341,7 +341,7 @@ ${runEntry}
       let dataSrc = '', entrySrc = undefined, notebookSrc = ''
       const notebookFile = this.notebookSelect.selectedItem?.name
       const dataFile = this.dataSelect.selectedItem?.filename
-      let config = {deps: []}
+      let config = {deps: [], importFiles: {}}
       for (const block of readBlocksWithNames(src)) {
         if (block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
@@ -357,10 +357,11 @@ ${runEntry}
           notebookSrc += "\n\n" + blockSrc
         }
       }
+      const deps = [...config.deps, ...Object.keys(config.importFiles)]
       for (const block of readBlocksWithNames(src)) {
         if (entrySrc === undefined && block.name === 'entry.js') {
           entrySrc = src.slice(...block.blockRange)
-        } else if (config.deps.includes(block.name)) {
+        } else if (deps.includes(block.name)) {
           notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
         }
       }

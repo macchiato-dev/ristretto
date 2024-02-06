@@ -6,154 +6,13 @@
 {
   "deps": [
     "loader.md",
-    "menu.md",
-    "forms.md",
     "codemirror-bundle.md"
   ],
   "importFiles": {
+    "code-edit.md": ["code-edit.js"],
     "forms.md": ["button-group.js"],
     "menu.md": ["dropdown.js"]
   }
-}
-```
-
-`code-edit.js`
-
-```js
-export class CodeEdit extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [
-      this.constructor.styleSheet
-    ]
-  }
-
-  connectedCallback() {
-    this.initEditor()
-  }
-
-  static get styleSheet() {
-    if (this._styleSheet === undefined) {
-      this._styleSheet = new CSSStyleSheet()
-      this._styleSheet.replaceSync(this.css)
-    }
-    return this._styleSheet
-  }
-
-  set value(value) {
-    if (this.view) {
-      this.view.dispatch({changes: {
-        from: 0,
-        to: this.view.state.doc.length,
-        insert: value
-      }})
-    } else {
-      this._value = value
-    }
-  }
-
-  get value() {
-    if (this.view) {
-      return this.view.state.doc.toString()
-    } else {
-      return this._value ?? ''
-    }
-  }
-
-  set fileType(value) {
-    this._fileType = value
-    if (this.view) {
-      const langPlugins = this.langPlugins
-      this.view.dispatch({
-        effects: 
-        this.languageCompartment.reconfigure(langPlugins)
-      })
-    }
-  }
-
-  get fileType() {
-    return this._fileType
-  }
-
-  get langPlugins() {
-    const cm = window.CodeMirrorBasic
-    const langPlugins = []
-    if (['js', 'javascript'].includes(this.fileType)) {
-      langPlugins.push(cm.javascriptLanguage)
-    } else if (this.fileType === 'css') {
-      langPlugins.push(cm.cssLanguage)
-    } else if (this.fileType === 'html') {
-      langPlugins.push(cm.htmlLanguage)
-    } else if (this.fileType === 'json') {
-      langPlugins.push(cm.jsonLanguage)
-    }
-    return langPlugins
-  }
-
-  initEditor() {
-    const cm = window.CodeMirrorBasic
-    this.languageCompartment = new cm.Compartment()
-    const langPlugins = this.langPlugins
-    const basicSetup = [
-      cm.lineNumbers(),
-      cm.highlightActiveLineGutter(),
-      cm.highlightSpecialChars(),
-      cm.history(),
-      cm.foldGutter(),
-      cm.drawSelection(),
-      cm.dropCursor(),
-      cm.EditorState.allowMultipleSelections.of(true),
-      cm.indentOnInput(),
-      cm.syntaxHighlighting(
-        cm.defaultHighlightStyle, {fallback: true}
-      ),
-      cm.bracketMatching(),
-      cm.closeBrackets(),
-      cm.autocompletion(),
-      cm.rectangularSelection(),
-      cm.crosshairCursor(),
-      cm.highlightActiveLine(),
-      cm.highlightSelectionMatches(),
-      cm.keymap.of([
-        ...cm.closeBracketsKeymap,
-        ...cm.defaultKeymap,
-        ...cm.searchKeymap,
-        ...cm.historyKeymap,
-        ...cm.foldKeymap,
-        ...cm.completionKeymap,
-        ...cm.lintKeymap
-      ]),
-    ]
-    this.view = new cm.EditorView({
-      doc: this._value ?? '',
-      extensions: [
-        ...basicSetup,
-        this.languageCompartment.of(langPlugins),
-        cm.EditorView.updateListener.of(e => {
-          if (e.docChanged) {
-            this.dispatchEvent(new CustomEvent(
-              'code-input', {bubbles: true, composed: true}
-            ))
-          }
-        }),
-      ],
-      root: this.shadowRoot,
-    })
-    this.shadowRoot.append(this.view.dom)
-  }
-
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      background-color: #fff;
-    }
-    :host > * {
-      flex-grow: 1;
-    }
-  `
 }
 ```
 
@@ -594,6 +453,148 @@ export class ListEditor extends HTMLElement {
 }
 ```
 
+`notebook-code.js`
+
+```js
+export class NotebookCode extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    const toolbar = document.createElement('div')
+    toolbar.classList.add('toolbar')
+    const selectContainer = document.createElement('div')
+    const iconContainer = document.createElement('div')
+    const closeBtn = document.createElement(
+      'button'
+    )
+    closeBtn.innerHTML = this.icons.close
+    closeBtn.addEventListener('click', () => {
+      this.onHide()
+    })
+    iconContainer.append(closeBtn)
+    iconContainer.classList.add('icon-container')
+    toolbar.append(selectContainer, iconContainer)
+    const editorContainer = document.createElement('div')
+    editorContainer.classList.add('editor-container')
+    this.editor = document.createElement('m-editor-code-edit')
+    editorContainer.append(this.editor)
+    this.shadowRoot.append(toolbar, editorContainer)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+      .toolbar {
+        background: #111;
+        color: #e7e7e7;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        padding: 3px;
+      }
+      .icon-container {
+        display: flex;
+      }
+      .icon-container button {
+        background: inherit;
+        color: inherit;
+        border: none;
+      }
+      .icon-container svg {
+        height: 20px;
+        width: 20px;
+      }
+      .editor-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex;
+        overflow-y: scroll;
+      }
+      .editor-container m-editor-code-edit {
+        flex-grow: 1;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  set value(value) {
+    this.editor.value = value
+  }
+
+  get value() {
+    return this.editor.value
+  }
+
+  icons = {
+    close: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12z"/>
+      </svg>
+    `,
+  }
+}
+```
+
+`toolbar.js`
+
+```js
+export class Toolbar extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    const selectContainer = document.createElement('div')
+    const iconContainer = document.createElement('div')
+    const codeBtn = document.createElement(
+      'button'
+    )
+    codeBtn.innerHTML = this.icons.code
+    codeBtn.addEventListener('click', () => {
+      this.onShowNotebookCode()
+    })
+    iconContainer.append(codeBtn)
+    iconContainer.classList.add('icon-container')
+    this.shadowRoot.append(selectContainer, iconContainer)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        background: #111;
+        color: #e7e7e7;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        padding: 3px;
+      }
+      .icon-container {
+        display: flex;
+      }
+      .icon-container button {
+        background: inherit;
+        color: inherit;
+        border: none;
+      }
+      .icon-container svg {
+        height: 20px;
+        width: 20px;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  icons = {
+    code: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6l6 6zm5.2 0l4.6-4.6l-4.6-4.6L16 6l6 6l-6 6z" />
+      </svg>
+    `,
+  }
+}
+```
+
 `app-view.js`
 
 ```js
@@ -603,10 +604,14 @@ export class AppView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.notebook = this.getBlockContent('notebook.md')
     this.loaded = false
+    this.toolbar = document.createElement('m-toolbar')
+    this.toolbar.onShowNotebookCode = () => {
+      this.showNotebookCode()
+    }
     this.editor = document.createElement('m-list-editor')
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.appendChild(this.editor, this.viewFrame)
+    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrame)
     this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
@@ -620,7 +625,7 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-rows: 1fr 1fr;
+        grid-template-rows: 1fr auto 1fr;
         grid-template-columns: 1fr;
         height: 100vh;
       }
@@ -632,6 +637,13 @@ export class AppView extends HTMLElement {
         height: 100%;
         padding: 0;
         border: none;
+      }
+      .notebook-code {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
       }
     `
     this.shadowRoot.append(style)
@@ -652,6 +664,7 @@ export class AppView extends HTMLElement {
   }
 
   handleInput(e) {
+     // TODO: use notebook.json to control frequency, automaticness, and spinner of updates
     this.lastInputEvent = e
     if (!this.inputTimeout) {
       setTimeout(() => {
@@ -692,7 +705,12 @@ export class AppView extends HTMLElement {
     }
   }
 
-  buildNotebook(notebook, files) {
+  async getDeps(notebook, files) {
+    // TODO: load deps via post if notebook.json is changed
+    return ''
+  }
+
+  async buildNotebook(notebook, files) {
     let result = ''
     let position = 0
     const remaining = [...files]
@@ -717,9 +735,9 @@ export class AppView extends HTMLElement {
     return result
   }
 
-  displayNotebook() {
+  async displayNotebook() {
     const dataSrc = ''
-    const notebookContent = this.buildNotebook(this.notebook, this.editor.el.files)
+    const notebookContent = await this.buildNotebook(this.notebook, this.editor.el.files)
     const notebookSrc = `
 generated
 
@@ -772,29 +790,62 @@ ${runEntry}
       )
     }, {once: true})
   }
+
+  async showNotebookCode() {
+    const value = await this.buildNotebook(this.notebook, this.editor.el.files)
+    if (!this.notebookCodeEl) {
+      this.notebookCodeEl = document.createElement('m-notebook-code')
+      this.notebookCodeEl.classList.add('notebook-code')
+      this.notebookCodeEl.initialValue = value
+      this.notebookCodeEl.value = value
+      this.notebookCodeEl.onHide = () => {
+        this.hideNotebookCode()
+      }
+      this.shadowRoot.append(this.notebookCodeEl)
+    }
+  }
+
+  async hideNotebookCode() {
+    if (this.notebookCodeEl) {
+      if (this.notebookCodeEl.value.trim() !== this.notebookCodeEl.initialValue.trim()) {
+        const oldEditor = this.editor
+        this.notebook = this.notebookCodeEl.value
+        this.editor = document.createElement('m-list-editor')
+        this.shadowRoot.replaceChild(this.editor, oldEditor)
+        this.editor.load(this.readNotebookFiles(this.notebook))
+        this.renderView()
+      }
+      this.notebookCodeEl.remove()
+      this.notebookCodeEl = undefined
+    }
+  }
 }
 ```
 
 `app.js`
 
 ```js
-import { AppView } from "/app-view.js"
-import { ListEditor } from "/list-editor.js"
-import { FileGroup } from "/file-group.js"
-import { FileView } from "/file-view.js"
-import { TextEdit } from "/text-edit.js"
-import { CodeEdit } from "/code-edit.js"
 import { ButtonGroup } from "/forms/button-group.js"
 import { Dropdown } from "/menu/dropdown.js"
+import { TextEdit } from "/text-edit.js"
+import { CodeEdit } from "/code-edit/code-edit.js"
+import { FileView } from "/file-view.js"
+import { FileGroup } from "/file-group.js"
+import { ListEditor } from "/list-editor.js"
+import { NotebookCode } from "/notebook-code.js"
+import { Toolbar } from "/toolbar.js"
+import { AppView } from "/app-view.js"
 
-customElements.define('m-app-view', AppView)
-customElements.define('m-list-editor', ListEditor)
-customElements.define('m-editor-file-group', FileGroup)
-customElements.define('m-editor-file-view', FileView)
-customElements.define('m-editor-text-edit', TextEdit)
-customElements.define('m-editor-code-edit', CodeEdit)
 customElements.define('m-forms-button-group', ButtonGroup)
 customElements.define('m-menu-dropdown', Dropdown)
+customElements.define('m-editor-text-edit', TextEdit)
+customElements.define('m-editor-code-edit', CodeEdit)
+customElements.define('m-editor-file-view', FileView)
+customElements.define('m-editor-file-group', FileGroup)
+customElements.define('m-list-editor', ListEditor)
+customElements.define('m-notebook-code', NotebookCode)
+customElements.define('m-toolbar', Toolbar)
+customElements.define('m-app-view', AppView)
 
 class Setup {
   async run() {
