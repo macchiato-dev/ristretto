@@ -635,8 +635,8 @@ export class AppView extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-    this.renderView()
     this.editor.load(this.readNotebookFiles(this.notebook))
+    this.renderView()
   }
 
   readNotebookFiles(notebook) {
@@ -692,7 +692,7 @@ export class AppView extends HTMLElement {
     }
   }
 
-  updateNotebook(notebook, files) {
+  buildNotebook(notebook, files) {
     let result = ''
     let position = 0
     const remaining = [...files]
@@ -700,26 +700,26 @@ export class AppView extends HTMLElement {
       result += notebook.slice(position, block.blockRange[0])
       const index = remaining.findIndex(({name}) => name === block.name)
       const file = remaining[index]
-      remaining.splice(index, 1)
       if (file) {
+        remaining.splice(index, 1)
         const fence = `\`\`\``
         result += `\`${block.name}\`\n\n${fence}\n${file.data}\n${fence}\n`
-        position = block.blockRange[1]
       } else {
         result += `\n\n`
       }
+      position = block.blockRange[1]
     }
     result += notebook.slice(position)
     for (const file of remaining) {
       const fence = `\`\`\``
       result += `\n\n\`${file.name}\`\n\n${fence}\n${file.data}\n${fence}\n\n`
     }
-    return result 
+    return result
   }
 
   displayNotebook() {
     const dataSrc = ''
-    const notebookContent = this.updateNotebook(this.notebook, this.editor.el.files)
+    const notebookContent = this.buildNotebook(this.notebook, this.editor.el.files)
     const notebookSrc = `
 generated
 
