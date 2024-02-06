@@ -11,8 +11,11 @@ export default class TransformView extends HTMLElement {
     this.imageEl.src = this.dataUrl
     this.imageEl.load = e => {
       this.showImage()
+      this.buildHistogram()
     }
     this.canvasEl = document.createElement('canvas')
+    this.canvasEl.setAttribute('height', '256')
+    this.canvasEl.setAttribute('width', '256')
     this.shadowRoot.append(this.imageEl, this.canvasEl)
   }
 
@@ -36,14 +39,17 @@ export default class TransformView extends HTMLElement {
       }
       img {
         display: none;
+        width: 256px;
+        height: 256px;
       }
       canvas {
-        height: 128px;
-        width: 128px;
+        height: 256px;
+        width: 256px;
       }
     `
     this.shadowRoot.append(style)
     this.showImage()
+    this.buildHistogram()
   }
 
   get dataUrl() {
@@ -57,7 +63,11 @@ export default class TransformView extends HTMLElement {
 
   showImage() {
     const ctx = this.canvasEl.getContext('2d')
-    ctx.drawImage(this.imageEl, 0, 0, 128, 128, 0, 0, 128, 128)
+    ctx.drawImage(this.imageEl, 0, 0, 256, 256, 0, 0, 256, 256)
+  }
+
+  buildHistogram() {
+    
   }
 }
 
