@@ -736,6 +736,13 @@ export class AppView extends HTMLElement {
     }
   }
 
+  fence(text) {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}\n${text}\n${quotes}\n`
+  }
+
   async buildNotebook(notebook, files) {
     let result = ''
     let position = 0
@@ -746,17 +753,16 @@ export class AppView extends HTMLElement {
       const file = remaining[index]
       if (file) {
         remaining.splice(index, 1)
-        const fence = `\`\`\``
-        result += `\`${block.name}\`\n\n${fence}\n${file.data}\n${fence}\n`
+        result += `\`${block.name}\`\n` + this.fence(file.data)
       } else {
-        result += `\n\n`
+        result += `\n`
       }
       position = block.blockRange[1]
     }
     result += notebook.slice(position)
     for (const file of remaining) {
       const fence = `\`\`\``
-      result += `\n\n\`${file.name}\`\n\n${fence}\n${file.data}\n${fence}\n\n`
+      result += `\n\n\`${file.name}\`\n\n${this.fence(file.data)}`
     }
     return result
   }
@@ -770,21 +776,14 @@ generated
 
 \`entry.js\`
 
-\`\`\`
-${this.getBlockContent('loader.md', 'entry.js')}
-\`\`\`
+${this.fence(this.getBlockContent('loader.md', 'entry.js'))}
 
 \`loader.md\`
 
-\`\`\`\`
-${this.getBlockContent('loader.md')}
-\`\`\`\`
-
-${deps}
+${this.fence(this.getBlockContent('loader.md'))}
 
 ${notebookContent}
-
-`
+${deps}`
     const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
     const runEntry = `
 const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
