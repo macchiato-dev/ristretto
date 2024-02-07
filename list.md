@@ -625,7 +625,7 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-rows: 1fr auto 1fr;
+        grid-template-rows: auto 1fr 1fr;
         grid-template-columns: 1fr;
         height: 100vh;
       }
@@ -705,9 +705,35 @@ export class AppView extends HTMLElement {
     }
   }
 
-  async getDeps(notebook, files) {
-    // TODO: load deps via post if notebook.json is changed
-    return ''
+  async getDepsConfig(notebook) {
+    const defaultDeps = {deps: [], importFiles: {}}
+    for (const block of readBlocksWithNames(notebook)) {
+      if (block.name === 'notebook.json') {
+        return {...defaultDeps, ...JSON.parse(notebook.slice(...block.contentRange))}
+      }
+    }
+    return defaultDeps
+  }
+
+  async getDeps(notebook) {
+    const newDepsConfig = await this.getDepsConfig(notebook)
+    if (newDepsConfig.deps.length === 0 && Object.keys(newDepsConfig.importFiles).length === 0) {
+      return ''
+    } else if (JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
+      return this.deps
+    } else {
+      const channel = new MessageChannel()
+      const deps = await new Promise((resolve, _) => {
+        channel.port1.onmessage = (message) => {
+          channel.port1.close()
+          resolve(message.data)
+        }
+        parent.postMessage(['getDeps', newDepsConfig], '*', [channel.port2])
+      })
+      this.depsConfig = newDepsConfig
+      this.deps = deps
+      return deps
+    }
   }
 
   async buildNotebook(notebook, files) {
@@ -738,6 +764,7 @@ export class AppView extends HTMLElement {
   async displayNotebook() {
     const dataSrc = ''
     const notebookContent = await this.buildNotebook(this.notebook, this.editor.el.files)
+    const deps = await this.getDeps(notebookContent)
     const notebookSrc = `
 generated
 
@@ -752,6 +779,8 @@ ${this.getBlockContent('loader.md', 'entry.js')}
 \`\`\`\`
 ${this.getBlockContent('loader.md')}
 \`\`\`\`
+
+${deps}
 
 ${notebookContent}
 

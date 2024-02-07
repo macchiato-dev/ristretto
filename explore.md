@@ -231,6 +231,16 @@ export default class ExploreApp extends HTMLElement {
     `
     this.shadowRoot.append(style)
     this.initImages(this.dataSelect.items)
+    addEventListener('message', async e => {
+      const [cmd, ...args] = e.data
+      const port = e.ports[0]
+      console.log('got message in explore')
+      if (cmd === 'getDeps') {
+        const [depsConfig] = args
+        const deps = await this.getDeps(depsConfig)
+        port.postMessage(deps)
+      }
+    })
   }
 
   dataUrl(name, data) {
@@ -309,6 +319,17 @@ export default class ExploreApp extends HTMLElement {
     this.initImages(this.notebookSelect.items)
   }
 
+  getDeps(config) {
+    let result = ''
+    const deps = [...config.deps, ...Object.keys(config.importFiles)]
+    for (const block of readBlocksWithNames(__source)) {
+      if (deps.includes(block.name)) {
+        result += `\n\n\`${block.name}\`\n\n` + __source.slice(...block.blockRange)
+      }
+    }
+    return result
+  }
+
   displayNotebook() {
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
@@ -357,17 +378,12 @@ ${runEntry}
           notebookSrc += "\n\n" + blockSrc
         }
       }
-      const deps = [...config.deps, ...Object.keys(config.importFiles)]
-      for (const block of readBlocksWithNames(src)) {
-        if (entrySrc === undefined && block.name === 'entry.js') {
-          entrySrc = src.slice(...block.blockRange)
-        } else if (deps.includes(block.name)) {
-          notebookSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.blockRange)
-        }
-      }
+      notebookSrc += this.getDeps(config)
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
           dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+        } else if (entrySrc === undefined && block.name === 'entry.js') {
+          entrySrc = src.slice(...block.blockRange)
         }
       }
       const messageText = `\n\n\`entry.js\`\n\n${entrySrc}\n\n---\n\n${dataSrc}\n\n---\n\n${notebookSrc}\n\n`
