@@ -10,7 +10,7 @@ export default class TransformView extends HTMLElement {
     this.imageEl = document.createElement('img')
     this.imageEl.src = this.dataUrl
     this.radioListEl = document.createElement('div')
-    this.radioListEl.append(...['no filter', 'sepia', 'grayscale'].map(name => {
+    this.radioListEl.append(...['no filter', 'sepia', 'grayscale', 'blur'].map(name => {
       const label = document.createElement('label')
       const el = document.createElement('input')
       el.name = 'filter'
@@ -31,7 +31,9 @@ export default class TransformView extends HTMLElement {
           this.imageStyle.textContent = 'img { filter: sepia(.7) }'
         } else if (e.target.value === 'grayscale') {
           this.imageStyle.textContent = 'img { filter: grayscale(.7) }'
-        }
+        } else if (e.target.value === 'blur') {
+          this.imageStyle.textContent = 'img { filter: blur(3px) }'
+        } 
       })
       label.append(el, name)
       return label
@@ -75,7 +77,7 @@ export default class TransformView extends HTMLElement {
 customElements.define('transform-view', TransformView)
 ```
 
-`run.js`
+`app.js`
 
 ```js
 async function setup() {
