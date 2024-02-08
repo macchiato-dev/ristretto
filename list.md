@@ -1,5 +1,7 @@
 # List
 
+This is a list of named code blocks, with customizable order. With the names as paths to files, it can represent a directory of files. It is similar to GitHub gists and GitLab snippets.
+
 `notebook.json`
 
 ```json
@@ -15,6 +17,8 @@
   }
 }
 ```
+
+This renders a list of files. The order needs to be changeable.
 
 `file-group.js`
 
@@ -538,6 +542,8 @@ export class NotebookCode extends HTMLElement {
 }
 ```
 
+
+
 `toolbar.js`
 
 ```js
@@ -1029,24 +1035,30 @@ run(__source)
 <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
   <style>
     svg {
-      background-color: #fff;
+      background-color: #eee;
     }
     .color1 {
-      fill: #000;
+      fill: #f2dbd8;
     }
     .color2 {
-      fill: #000;
+      fill: #466d1d;
     }
-    .color3 {
+    .text {
       fill: #000;
+      opacity: 30%;
     }
   </style>
-
-  <rect x="0" y="0" width="128" height="128" stroke="#bbb" stroke-width="5" fill="transparent" />
-  <g transform="translate(17 15)">
-    <rect x="10" y="15" width="75" height="20" class="color1" />
-    <rect x="10" y="40" width="75" height="20" class="color2" />
-    <rect x="10" y="65" width="75" height="20" class="color3" />
+  <rect x="0" y="0" width="128" height="18" class="color1" />
+  <rect x="5" y="4" width="45" height="10" class="text" />
+  <rect x="5" y="22" width="70" height="10" class="text" />
+  <rect x="20" y="37" width="89" height="10" class="text" />
+  <rect x="5" y="52" width="5" height="10" class="text" />
+  <g transform="translate(0 67)">
+    <rect x="0" y="0" width="128" height="18" class="color1" />
+    <rect x="5" y="4" width="45" height="10" class="text" />
+    <rect x="5" y="22" width="40" height="10" class="text" />
+    <rect x="20" y="37" width="40" height="10" class="text" />
+    <rect x="20" y="52" width="50" height="10" class="text" />
   </g>
 </svg>
 ```
