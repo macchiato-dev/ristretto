@@ -1,9 +1,9 @@
-# Transform
+# Image Filters
 
-`TransformView.js`
+`image-filter-view.js`
 
 ```js
-export default class TransformView extends HTMLElement {
+export default class ImageFilterView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -74,15 +74,15 @@ export default class TransformView extends HTMLElement {
   }
 }
 
-customElements.define('transform-view', TransformView)
+customElements.define('image-filter-view', ImageFilterView)
 ```
 
 `app.js`
 
 ```js
 async function setup() {
-  const transformView = document.createElement('transform-view')
-  document.body.replaceChildren(transformView)
+  const imageFilterView = document.createElement('image-filter-view')
+  document.body.replaceChildren(imageFilterView)
 }
 
 await setup()

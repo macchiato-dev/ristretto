@@ -150,7 +150,7 @@ export default class ExploreApp extends HTMLElement {
         'shapes.md',
       ],
       'image.png': [
-        'transform.md',
+        'image-filters.md',
         'histogram.md',
       ],
       'example-notebook.md': [
