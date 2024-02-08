@@ -121,3 +121,33 @@ document.body.appendChild(el2)
 
 
 ````
+
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    svg {
+      background-color: #000;
+    }
+    .color1 {
+      fill: #422d09;
+    }
+    .color2 {
+      fill: #466d1d;
+    }
+    .title {
+      fill: lawngreen;
+      opacity: 30%;
+    }
+  </style>
+
+  <g transform="translate(17 5)">
+    <rect x="10" y="8" width="40" height="8" class="title" />
+    <rect x="10" y="20" width="75" height="30" class="color1" />
+    <rect x="10" y="58" width="40" height="8" class="title" />
+    <rect x="10" y="70" width="75" height="30" class="color2" />
+  </g>
+</svg>
+```
+
