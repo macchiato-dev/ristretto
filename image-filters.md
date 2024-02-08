@@ -30,7 +30,7 @@ export default class ImageFilterView extends HTMLElement {
         } else if (e.target.value === 'sepia') {
           this.imageStyle.textContent = 'img { filter: sepia(.7) }'
         } else if (e.target.value === 'grayscale') {
-          this.imageStyle.textContent = 'img { filter: grayscale(.7) }'
+          this.imageStyle.textContent = 'img { filter: grayscale(1) }'
         } else if (e.target.value === 'blur') {
           this.imageStyle.textContent = 'img { filter: blur(3px) }'
         } 
