@@ -659,24 +659,17 @@ export class AppView extends HTMLElement {
     return result
   }
 
-  update(e) {
+  update() {
     this.renderView()
   }
 
   handleInput(e) {
-     // TODO: use notebook.json to control frequency, automaticness, and spinner of updates
-    this.lastInputEvent = e
+    // TODO: use notebook.json to control frequency, automaticness, and spinner of updates
     if (!this.inputTimeout) {
-      setTimeout(() => {
-        this.update(this.lastInputEvent)
-      }, 10)
-      this.lastInputEvent = undefined
       this.inputTimeout = setTimeout(() => {
         this.inputTimeout = undefined
-        if (this.lastInputEvent) {
-          this.handleInput(this.lastInputEvent)
-        }
-      }, 100)
+        this.update()
+      }, 500)
     }
   }
 
