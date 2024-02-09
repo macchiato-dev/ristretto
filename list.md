@@ -43,34 +43,10 @@ export class FileGroup extends HTMLElement {
       'm-forms-button-group'
     )
     this.shadowRoot.appendChild(bGroup)
-    this.contentEl.addEventListener(
-      'click-add-above',
-      e => {
-        const el = document.createElement(
-          'm-editor-file-view'
-        )
-        el.fileCount = this.fileCount
-        el.codeMirror = this.codeMirror
-        e.target.insertAdjacentElement(
-          'beforebegin', el
-        )
-        this.fileCount.value += 1
-      },
-    )
-    this.contentEl.addEventListener(
-      'click-add-below',
-      e => {
-        const el = document.createElement(
-          'm-editor-file-view'
-        )
-        el.fileCount = this.fileCount
-        el.codeMirror = this.codeMirror
-        e.target.insertAdjacentElement(
-          'afterend', el
-        )
-        this.fileCount.value += 1
-      },
-    )
+    this.contentEl.addEventListener('click-add-above', e => { this.handleAdd(e, 'up') })
+    this.contentEl.addEventListener('click-add-below', e => { this.handleAdd(e, 'down') })
+    this.contentEl.addEventListener('click-move-up', e => { this.handleMove(e, 'up') })
+    this.contentEl.addEventListener('click-move-down', e => { this.handleMove(e, 'down') })
   }
 
   connectedCallback() {
@@ -114,6 +90,25 @@ export class FileGroup extends HTMLElement {
     this.contentEl.appendChild(el)
     this.fileCount.value += 1
     return el
+  }
+
+  handleAdd(e, direction) {
+    const el = document.createElement(
+      'm-editor-file-view'
+    )
+    el.fileCount = this.fileCount
+    el.codeMirror = this.codeMirror
+    const position = direction == 'up' ? 'beforebegin' : 'afterend'
+    e.target.insertAdjacentElement(position, el)
+    this.fileCount.value += 1
+  }
+
+  handleMove(e, direction) {
+    const siblingEl = direction == 'up' ? e.target.previousElementSibling : e.target.nextElementSibling
+    if (siblingEl) {
+      const position = direction == 'up' ? 'beforebegin' : 'afterend'
+      siblingEl.insertAdjacentElement(position, e.target)
+    }
   }
 
   get language() {
@@ -160,12 +155,16 @@ export class FileView extends HTMLElement {
   textEn = {
     addAbove: 'Add above',
     addBelow: 'Add below',
+    moveUp: 'Move up',
+    moveDown: 'Move down',
     delete: 'Delete',
   }
 
   textEs = {
     addAbove: 'Añadir arriba',
     addBelow: 'Añadir abajo',
+    moveUp: 'Mover arriba',
+    moveDown: 'Mover abajo',
     delete: 'Borrar',
   }
 
@@ -266,6 +265,20 @@ export class FileView extends HTMLElement {
         'click-add-below', {bubbles: true}
       ))
     })
+    if (this.previousElementSibling) {
+      this.menu.add(this.text.moveUp, () => {
+        this.dispatchEvent(new CustomEvent(
+          'click-move-up', {bubbles: true}
+        ))
+      })
+    }
+    if (this.nextElementSibling) {
+      this.menu.add(this.text.moveDown, () => {
+        this.dispatchEvent(new CustomEvent(
+          'click-move-down', {bubbles: true}
+        ))
+      })
+    }
     if (this.fileCount.value > 1) {
       this.menu.add(this.text.delete, () => {
         this.remove()
