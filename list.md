@@ -621,6 +621,7 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
+    this.depsConfig = {deps: [], importFiles: {}}
     this.notebook = this.getBlockContent('notebook.md')
     this.loaded = false
     this.toolbar = document.createElement('m-toolbar')
@@ -641,6 +642,24 @@ export class AppView extends HTMLElement {
 
   connectedCallback() {
     const style = document.createElement('style')
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      html, body {
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+    `
+    document.head.append(globalStyle)
     style.textContent = `
       :host {
         display: grid;
@@ -688,7 +707,7 @@ export class AppView extends HTMLElement {
       this.inputTimeout = setTimeout(() => {
         this.inputTimeout = undefined
         this.update()
-      }, 500)
+      }, 1500)
     }
   }
 
@@ -729,9 +748,7 @@ export class AppView extends HTMLElement {
 
   async getDeps(notebook) {
     const newDepsConfig = await this.getDepsConfig(notebook)
-    if (newDepsConfig.deps.length === 0 && Object.keys(newDepsConfig.importFiles).length === 0) {
-      return ''
-    } else if (JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
+    if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
       return this.deps
     } else {
       const channel = new MessageChannel()
@@ -784,18 +801,16 @@ export class AppView extends HTMLElement {
     const notebookContent = await this.buildNotebook(this.notebook, this.editor.el.files)
     const deps = await this.getDeps(notebookContent)
     const notebookSrc = `
-generated
+**deps**
 
-\`entry.js\`
+${deps}
 
-${this.fence(this.getBlockContent('loader.md', 'entry.js'))}
+---
 
-\`loader.md\`
-
-${this.fence(this.getBlockContent('loader.md'))}
+**notebook**
 
 ${notebookContent}
-${deps}`
+`
     const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
     const runEntry = `
 const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
@@ -887,7 +902,7 @@ customElements.define('m-notebook-code', NotebookCode)
 customElements.define('m-toolbar', Toolbar)
 customElements.define('m-app-view', AppView)
 
-class Setup {
+class App {
   async run() {
     document.body.appendChild(
       document.createElement(
@@ -897,149 +912,7 @@ class Setup {
   }
 }
 
-new Setup().run()
-```
-
-`NotebookView.js`
-
-```js
-export default class NotebookView extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.shadowRoot.append()
-  }
-
-  connectedCallback() {
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      html, body {
-        margin: 0;
-        padding: 0;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: space-around;
-        background: #fff;
-        color: #000;
-        overflow: auto;
-      }
-      .cm-editor {
-        flex-grow: 1;
-        height: 99vh;
-        background: #fff;
-        color: #000;
-      }
-    `
-    this.shadowRoot.append(style)
-    this.loadEditor()
-  }
-
-  async loadEditor() {
-    const loaderSource = this.getBlockContent('loader.md', 'loader.js')
-    const {Loader} = await import(`data:text/javascript;base64,${btoa(loaderSource)}`)
-    const loader = new Loader(__source)
-    loader.read()
-    loader.build()
-    loader.loadLibraries(document)
-    loader.render(document)
-  }
-
-  getBlockContent(blockName, subBlockName = undefined) {
-    for (const block of readBlocksWithNames(__source)) {
-      if (block.name === blockName) {
-        const blockSource = __source.slice(...block.contentRange)
-        if (subBlockName === undefined) {
-          return blockSource
-        } else {
-          for (const subBlock of readBlocksWithNames(blockSource)) {
-            if (subBlock.name === subBlockName)
-            return blockSource.slice(...subBlock.contentRange)
-          }
-        }
-      }
-    }
-  }
-}
-
-customElements.define('notebook-view', NotebookView)
-```
-
-`run.js`
-
-```js
-async function setup() {
-  const notebookView = document.createElement('notebook-view')
-  document.body.replaceChildren(notebookView)
-}
-
-await setup()
-```
-
-`entry.js`
-
-```js
-function* readBlocks(input) {
-  const re = /(?:^|\n)([ \t]*)(`{3,}|~{3,})([^\n]*\n)/
-  let index = 0
-  while (index < input.length) {
-    const open = input.substring(index).match(re)
-    if (!open) {
-      break
-    } else if (open[1].length > 0 || open[2][0] === '~') {
-      throw new Error(`Invalid open fence at ${index + open.index}`)
-    }
-    const contentStart = index + open.index + open[0].length
-    const close = input.substring(contentStart).match(
-      new RegExp(`\n([ ]{0,3})${open[2]}(\`*)[ \t]*\r?(?:\n|$)`)
-    )
-    if (!(close && close[1] === '')) {
-      throw new Error(`Missing or invalid close fence at ${index + open.index}`)
-    }
-    const contentRange = [contentStart, contentStart + close.index]
-    const blockRange = [index + open.index, contentRange.at(-1) + close[0].length]
-    yield { blockRange, contentRange, info: open[3].trim() }
-    index = blockRange.at(-1)
-  }
-}
-
-function* readBlocksWithNames(input) {
-  for (const block of readBlocks(input)) {
-    const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
-    )
-    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
-  }
-}
-
-async function run(src) {
-  globalThis.readBlocks = readBlocks
-  globalThis.readBlocksWithNames = readBlocksWithNames
-  for (const block of readBlocksWithNames(src)) {
-    if (['NotebookView.js', 'run.js'].includes(block.name)) {
-      const blockSrc = src.slice(...block.contentRange)
-      await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
-    }
-  }
-}
-
-run(__source)
+new App().run()
 ```
 
 `thumbnail.svg`

@@ -3,7 +3,7 @@
 `ShapesView.js`
 
 ```js
-export default class ShapesView extends HTMLElement {
+export class ShapesView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -68,13 +68,15 @@ export default class ShapesView extends HTMLElement {
     this.shadowRoot.append(style)
   }
 }
-
-customElements.define('shapes-view', ShapesView)
 ```
 
-`run.js`
+`app.js`
 
 ```js
+import {ShapesView} from '/ShapesView.js'
+
+customElements.define('shapes-view', ShapesView)
+
 async function setup() {
   const shapesView = document.createElement('shapes-view')
   document.body.replaceChildren(shapesView)

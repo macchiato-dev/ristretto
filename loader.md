@@ -51,8 +51,11 @@ export class Loader {
     const importFiles = config.importFiles
     const importNotebooks = Object.keys(importFiles)
     const files = []
+    this.bundleBlocks = []
     for (const block of readBlocksWithNames(this.src)) {
-      if (block.name && block.name.endsWith('.js') && !['entry.js', 'run.js', 'NotebookView.js'].includes(block.name)) {
+      if ((block.name || '').endsWith('-bundle.js')) {
+        this.bundleBlocks.push(block)
+      } else if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
         files.push({name: block.name, data: this.src.slice(...block.contentRange)})
       }
       if (importNotebooks.includes(block.name)) {
@@ -159,7 +162,7 @@ export class Loader {
     this.scripts = [intro, ...modules]
   }
 
-  loadLibraries(document) {
+  loadBundles(document) {
     const codeMirrorSource = this.getBlockContent('codemirror-bundle.md', 'codemirror-bundle.js')
     const codeMirrorScript = document.createElement('script')
     codeMirrorScript.type = 'module'
@@ -168,6 +171,12 @@ export class Loader {
   }
 
   render(document) {
+    for (const bundleBlock of this.bundleBlocks) {
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.textContent = scriptText
+      document.head.append(this.src.slice(...bundleBlock.contentRange))
+    }
     for (const styleText of this.styles) {
       const style = document.createElement('style')
       style.textContent = styleText
@@ -213,9 +222,9 @@ function* readBlocks(input) {
 function* readBlocksWithNames(input) {
   for (const block of readBlocks(input)) {
     const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
     )
-    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
   }
 }
 
@@ -232,7 +241,7 @@ async function run(src) {
           const loader = new Loader(__source)
           loader.read()
           loader.build()
-          // loader.loadLibraries(document)
+          loader.loadBundles(document)
           loader.render(document)
         }
       }

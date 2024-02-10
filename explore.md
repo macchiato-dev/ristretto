@@ -234,7 +234,6 @@ export default class ExploreApp extends HTMLElement {
     addEventListener('message', async e => {
       const [cmd, ...args] = e.data
       const port = e.ports[0]
-      console.log('got message in explore')
       if (cmd === 'getDeps') {
         const [depsConfig] = args
         const deps = await this.getDeps(depsConfig)
@@ -271,35 +270,28 @@ export default class ExploreApp extends HTMLElement {
         return [item.filename, item]
       })
     )
-    for (const block of readBlocks(src)) {
-      const name = src.slice(0, block.blockRange[0]).match(
-        new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
-      ).at(1)
-      const item = itemsByFile[name]
+    for (const block of readBlocksWithNames(src)) {
+      const item = itemsByFile[block.name]
       if (item !== undefined) {
         const blockSrc = src.slice(...block.contentRange)
         let thumbnail
-        for (const block of readBlocks(blockSrc)) {
-          const name = blockSrc.slice(0, block.blockRange[0]).match(
-            new RegExp('\\s*`([^`]+)`\\s*$')
-          ).at(1)
+        for (const subBlock of readBlocksWithNames(blockSrc)) {
           if (
-            thumbnail === undefined && name && name.match(/\.(png|jpe?g|svg|webm)/) ||
-            name.startsWith('thumbnail.')
+            thumbnail === undefined && (subBlock.name || '').match(/\.(png|jpe?g|svg|webm)/) ||
+            subBlock.name.startsWith('thumbnail.')
           ) {
-            thumbnail = [name, block.contentRange]
+            thumbnail = subBlock
           }
         }
         if (thumbnail !== undefined) {
-          const name = thumbnail[0]
-          const data = blockSrc.slice(...thumbnail[1]).replaceAll(
+          const data = blockSrc.slice(...thumbnail.contentRange).replaceAll(
             new RegExp(`\\$\\{image\\('([^']+)'\\)\\}`, 'g'),
             (_, m) => {
               const img = this.findImage(m)
               return img ? this.dataUrl(...img) : m
             }
           )
-          item.image = this.dataUrl(name, data)
+          item.image = this.dataUrl(thumbnail.name, data)
         }
       }
     }
@@ -321,13 +313,23 @@ export default class ExploreApp extends HTMLElement {
 
   getDeps(config) {
     let result = ''
+    let entry = ''
+    let loader = ''
     const deps = [...config.deps, ...Object.keys(config.importFiles)]
     for (const block of readBlocksWithNames(__source)) {
-      if (deps.includes(block.name)) {
-        result += `\n\n\`${block.name}\`\n\n` + __source.slice(...block.blockRange)
+      if (block.name === 'loader.md') {
+        loader = `\n\n` + __source.slice(...block.blockRange)
+        const blockContent = __source.slice(...block.contentRange)
+        for (const subBlock of readBlocksWithNames(blockContent)) {
+          if (subBlock.name === 'entry.js') {
+            entry = `\n\n` + blockContent.slice(...subBlock.blockRange)
+          }
+        }
+      } else if (deps.includes(block.name)) {
+        result += `\n\n` + __source.slice(...block.blockRange)
       }
     }
-    return result
+    return entry + loader + result
   }
 
   displayNotebook() {
@@ -359,34 +361,28 @@ ${runEntry}
 `.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
-      let dataSrc = '', entrySrc = undefined, notebookSrc = ''
+      let dataSrc = '', notebookSrc = ''
       const notebookFile = this.notebookSelect.selectedItem?.name
       const dataFile = this.dataSelect.selectedItem?.filename
       let config = {deps: [], importFiles: {}}
       for (const block of readBlocksWithNames(src)) {
-        if (block.name === 'entry.js') {
-          entrySrc = src.slice(...block.blockRange)
-        } else if (block.name === notebookFile) {
+        if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
           for (const subBlock of readBlocksWithNames(blockSrc)) {
             if (subBlock.name === 'notebook.json') {
               config = {...config, ...JSON.parse(blockSrc.slice(...subBlock.contentRange))}
-            } else if (subBlock.name === 'entry.js') {
-              entrySrc = blockSrc.slice(...subBlock.blockRange)
             }
           }
           notebookSrc += "\n\n" + blockSrc
         }
       }
-      notebookSrc += this.getDeps(config)
+      const depsSrc = this.getDeps(config)
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
           dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
-        } else if (entrySrc === undefined && block.name === 'entry.js') {
-          entrySrc = src.slice(...block.blockRange)
         }
       }
-      const messageText = `\n\n\`entry.js\`\n\n${entrySrc}\n\n---\n\n${dataSrc}\n\n---\n\n${notebookSrc}\n\n`
+      const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
       this.viewFrame.contentWindow.postMessage(
         ['notebook', messageData],
@@ -445,9 +441,9 @@ function* readBlocks(input) {
 function* readBlocksWithNames(input) {
   for (const block of readBlocks(input)) {
     const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
     )
-    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
   }
 }
 
@@ -455,7 +451,7 @@ async function run(src) {
   globalThis.readBlocks = readBlocks
   globalThis.readBlocksWithNames = readBlocksWithNames
   for (const block of readBlocksWithNames(src)) {
-    if (block.name && (block.name.endsWith('.js') && block.name !== 'entry.js')) {
+    if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
       const blockSrc = src.slice(...block.contentRange)
       await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
     }

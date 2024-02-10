@@ -3,7 +3,7 @@
 `PaletteView.js`
 
 ```js
-export default class PaletteView extends HTMLElement {
+export class PaletteView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -58,13 +58,15 @@ export default class PaletteView extends HTMLElement {
     this.shadowRoot.append(style)
   }
 }
-
-customElements.define('palette-view', PaletteView)
 ```
 
-`run.js`
+`app.js`
 
 ```js
+import {PaletteView} from '/PaletteView.js'
+
+customElements.define('palette-view', PaletteView)
+
 async function setup() {
   const paletteView = document.createElement('palette-view')
   document.body.replaceChildren(paletteView)
