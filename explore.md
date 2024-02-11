@@ -2,10 +2,23 @@
 
 This is an interface to explore different notebooks for different types of content.
 
+`notebook.json`
+
+```json
+{
+  "deps": [
+    "loader.md"
+  ],
+  "importFiles": [
+    ["loader.md", "builder.js"]
+  ]
+}
+```
+
 `FileCard.js`
 
 ```js
-export default class FileCard extends HTMLElement {
+export class FileCard extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -66,14 +79,12 @@ export default class FileCard extends HTMLElement {
     ))
   }
 }
-
-customElements.define('file-card', FileCard)
 ```
 
 `FileCardList.js`
 
 ```js
-export default class FileCardList extends HTMLElement {
+export class FileCardList extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -130,14 +141,14 @@ export default class FileCardList extends HTMLElement {
     return this.listEl.querySelector('[selected]')
   }
 }
-
-customElements.define('file-card-list', FileCardList)
 ```
 
 `ExploreApp.js`
 
 ```js
-export default class ExploreApp extends HTMLElement {
+import {Builder} from '/loader/builder.js'
+
+export class ExploreApp extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -235,8 +246,9 @@ export default class ExploreApp extends HTMLElement {
       const [cmd, ...args] = e.data
       const port = e.ports[0]
       if (cmd === 'getDeps') {
-        const [depsConfig] = args
-        const deps = await this.getDeps(depsConfig)
+        const [notebookSrc] = args
+        const builder = new Builder({src: notebookSrc, parentSrc: __source})
+        const deps = builder.getDeps()
         port.postMessage(deps)
       }
     })
@@ -311,27 +323,6 @@ export default class ExploreApp extends HTMLElement {
     this.initImages(this.notebookSelect.items)
   }
 
-  getDeps(config) {
-    let result = ''
-    let entry = ''
-    let loader = ''
-    const deps = [...config.deps, ...Object.keys(config.importFiles)]
-    for (const block of readBlocksWithNames(__source)) {
-      if (block.name === 'loader.md') {
-        loader = `\n\n` + __source.slice(...block.blockRange)
-        const blockContent = __source.slice(...block.contentRange)
-        for (const subBlock of readBlocksWithNames(blockContent)) {
-          if (subBlock.name === 'entry.js') {
-            entry = `\n\n` + blockContent.slice(...subBlock.blockRange)
-          }
-        }
-      } else if (deps.includes(block.name)) {
-        result += `\n\n` + __source.slice(...block.blockRange)
-      }
-    }
-    return entry + loader + result
-  }
-
   displayNotebook() {
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
@@ -364,19 +355,14 @@ ${runEntry}
       let dataSrc = '', notebookSrc = ''
       const notebookFile = this.notebookSelect.selectedItem?.name
       const dataFile = this.dataSelect.selectedItem?.filename
-      let config = {deps: [], importFiles: {}}
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
-          for (const subBlock of readBlocksWithNames(blockSrc)) {
-            if (subBlock.name === 'notebook.json') {
-              config = {...config, ...JSON.parse(blockSrc.slice(...subBlock.contentRange))}
-            }
-          }
-          notebookSrc += "\n\n" + blockSrc
+          notebookSrc = blockSrc
         }
       }
-      const depsSrc = this.getDeps(config)
+      const builder = new Builder({src: notebookSrc, parentSrc: src})
+      const depsSrc = builder.getDeps()
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
           dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
@@ -397,67 +383,22 @@ ${runEntry}
     return this.notebookSelect
   }
 }
-
-customElements.define('explore-app', ExploreApp)
 ```
 
-`setup.js`
+`app.js`
 
 ```js
+import {FileCard} from '/FileCard.js'
+import {FileCardList} from '/FileCardList.js'
+import {ExploreApp} from '/ExploreApp.js'
+
+customElements.define('file-card', FileCard)
+customElements.define('file-card-list', FileCardList)
+customElements.define('explore-app', ExploreApp)
+
 async function setup() {
   document.body.append(document.createElement('explore-app'))
 }
 
 setup()
 ```
-
-`entry.js`
-
-```js
-function* readBlocks(input) {
-  const re = /(?:^|\n)([ \t]*)(`{3,}|~{3,})([^\n]*\n)/
-  let index = 0
-  while (index < input.length) {
-    const open = input.substring(index).match(re)
-    if (!open) {
-      break
-    } else if (open[1].length > 0 || open[2][0] === '~') {
-      throw new Error(`Invalid open fence at ${index + open.index}`)
-    }
-    const contentStart = index + open.index + open[0].length
-    const close = input.substring(contentStart).match(
-      new RegExp(`\n([ ]{0,3})${open[2]}(\`*)[ \t]*\r?(?:\n|$)`)
-    )
-    if (!(close && close[1] === '')) {
-      throw new Error(`Missing or invalid close fence at ${index + open.index}`)
-    }
-    const contentRange = [contentStart, contentStart + close.index]
-    const blockRange = [index + open.index, contentRange.at(-1) + close[0].length]
-    yield { blockRange, contentRange, info: open[3].trim() }
-    index = blockRange.at(-1)
-  }
-}
-
-function* readBlocksWithNames(input) {
-  for (const block of readBlocks(input)) {
-    const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
-    )
-    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
-  }
-}
-
-async function run(src) {
-  globalThis.readBlocks = readBlocks
-  globalThis.readBlocksWithNames = readBlocksWithNames
-  for (const block of readBlocksWithNames(src)) {
-    if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
-      const blockSrc = src.slice(...block.contentRange)
-      await import(`data:text/javascript;base64,${btoa(blockSrc)}`)
-    }
-  }
-}
-
-run(__source)
-```
-

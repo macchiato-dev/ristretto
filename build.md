@@ -76,12 +76,6 @@ async function handleMessage(e) {
   try {
     if (cmd === 'readPaths') {
       const paths = await Array.fromAsync(readPaths())
-      paths.sort((a, b) => {
-        const [strA, strB] = [join(...a), join(...b)]
-        const hasBundle = [strA, strB].map(s => s.includes('codemirror-bundle.md') ? 'b' : 'a')
-        const hasBundleCompare = hasBundle[0].localeCompare(hasBundle[1])
-        return (hasBundleCompare !== 0) ? hasBundleCompare : strA.localeCompare(strB)
-      })
       port.postMessage(paths)
     } else if (cmd === 'readFile') {
       const [path] = args
@@ -156,22 +150,40 @@ function arrEquals(a1, a2) {
   return a1.length === a2.length && a1.every((v, i) => v === a2[i])
 }
 
+async function renderNotebook() {
+  const exploreSrc = new TextDecoder().decode(await readFile(['explore.md']))
+  const loaderSrc = new TextDecoder().decode(await readFile(['loader.md']))
+  let entry = ''
+  for (const block of readBlocksWithNames(loaderSrc)) {
+    if (block.name === 'entry.js') {
+      entry = loaderSrc.slice(...block.blockRange)
+    }
+  }
+  return `${exploreSrc}\n\n${entry}`
+}
+
 async function buildNotebook() {
   try {
     const allPaths = await readPaths()
+    const sortedPaths = allPaths.sort((a, b) => {
+      const withBundle = [a, b].map(path => [path.some(s => s.includes('codemirror-bundle.md')) ? 'b' : 'a', ...path])
+      const len = Math.max(...withBundle.map(path => path.length))
+      for (let i=0; i < len; i++) {
+        const result = (withBundle[0][i] ?? '').localeCompare(withBundle[1][i] ?? '')
+        if (result !== 0) {
+          return result
+        }
+      }
+      return 0
+    })
     const paths = [
-      [['explore.md']],
-      ...allPaths.filter(path => (
+      ...sortedPaths.filter(path => (
         path.at('-1').endsWith('.md') &&
         path.at(0) !== 'build' &&
-        path.at(0) !== 'out' &&
-        !arrEquals(path, ['README.md']) &&
-        !arrEquals(path, ['notebook.md']) &&
-        !arrEquals(path, ['explore.md']) &&
-        !arrEquals(path, ['build.md'])
+        path.at(0) !== 'out'
       )).map(path => ([path, true])),
     ]
-    let output = ''
+    let output = await renderNotebook()
     for (const [path, wrap] of paths) {
       const text = new TextDecoder().decode(await readFile(path))
       if (wrap) {
@@ -302,9 +314,9 @@ function* readBlocks(input) {
 function* readBlocksWithNames(input) {
   for (const block of readBlocks(input)) {
     const match = input.slice(0, block.blockRange[0]).match(
-      new RegExp('\\n\\s*\\n\\s*`([^`]+)`\\s*\\n\\s*$')
+      new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
     )
-    yield ({...block, ...(match ? {name: match[1]} : undefined)})
+    yield ({...block, ...(match ? {name: match[1], blockRange: [block.blockRange[0] - match[0].length, block.blockRange[1]]} : undefined)})
   }
 }
 

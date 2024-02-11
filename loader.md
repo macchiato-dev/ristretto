@@ -34,10 +34,10 @@ export class Loader {
 
   getConfig() {
     const configBlock = this.getBlockContent('notebook.json')
-    const defaultConfig = {importFiles: {}}
+    const defaultConfig = {bundleFiles: [], importFiles: []}
     if (configBlock) {
       try {
-        return JSON.parse(configBlock)
+        return {...defaultConfig, ...JSON.parse(configBlock)}
       } catch (err) {
         return defaultConfig
       }
@@ -47,28 +47,36 @@ export class Loader {
   }
 
   read() {
-    const config = this.getConfig()
-    const importFiles = config.importFiles
-    const importNotebooks = Object.keys(importFiles)
+    this.config = this.getConfig()
+    const {importFiles, bundleFiles} = this.config
+    const importNotebooks = [...importFiles, ...bundleFiles].map(a => a[0])
     const files = []
-    this.bundleBlocks = []
+    const importFileData = importFiles.map(v => undefined)
+    const bundleFileData = bundleFiles.map(v => undefined)
     for (const block of readBlocksWithNames(this.src)) {
-      if ((block.name || '').endsWith('-bundle.js')) {
-        this.bundleBlocks.push(block)
-      } else if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
+      if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
         files.push({name: block.name, data: this.src.slice(...block.contentRange)})
       }
       if (importNotebooks.includes(block.name)) {
         const blockSource = this.src.slice(...block.contentRange)
         const parent = block.name.match(/(^.*)\.md$/)[1]
+        const blockBundleFiles = bundleFiles.map(a => a[0] === block.name).map(a => a[1])
+        const blockImportFiles = importFiles.map(a => a[0] === block.name).map(a => a[1])
         for (const subBlock of readBlocksWithNames(blockSource)) {
-          if (importFiles[block.name].includes(subBlock.name)) {
-            files.push({name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)})
+          const bundleIndex = bundleFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
+          const importIndex = importFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
+          if (bundleIndex !== -1) {
+            bundleFileData[bundleIndex] = {path: bundleFiles[bundleIndex], content: blockSource.slice(...subBlock.contentRange)}
+          }
+          if (importIndex !== -1) {
+            importFileData[importIndex] = {name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)}
           }
         }
       }
     }
-    this.files = [...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')]
+    this.bundles = bundleFileData.filter(v => v !== undefined)
+    const depFiles = importFileData.filter(v => v !== undefined)
+    this.files = [...depFiles, ...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')]
   }
 
   buildStyle(file) {
@@ -163,20 +171,16 @@ export class Loader {
   }
 
   loadBundles(document) {
-    const codeMirrorSource = this.getBlockContent('codemirror-bundle.md', 'codemirror-bundle.js')
-    const codeMirrorScript = document.createElement('script')
-    codeMirrorScript.type = 'module'
-    codeMirrorScript.textContent = codeMirrorSource
-    document.head.appendChild(codeMirrorScript)
+    for (const bundle of this.bundles) {
+      const scriptSrc = bundle.content
+      const scriptEl = document.createElement('script')
+      scriptEl.type = 'module'
+      scriptEl.textContent = scriptSrc
+      document.head.appendChild(scriptEl)
+    }
   }
 
   render(document) {
-    for (const bundleBlock of this.bundleBlocks) {
-      const script = document.createElement('script')
-      script.type = 'module'
-      script.textContent = scriptText
-      document.head.append(this.src.slice(...bundleBlock.contentRange))
-    }
     for (const styleText of this.styles) {
       const style = document.createElement('style')
       style.textContent = styleText
@@ -188,6 +192,49 @@ export class Loader {
       script.textContent = scriptText
       document.head.append(script)
     }
+  }
+}
+```
+
+`builder.js`
+
+```js
+export class Builder {
+  constructor({src, parentSrc}) {
+    this.src = src
+    this.parentSrc = parentSrc
+  }
+
+  getConfig() {
+    const defaultConfig = {bundleFiles: [], importFiles: []}
+    for (const block of readBlocksWithNames(this.src)) {
+      if (block.name === 'notebook.json') {
+        return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
+      }
+    }
+    return defaultConfig
+  }
+
+  getDeps() {
+    let result = ''
+    let entry = ''
+    let loader = ''
+    const config = this.getConfig()
+    const deps = [...config.bundleFiles, ...config.importFiles].map(a => a[0])
+    for (const block of readBlocksWithNames(this.parentSrc)) {
+      if (block.name === 'loader.md') {
+        loader = `\n\n` + this.parentSrc.slice(...block.blockRange)
+        const blockContent = this.parentSrc.slice(...block.contentRange)
+        for (const subBlock of readBlocksWithNames(blockContent)) {
+          if (subBlock.name === 'entry.js') {
+            entry = `\n\n` + blockContent.slice(...subBlock.blockRange)
+          }
+        }
+      } else if (deps.includes(block.name)) {
+        result += `\n\n` + this.parentSrc.slice(...block.blockRange)
+      }
+    }
+    return entry + loader + result
   }
 }
 ```

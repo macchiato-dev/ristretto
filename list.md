@@ -6,15 +6,14 @@ This is a list of named code blocks, with customizable order. With the names as 
 
 ```json
 {
-  "deps": [
-    "loader.md",
-    "codemirror-bundle.md"
+  "bundleFiles": [
+    ["codemirror-bundle.md", "codemirror-bundle.js"]
   ],
-  "importFiles": {
-    "code-edit.md": ["code-edit.js"],
-    "forms.md": ["button-group.js"],
-    "menu.md": ["dropdown.js"]
-  }
+  "importFiles": [
+    ["forms.md", "button-group.js"],
+    ["code-edit.md", "code-edit.js"],
+    ["menu.md", "dropdown.js"]
+  ]
 }
 ```
 
@@ -621,7 +620,7 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.depsConfig = {deps: [], importFiles: {}}
+    this.depsConfig = {bundleFiles: [], importFiles: []}
     this.notebook = this.getBlockContent('notebook.md')
     this.loaded = false
     this.toolbar = document.createElement('m-toolbar')
@@ -737,7 +736,7 @@ export class AppView extends HTMLElement {
   }
 
   async getDepsConfig(notebook) {
-    const defaultDeps = {deps: [], importFiles: {}}
+    const defaultDeps = {bundleFiles: [], importFiles: []}
     for (const block of readBlocksWithNames(notebook)) {
       if (block.name === 'notebook.json') {
         return {...defaultDeps, ...JSON.parse(notebook.slice(...block.contentRange))}
@@ -757,7 +756,7 @@ export class AppView extends HTMLElement {
           channel.port1.close()
           resolve(message.data)
         }
-        parent.postMessage(['getDeps', newDepsConfig], '*', [channel.port2])
+        parent.postMessage(['getDeps', notebook], '*', [channel.port2])
       })
       this.depsConfig = newDepsConfig
       this.deps = deps

@@ -63,12 +63,6 @@ async function handleMessage(e) {
   try {
     if (cmd === 'readPaths') {
       const paths = await Array.fromAsync(readPaths())
-      paths.sort((a, b) => {
-        const [strA, strB] = [join(...a), join(...b)]
-        const hasBundle = [strA, strB].map(s => s.includes('codemirror-bundle.md') ? 'b' : 'a')
-        const hasBundleCompare = hasBundle[0].localeCompare(hasBundle[1])
-        return (hasBundleCompare !== 0) ? hasBundleCompare : strA.localeCompare(strB)
-      })
       port.postMessage(paths)
     } else if (cmd === 'readFile') {
       const [path] = args
