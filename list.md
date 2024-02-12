@@ -10,6 +10,7 @@ This is a list of named code blocks, with customizable order. With the names as 
     ["codemirror-bundle.md", "codemirror-bundle.js"]
   ],
   "importFiles": [
+    ["loader.md", "builder.js"],
     ["forms.md", "button-group.js"],
     ["code-edit.md", "code-edit.js"],
     ["menu.md", "dropdown.js"]
@@ -616,12 +617,16 @@ export class Toolbar extends HTMLElement {
 `app-view.js`
 
 ```js
+import {Builder} from '/loader/builder.js'
+
 export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
     this.depsConfig = {bundleFiles: [], importFiles: []}
-    this.notebook = this.getBlockContent('notebook.md')
+    this.notebook = this.getBlockContent('notebook.md') ?? (
+      `\n\n\`app.js\`\n\n${this.fence(`document.body.innerText = 'hello'`)}`
+    )
     this.loaded = false
     this.toolbar = document.createElement('m-toolbar')
     this.toolbar.onShowNotebookCode = () => {
@@ -751,13 +756,27 @@ export class AppView extends HTMLElement {
       return this.deps
     } else {
       const channel = new MessageChannel()
-      const deps = await new Promise((resolve, _) => {
+      let loaded = false
+      const remotePromise = new Promise((resolve, _) => {
         channel.port1.onmessage = (message) => {
           channel.port1.close()
+          loaded = true
           resolve(message.data)
         }
         parent.postMessage(['getDeps', notebook], '*', [channel.port2])
       })
+      const localPromise = new Promise((resolve, _reject) => {
+        setTimeout(() => {
+          if (loaded) {
+            resolve(undefined)
+          } else {
+            const builder = new Builder({src: '', parentSrc: __source})
+            const deps = builder.getDeps()
+            resolve(deps)
+          }
+        }, 500)
+      })
+      const deps = await Promise.race([remotePromise, localPromise])
       this.depsConfig = newDepsConfig
       this.deps = deps
       return deps
