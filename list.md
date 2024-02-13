@@ -783,11 +783,11 @@ export class AppView extends HTMLElement {
     }
   }
 
-  fence(text) {
+  fence(text, info = '') {
     const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
     const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
     const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
-    return `\n${quotes}\n${text}\n${quotes}\n`
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
   }
 
   async buildNotebook(notebook, files) {
@@ -800,16 +800,23 @@ export class AppView extends HTMLElement {
       const file = remaining[index]
       if (file) {
         remaining.splice(index, 1)
-        result += `\`${block.name}\`\n` + this.fence(file.data)
+        const info = (block.info ?? '').trim().length > 0 ? block.info.trim() : undefined
+        const extMatch = block.name.match(/\.([\w-]+)/)
+        const ext = extMatch ? extMatch[1] : undefined
+        result += `\`${block.name}\`\n` + this.fence(file.data, info ?? ext ?? '')
       } else {
         result += `\n`
       }
       position = block.blockRange[1]
     }
     result += notebook.slice(position)
+    if (remaining.length > 0) {
+      result = result.trimEnd()
+    }
     for (const file of remaining) {
-      const fence = `\`\`\``
-      result += `\n\n\`${file.name}\`\n\n${this.fence(file.data)}`
+      const extMatch = (file.name ?? '').match(/\.([\w-]+)/)
+      const ext = extMatch ? extMatch[1] : undefined
+      result += `\n\n\`${file.name}\`\n${this.fence(file.data, ext ?? '')}`
     }
     return result
   }
