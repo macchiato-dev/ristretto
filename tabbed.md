@@ -79,6 +79,8 @@ export class FileGroup extends HTMLElement {
     const tabEl = document.createElement('m-editor-file-tab-view')
     const contentEl = document.createElement('m-editor-file-content-view')
     tabEl.contentEl = contentEl
+    this.headerEl.appendChild(tabEl)
+    this.contentEl.appendChild(contentEl)
     tabEl.fileCount = this.fileCount
     if (name !== undefined) {
       tabEl.name = name
@@ -87,8 +89,6 @@ export class FileGroup extends HTMLElement {
     if (data !== undefined) {
       contentEl.data = data
     }
-    this.headerEl.appendChild(tabEl)
-    this.contentEl.appendChild(contentEl)
     this.fileCount.value += 1
     return tabEl
   }
@@ -141,7 +141,7 @@ export class FileGroup extends HTMLElement {
   }
 
   get files() {
-    return [...this.contentEl.children]
+    return [...this.headerEl.children]
   }
 }
 ```
@@ -181,10 +181,7 @@ export class FileTabView extends HTMLElement {
     this.codeMirror = true
     this.headerEl = document.createElement('div')
     this.headerEl.classList.add('header')
-    this.contentEl = document.createElement('div')
-    this.contentEl.classList.add('content')
     this.shadowRoot.appendChild(this.headerEl)
-    this.shadowRoot.appendChild(this.contentEl)
     this.nameEl = document.createElement('input')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
@@ -294,6 +291,10 @@ export class FileTabView extends HTMLElement {
     this.menu.open(this.menuBtn)
   }
 
+  get editEl() {
+    return this.contentEl.editEl
+  }
+
   set name(name) {
     this.nameEl.value = name
     this.setFileType(name)
@@ -399,6 +400,14 @@ export class FileContentView extends HTMLElement {
 
   get codeMirror() {
     return this._codeMirror
+  }
+
+  set data(data) {
+    this.editEl.value = data
+  }
+
+  get data() {
+    return this.editEl.value
   }
 
   get selected() {
