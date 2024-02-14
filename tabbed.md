@@ -103,6 +103,7 @@ export class FileGroup extends HTMLElement {
     e.target.insertAdjacentElement(position, tabEl)
     e.target.contentEl.insertAdjacentElement(position, contentEl)
     this.fileCount.value += 1
+    tabEl.selected = true
   }
 
   handleMove(e, direction) {
@@ -201,6 +202,8 @@ export class FileTabView extends HTMLElement {
       'm-menu-dropdown'
     )
     this.shadowRoot.appendChild(this.menu)
+    this.addEventListener('click', () => { this.selected = true })
+    this.addEventListener('focus', () => { this.selected = true })
   }
 
   connectedCallback() {
@@ -283,6 +286,7 @@ export class FileTabView extends HTMLElement {
     }
     if (this.fileCount.value > 1) {
       this.menu.add(this.text.delete, () => {
+        this.contentEl.remove()
         this.remove()
         this.fileCount.value -= 1
       })
@@ -328,10 +332,18 @@ export class FileTabView extends HTMLElement {
   }
 
   set selected(value) {
-    if (value) {      
-      this.classList.add('selected')
-    } else {
-      this.classList.remove('selected')
+    if (this.selected !== value) {
+      if (value) {      
+        this.classList.add('selected')
+      } else {
+        this.classList.remove('selected')
+      }
+      for (const el of [...this.parentElement.children].filter(el => el !== this)) {
+        el.selected = false
+      }
+      if (this.contentEl) {
+        this.contentEl.selected = value
+      }
     }
   }
 
@@ -364,9 +376,12 @@ export class FileContentView extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = `
       :host {
-        display: flex;
+        display: none;
         flex-direction: column;
         align-items: stretch;
+      }
+      :host(.selected) {
+        display: flex;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -384,6 +399,20 @@ export class FileContentView extends HTMLElement {
 
   get codeMirror() {
     return this._codeMirror
+  }
+
+  get selected() {
+    return this.classList.contains('selected')
+  }
+
+  set selected(value) {
+    if (this.selected !== value) {
+      if (value) {      
+        this.classList.add('selected')
+      } else {
+        this.classList.remove('selected')
+      }
+    }
   }
 }
 ```
