@@ -92,7 +92,7 @@ export class ExploreApp extends HTMLElement {
         display: grid;
         grid-template-columns: 1fr 1.8fr;
         grid-template-rows: 1fr;
-        gap: 10px;
+        gap: 12px;
         height: 100vh;
         margin: 0;
         padding: 0;
@@ -109,12 +109,14 @@ export class ExploreApp extends HTMLElement {
         display: flex;
         flex-direction: column;
         padding: 10px;
+        padding-right: 0px;
         overflow-y: auto;
       }
       div.view-pane {
         display: flex;
         flex-direction: column;
         padding: 10px;
+        padding-left: 0px;
       }
       div.view-pane iframe {
         flex-grow: 1;
