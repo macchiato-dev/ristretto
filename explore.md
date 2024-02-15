@@ -44,7 +44,7 @@ export class ExploreApp extends HTMLElement {
       'example-notebook.md': [
         'list.md',
         'tabbed.md',
-        'overlay.md',
+        // 'overlay.md',  # TODO
       ],
     }
     this.dataSelect = document.createElement('file-card-list')
