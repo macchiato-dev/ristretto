@@ -30,7 +30,6 @@ export class FileGroup extends HTMLElement {
 
   constructor() {
     super()
-    this.fileCount = {value: 0}
     this.language = navigator.language
     this.attachShadow({mode: 'open'})
     this.headerEl = document.createElement('div')
@@ -79,17 +78,15 @@ export class FileGroup extends HTMLElement {
     const tabEl = document.createElement('m-editor-file-tab-view')
     const contentEl = document.createElement('m-editor-file-content-view')
     tabEl.contentEl = contentEl
-    this.headerEl.appendChild(tabEl)
-    this.contentEl.appendChild(contentEl)
-    tabEl.fileCount = this.fileCount
     if (name !== undefined) {
       tabEl.name = name
     }
+    this.headerEl.appendChild(tabEl)
+    this.contentEl.appendChild(contentEl)
     contentEl.codeMirror = this.codeMirror
     if (data !== undefined) {
       contentEl.data = data
     }
-    this.fileCount.value += 1
     return tabEl
   }
 
@@ -97,12 +94,10 @@ export class FileGroup extends HTMLElement {
     const tabEl = document.createElement('m-editor-file-tab-view')
     const contentEl = document.createElement('m-editor-file-content-view')
     tabEl.contentEl = contentEl
-    tabEl.fileCount = this.fileCount
     contentEl.codeMirror = this.codeMirror
     const position = direction == 'left' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, tabEl)
     e.target.contentEl.insertAdjacentElement(position, contentEl)
-    this.fileCount.value += 1
     tabEl.selected = true
   }
 
@@ -281,11 +276,10 @@ export class FileTabView extends HTMLElement {
         ))
       })
     }
-    if (this.fileCount.value > 1) {
+    if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
         this.contentEl.remove()
         this.remove()
-        this.fileCount.value -= 1
       })
     }
     this.menu.open(this.menuBtn)

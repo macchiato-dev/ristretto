@@ -30,7 +30,6 @@ export class FileGroup extends HTMLElement {
 
   constructor() {
     super()
-    this.fileCount = {value: 0}
     this.language = navigator.language
     this.attachShadow({mode: 'open'})
     this.headerEl = document.createElement('div')
@@ -76,7 +75,6 @@ export class FileGroup extends HTMLElement {
 
   addFile({name, data, collapsed} = {}) {
     const el = document.createElement('m-editor-file-view')
-    el.fileCount = this.fileCount
     el.codeMirror = this.codeMirror
     if (name !== undefined) {
       el.name = name
@@ -88,7 +86,6 @@ export class FileGroup extends HTMLElement {
       el.collapsed = collapsed
     }
     this.contentEl.appendChild(el)
-    this.fileCount.value += 1
     return el
   }
 
@@ -96,11 +93,9 @@ export class FileGroup extends HTMLElement {
     const el = document.createElement(
       'm-editor-file-view'
     )
-    el.fileCount = this.fileCount
     el.codeMirror = this.codeMirror
     const position = direction == 'up' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, el)
-    this.fileCount.value += 1
   }
 
   handleMove(e, direction) {
@@ -279,10 +274,9 @@ export class FileView extends HTMLElement {
         ))
       })
     }
-    if (this.fileCount.value > 1) {
+    if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
         this.remove()
-        this.fileCount.value -= 1
       })
     }
     this.menu.open(this.menuBtn)

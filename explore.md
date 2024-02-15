@@ -35,20 +35,20 @@ export class FileCard extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 15px;
-        width: 160px;
+        gap: 12px;
+        min-width: 140px;
         padding: 10px 0px;
         font-family: monospace;
         font-weight: 700;
-        font-size: 12px;
+        font-size: 11px;
         border: 2px solid transparent;
       }
       :host([selected]) {
         border-color: blue;
       }
       .icon {
-        width: 128px;
-        height: 128px;
+        width: 96px;
+        height: 96px;
         background: #bbb;
         display: flex;
         flex-direction: column;
@@ -106,6 +106,7 @@ export class FileCardList extends HTMLElement {
         background-color: #2b172a;
         padding: 20px;
         border-radius: 10px;
+        overflow-x: auto;
       }
     `
     this.shadowRoot.append(style)
@@ -213,13 +214,20 @@ export class ExploreApp extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1.8fr;
         grid-template-rows: 1fr;
         gap: 10px;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
+      }
+      @media (max-width: 600px) {
+        :host {
+          height: auto;
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 100vh;
+        }
       }
       div.select {
         display: flex;
