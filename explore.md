@@ -81,6 +81,12 @@ export class FileCard extends HTMLElement {
 }
 ```
 
+TODO: to the right of where it says Data, add a pill switcher ( My Files | Examples ), also a filter icon to filter them. When creating a new one, upon editing, add it to the end of My Files, switch to My Files, and smooth scroll to select it.
+
+The page by default will have Examples selected, but if you resume an instance by dragging the Markdown to the file drop zone, it will go back to having whatever was selected, selected.
+
+The Markdown for an instance will be saved in SessionStorage, and upon reloading, such as after a crash, an option will be given to download it, try running it again, or discard it (with confirmation).
+
 `FileCardList.js`
 
 ```js
@@ -154,9 +160,12 @@ export class ExploreApp extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.dataTemplates = [
-      'colors.json', 'image.png', 'example-notebook.md'
+      'new.md', 'colors.json', 'image.png', 'example-notebook.md'
     ]
     this.notebookTemplates = {
+      'new.md': [
+        'upload.md',
+      ],
       'colors.json': [
         'palette.md',
         'shapes.md',
