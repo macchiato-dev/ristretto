@@ -1,0 +1,6 @@
+FROM ristretto-deno-node:latest
+WORKDIR /app
+ADD build-libraries.md /app
+ADD run-build-in-container.js /app
+ENTRYPOINT []
+CMD ["/bin/deno", "run", "--allow-net", "--allow-read=/app", "--allow-write=/app", "--allow-run=npm", "run-build-in-container.js", "build"]

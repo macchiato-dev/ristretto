@@ -24,9 +24,7 @@ The code setting up the Content-Security-Policy and the sandboxed iFrame is very
 - a middle iframe, `frame.html`, which takes care of setting up the sandboxed iframe, and has a Content-Security-Policy that prevents all network requests - the ones it needs are accessed through the parent iframe via postMessage
 - a sandboxed `srcdoc` iframe under which the notebook code is run – This has `allow-scripts` but not `allow-same-origin`, so notebook code can run but it can't access localStorage, so each tab is kept separate
 
-This is the first version, which doesn't allow anything except copying and pasting, and navigating directly to URLs on the same origin.
-
-A short-term goal is to allow the user to upload and download files, and navigate with confirmation. In the meantime, some of this can be done with copying and pasting.
+This doesn't allow anything except copying and pasting. Navigating to URLs is also blocked through a Content Security Policy. This way, a page can't trick a user into clicking on a link. To load data from a file, use copy and paste. This can also work for binary data through Base64. Another container will provide a way to upload and download files directly.
 
 A Content-Security-Policy can be set through a header or through a meta tag. When headers can be reliably set, a header is preferred. However, this is run on the Pages platforms of code hosts, so the code and how it gets updated is more transparent.
 
@@ -34,7 +32,7 @@ All the sandbox does to load the code is have the outer frame download a giant M
 
 The inner `srcdoc` sandboxed iframe can have sandboxed iframes within it, to keep parts of the notebooks separate. How deeply nested they can be depends on the browser.
 
-It also uses postMessage to allow the notebook to set the title of the web page, and in the future will allow the code to do other things like initiate upload, download, and navigation, with user interaction.
+It also uses postMessage to allow the notebook to set the title of the web page.
 
 ### The Notebook Collection
 
@@ -74,6 +72,9 @@ iframe {
   border: 0;
 }
 </style>
+  </head>
+  <body>
+    <iframe id="frame" src="/frame.html"></iframe>
 <script type="module">
 const frame = document.getElementById('frame')
 frame.addEventListener('load', async () => {
@@ -81,9 +82,6 @@ frame.addEventListener('load', async () => {
   frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
 })
 </script>
-  </head>
-  <body>
-    <iframe id="frame" src="/frame.html"></iframe>
   </body>
 </html>
 ```
@@ -109,41 +107,46 @@ iframe {
   border: 0;
 }
 </style>
+  </head>
+  <body>
 <script type="module">
 addEventListener('message', e => {
   if (e.data[0] === 'notebook') {
-    const frame = document.getElementById('frame')
-    frame.addEventListener('load', async () => {
+    const iframe = document.createElement('iframe')
+    iframe.sandbox = 'allow-scripts'
+    iframe.addEventListener('load', async () => {
       const data = e.data[1]
-      frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
+      iframe.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
     })
-    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
-    frame.srcdoc = `
+    const re = new RegExp('(?:^|\\n)\\s*\\n`entry.js`\\n\\s*\\n```.*?\\n(.*?)```\\s*(?:\\n|$)', 's')
+    iframe.srcdoc = `
 <!doctype html>
-    <html>
-      <head>
-    <script type="module">
-    addEventListener('message', e => {
-      if (e.data[0] === 'notebook') {
-        window.__source = new TextDecoder().decode(e.data[1])
-        const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
-        const entrySrc = window.__source.match(re)[1]
-        const script = document.createElement('script')
-        script.type = 'module'
-        script.textContent = entrySrc
-        document.body.append(script)
-      }
-    })
-    <-script>
-      </head>
-    </html>
-`.trim().replace('-script', '/script')
+<html>
+  <head>
+    <title></title>
+    <meta charset="utf-8">
+  </head>
+  <body>
+<script type="module">
+addEventListener('message', e => {
+  if (e.data[0] === 'notebook') {
+    window.__source = new TextDecoder().decode(e.data[1])
+    const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+    const entrySrc = window.__source.match(re)[1]
+    const script = document.createElement('script')
+    script.type = 'module'
+    script.textContent = entrySrc
+    document.body.append(script)
+  }
+})
+<-script>
+  </body>
+</html>
+    `.trim().replace('-script', '/script')
+    document.body.replaceChildren(iframe)
   }
 })
 </script>
-  </head>
-  <body>
-    <iframe id="frame" sandbox="allow-scripts"></iframe>
   </body>
 </html>
 ```

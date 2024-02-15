@@ -1,0 +1,8 @@
+{
+    "search.exclude": {
+        "*-bundle.md": true,
+        "**/*.*.md": true,
+        "**/library-source.md": true,
+        "**/out": true
+    }
+}
