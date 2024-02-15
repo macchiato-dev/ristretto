@@ -6,78 +6,11 @@ This is an interface to explore different notebooks for different types of conte
 
 ```json
 {
-  "deps": [
-    "loader.md"
-  ],
   "importFiles": [
-    ["loader.md", "builder.js"]
+    ["loader.md", "builder.js"],
+    ["file-cards.md", "FileCard.js"],
+    ["file-cards.md", "FileCardList.js"]
   ]
-}
-```
-
-`FileCard.js`
-
-```js
-export class FileCard extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.iconEl = document.createElement('div')
-    this.iconEl.classList.add('icon')
-    this.nameEl = document.createElement('div')
-    this.shadowRoot.append(this.iconEl, this.nameEl)
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-        min-width: 140px;
-        padding: 10px 0px;
-        font-family: monospace;
-        font-weight: 700;
-        font-size: 11px;
-        border: 2px solid transparent;
-      }
-      :host([selected]) {
-        border-color: blue;
-      }
-      .icon {
-        width: 96px;
-        height: 96px;
-        background: #bbb;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .icon img {
-        flex-grow: 1;
-      }
-    `
-    this.shadowRoot.append(style)
-  }
-
-  get name() {
-    return this.nameEl.innerText
-  }
-
-  set name(name) {
-    this.nameEl.innerText = name
-  }
-
-  get filename() {
-    return this.name.endsWith('.md') ? this.name : `${this.name}.md`
-  }
-
-  set image(data) {
-    this.iconEl.replaceChildren(Object.assign(
-      document.createElement('img'), {src: data}
-    ))
-  }
 }
 ```
 
@@ -86,69 +19,6 @@ TODO: to the right of where it says Data, add a pill switcher ( My Files | Examp
 The page by default will have Examples selected, but if you resume an instance by dragging the Markdown to the file drop zone, it will go back to having whatever was selected, selected.
 
 The Markdown for an instance will be saved in SessionStorage, and upon reloading, such as after a crash, an option will be given to download it, try running it again, or discard it (with confirmation).
-
-`FileCardList.js`
-
-```js
-export class FileCardList extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.headerEl = document.createElement('h2')
-    this.listEl = document.createElement('div')
-    this.listEl.classList.add('list')
-    this.listEl.addEventListener('click', e => this.childClicked(e))
-    this.shadowRoot.append(this.headerEl, this.listEl)
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      .list {
-        display: flex;
-        flex-direction: row;
-        gap: 10px;
-        color: #bfcfcd;
-        background-color: #2b172a;
-        padding: 20px;
-        border-radius: 10px;
-        overflow-x: auto;
-      }
-    `
-    this.shadowRoot.append(style)
-  }
-
-  childClicked(e) {
-    if (e.target !== this.listEl && !e.target.hasAttribute('selected')) {
-      this.listEl.querySelectorAll('[selected]')?.forEach?.(el => {
-        el.removeAttribute('selected')
-      })
-      e.target.setAttribute('selected', '')
-      this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
-    }
-  }
-
-  get name() {
-    return this.headerEl.innerText
-  }
-
-  set name(value) {
-    this.headerEl.innerText = value
-  }
-
-  get items() {
-    return this.listEl.children
-  }
-
-  set items(value) {
-    this.listEl.replaceChildren(...value)
-  }
-
-  get selectedItem() {
-    return this.listEl.querySelector('[selected]')
-  }
-}
-```
 
 `ExploreApp.js`
 
@@ -164,7 +34,7 @@ export class ExploreApp extends HTMLElement {
     ]
     this.notebookTemplates = {
       'new.md': [
-        'upload.md',
+        'create.md',
       ],
       'colors.json': [
         'palette.md',
@@ -405,8 +275,8 @@ ${runEntry}
 `app.js`
 
 ```js
-import {FileCard} from '/FileCard.js'
-import {FileCardList} from '/FileCardList.js'
+import {FileCard} from '/file-cards/FileCard.js'
+import {FileCardList} from '/file-cards/FileCardList.js'
 import {ExploreApp} from '/ExploreApp.js'
 
 customElements.define('file-card', FileCard)
