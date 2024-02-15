@@ -30,12 +30,9 @@ export class ExploreApp extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.dataTemplates = [
-      'new.md', 'colors.json', 'image.png', 'example-notebook.md'
+      'colors.json', 'image.png', 'example-notebook.md'
     ]
     this.notebookTemplates = {
-      'new.md': [
-        'create.md',
-      ],
       'colors.json': [
         'palette.md',
         'shapes.md',
