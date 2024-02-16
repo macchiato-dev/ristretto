@@ -6,7 +6,7 @@ This is a component for lists of cards representing files, that have an icon and
 
 ```json
 {
-  "importData": [
+  "dataFiles": [
     ["colors.json.md", "thumbnail.svg"]
   ]
 }
@@ -196,6 +196,7 @@ export class ExampleApp extends HTMLElement {
       el.name = template
       if (i === 0) {
         el.setAttribute('selected', true)
+        el.image = `data:image/svg+xml;base64,${btoa(Macchiato.data['colors.json/thumbnail.svg'])}`
       }
       return el
     })
