@@ -56,6 +56,7 @@ export class FileCard extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
+    this.setAttribute('tabindex', '0')
   }
 
   get name() {
@@ -82,28 +83,80 @@ export class FileCard extends HTMLElement {
 
 ```js
 export class FileCardList extends HTMLElement {
+  icons = {
+    left: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 24 24">
+        <path d="m14 17l-5-5l5-5z"/>
+      </svg>
+    `,
+    right: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 24 24">
+        <path d="M10 17V7l5 5z"/>
+      </svg>
+    `,
+  }
+
   constructor() {
     super()
+    const leftBtn = document.createElement('button')
+    leftBtn.innerHTML = this.icons.left
+    leftBtn.addEventListener('click', () => {
+      //scroll left
+    })
+    const rightBtn = document.createElement('button')
+    rightBtn.innerHTML = this.icons.right
+    rightBtn.addEventListener('click', () => {
+      //scroll right
+    })
     this.attachShadow({mode: 'open'})
     this.headerEl = document.createElement('h2')
+    const listWrapEl = document.createElement('div')
+    listWrapEl.classList.add('list-wrap')
     this.listEl = document.createElement('div')
     this.listEl.classList.add('list')
     this.listEl.addEventListener('click', e => this.childClicked(e))
-    this.shadowRoot.append(this.headerEl, this.listEl)
+    this.listEl.addEventListener('keypress', e => {
+      if (e.which === 13) {
+        this.childClicked(e)
+      }
+    })
+    // TODO: make the arrows work and comment this out
+    // listWrapEl.append(leftBtn, this.listEl, rightBtn)
+    listWrapEl.append(this.listEl)
+    this.shadowRoot.append(this.headerEl, listWrapEl)
   }
 
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      .list-wrap {
+        display: flex;
+        flex-direction: row;
+        gap: 0px;
+        color: #bfcfcd;
+        background-color: #2b172a;
+        padding: 10px;
+        border-radius: 10px;
+        overflow-x: auto;
+        align-items: center;
+      }
       .list {
         display: flex;
         flex-direction: row;
         gap: 10px;
         color: #bfcfcd;
         background-color: #2b172a;
-        padding: 20px;
+        padding: 6px 0;
         border-radius: 10px;
         overflow-x: auto;
+      }
+      button {
+        all: unset;
+      }
+      button svg {
+        color: #bfcfcd;
+        width: 32px;
+        height: 32px;
       }
     `
     this.shadowRoot.append(style)
