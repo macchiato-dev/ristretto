@@ -32,6 +32,7 @@ export class TabItem extends HTMLElement {
     addRight: 'Add right',
     moveLeft: 'Move left',
     moveRight: 'Move right',
+    rename: 'Rename',
     delete: 'Delete',
   }
 
@@ -40,6 +41,7 @@ export class TabItem extends HTMLElement {
     addRight: 'Añadir derecha',
     moveLeft: 'Mover izquierda',
     moveRight: 'Mover derecha',
+    rename: 'Cambiar nombre',
     delete: 'Borrar',
   }
 
@@ -51,13 +53,16 @@ export class TabItem extends HTMLElement {
     this.headerEl = document.createElement('div')
     this.headerEl.classList.add('header')
     this.shadowRoot.appendChild(this.headerEl)
-    this.nameEl = document.createElement('input')
+    this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
     this.nameEl.addEventListener('input', e => {
       this.dispatchEvent(new CustomEvent(
         'tab-update', {detail: {property: 'name'}, bubbles: true}
       ))
+    })
+    this.nameEl.addEventListener('blur', () => {
+      this.nameEl.removeAttribute('contenteditable')
     })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
@@ -158,16 +163,20 @@ export class TabItem extends HTMLElement {
         this.remove()
       })
     }
+    this.menu.add(this.text.rename, () => {
+      this.nameEl.setAttribute('contenteditable', '')
+      this.nameEl.focus()
+    })
     this.menu.open(this.menuBtn)
   }
 
   set name(name) {
-    this.nameEl.value = name
+    this.nameEl.innerText = name
     //this.setFileType(name)
   }
 
   get name() {
-    return this.nameEl.value
+    return this.nameEl.innerText
   }
 
   get selected() {
@@ -252,8 +261,11 @@ export class TabList extends HTMLElement {
     contentEl.codeMirror = this.codeMirror
     const position = direction == 'left' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, tabEl)
-    e.target.contentEl.insertAdjacentElement(position, contentEl)
-    tabEl.selected = true
+    //e.target.contentEl.insertAdjacentElement(position, contentEl)
+    setTimeout(() => {
+      tabEl.nameEl.setAttribute('contenteditable', '')
+      tabEl.nameEl.focus()
+    }, 50)
   }
 
   handleMove(e) {
