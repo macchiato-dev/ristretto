@@ -64,6 +64,13 @@ export class TabItem extends HTMLElement {
     this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
     })
+    this.nameEl.addEventListener('keydown', e => {
+      if (e.which === 13) {
+        e.preventDefault()
+        this.nameEl.blur()
+        return false
+      }
+    })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
     this.menuBtn.innerHTML = this.icons.menu
@@ -91,9 +98,10 @@ export class TabItem extends HTMLElement {
         display: flex;
         flex-direction: row;
         align-items: stretch;
-        padding: 3px 0;
+        padding-left: 3px 0;
         border-radius: 5px;
         background-color: rgb(212,212,216);
+        align-items: center;
       }
       :host(.selected) div.header {
         background-color: rgb(15,118,110);
@@ -117,14 +125,21 @@ export class TabItem extends HTMLElement {
       div.content {
         display: flex;
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
         min-height: 5px;
       }
       div.content.collapsed > * {
         display: none;
       }
+      label {
+        padding: 0;
+        margin: 0;
+      }
+      button {
+        padding: 0 4px;
+      }
       svg {
-        height: 20px;
+        height: 24px;
         width: 20px;
       }
     `
@@ -165,6 +180,12 @@ export class TabItem extends HTMLElement {
     }
     this.menu.add(this.text.rename, () => {
       this.nameEl.setAttribute('contenteditable', '')
+      const range = document.createRange()
+      const sel = window.getSelection()
+      range.setStart(this.nameEl, this.nameEl.childNodes.length)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
       this.nameEl.focus()
     })
     this.menu.open(this.menuBtn)
