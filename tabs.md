@@ -55,7 +55,9 @@ export class TabItem extends HTMLElement {
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
     this.nameEl.addEventListener('input', e => {
-      //this.setFileType(e.target.value)
+      this.dispatchEvent(new CustomEvent(
+        'tab-update', {detail: {property: 'name'}, bubbles: true}
+      ))
     })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
@@ -128,25 +130,25 @@ export class TabItem extends HTMLElement {
     this.menu.clear()
     this.menu.add(this.text.addLeft, () => {
       this.dispatchEvent(new CustomEvent(
-        'click-add-left', {bubbles: true}
+        'click-add', {bubbles: true, detail: {direction: 'left'}}
       ))
     })
     this.menu.add(this.text.addRight, () => {
       this.dispatchEvent(new CustomEvent(
-        'click-add-right', {bubbles: true}
+        'click-add', {bubbles: true, detail: {direction: 'right'}}
       ))
     })
     if (this.previousElementSibling) {
       this.menu.add(this.text.moveLeft, () => {
         this.dispatchEvent(new CustomEvent(
-          'click-move-left', {bubbles: true}
+          'click-move', {bubbles: true, detail: {direction: 'left'}}
         ))
       })
     }
     if (this.nextElementSibling) {
       this.menu.add(this.text.moveRight, () => {
         this.dispatchEvent(new CustomEvent(
-          'click-move-right', {bubbles: true}
+          'click-move', {bubbles: true, detail: {direction: 'right'}}
         ))
       })
     }
@@ -213,6 +215,8 @@ export class TabList extends HTMLElement {
     this.listEl = document.createElement('div')
     this.listEl.classList.add('list')
     this.listEl.addEventListener('click', e => this.childClicked(e))
+    this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
+    this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
     this.shadowRoot.append(this.listEl)
   }
 
@@ -237,6 +241,40 @@ export class TabList extends HTMLElement {
       })
       e.target.setAttribute('selected', '')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
+    }
+  }
+
+  handleAdd(e) {
+    const direction = e.detail.direction
+    const tabEl = document.createElement('tab-item')
+    const contentEl = document.createElement('m-editor-file-content-view')
+    tabEl.contentEl = contentEl
+    contentEl.codeMirror = this.codeMirror
+    const position = direction == 'left' ? 'beforebegin' : 'afterend'
+    e.target.insertAdjacentElement(position, tabEl)
+    e.target.contentEl.insertAdjacentElement(position, contentEl)
+    tabEl.selected = true
+  }
+
+  handleMove(e) {
+    const direction = e.detail.direction
+    const siblingEl = (
+      direction == 'left' ?
+      e.target.previousElementSibling :
+      e.target.nextElementSibling
+    )
+    if (siblingEl) {
+      const position = direction == 'left' ? 'beforebegin' : 'afterend'
+      siblingEl.insertAdjacentElement(position, e.target)
+    }
+    const contentSiblingEl = (
+      direction == 'left' ?
+      e.target.contentEl.previousElementSibling :
+      e.target.contentEl.nextElementSibling
+    )
+    if (contentSiblingEl) {
+      const position = direction == 'left' ? 'beforebegin' : 'afterend'
+      contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
     }
   }
 
