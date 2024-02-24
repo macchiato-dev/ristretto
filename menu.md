@@ -110,3 +110,97 @@ export class Dropdown extends HTMLElement {
   }
 }
 ```
+
+`ExampleView.js`
+
+```js
+export class ExampleView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    const buttons = ['start', 'center', 'end'].map(v => (
+      ['start', 'center', 'end'].map(h => {
+        const btn = document.createElement('button')
+        btn.innerText = '⬇️'
+        const btnWrap = document.createElement('div')
+        btnWrap.classList.add(`v-${v}`)
+        btnWrap.classList.add(`h-${h}`)
+        btnWrap.append(btn)
+        return btnWrap
+      })
+    )).flat()
+    this.shadowRoot.append(...buttons)
+  }
+
+  connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #55391b;
+      }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+    `
+    document.head.append(globalStyle)
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 10px;
+        color: #bfcfcd;
+        background: #fff;
+      }
+      div {
+        display: flex;
+        flex-direction: column;
+      }
+      .v-start {
+        justify-content: flex-start;
+      }
+      .v-center {
+        justify-content: center;
+      }
+      .v-end {
+        justify-content: flex-end;
+      }
+      .h-start {
+        align-items: flex-start;
+      }
+      .h-center {
+        align-items: center;
+      }
+      .h-end {
+        align-items: flex-end;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+}
+```
+
+`app.js`
+
+```js
+import {Dropdown} from '/dropdown.js'
+import {ExampleView} from '/ExampleView.js'
+
+customElements.define('m-menu-dropdown', Dropdown)
+customElements.define('example-view', ExampleView)
+
+async function setup() {
+  document.body.append(document.createElement('example-view'))
+}
+
+setup()
+```
