@@ -205,17 +205,14 @@ export class TabItem extends HTMLElement {
   }
 
   set selected(value) {
-    if (this.selected !== value) {
-      if (value) {      
-        this.classList.add('selected')
-      } else {
-        this.classList.remove('selected')
-      }
-      /*for (const el of [...this.parentElement.children].filter(el => el !== this)) {
+    if (value) {      
+      this.classList.add('selected')
+    } else {
+      this.classList.remove('selected')
+    }
+    if (value === true) {
+      for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
         el.selected = false
-      }*/
-      if (this.contentEl) {
-        this.contentEl.selected = value
       }
     }
   }
@@ -325,10 +322,10 @@ export class TabList extends HTMLElement {
 }
 ```
 
-`ExampleApp.js`
+`ExampleView.js`
 
 ```js
-export class ExampleApp extends HTMLElement {
+export class ExampleView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -390,15 +387,15 @@ export class ExampleApp extends HTMLElement {
 import {Dropdown} from "/menu/dropdown.js"
 import {TabItem} from '/TabItem.js'
 import {TabList} from '/TabList.js'
-import {ExampleApp} from '/ExampleApp.js'
+import {ExampleView} from '/ExampleView.js'
 
 customElements.define('m-menu-dropdown', Dropdown)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
-customElements.define('example-app', ExampleApp)
+customElements.define('example-view', ExampleView)
 
 async function setup() {
-  document.body.append(document.createElement('example-app'))
+  document.body.append(document.createElement('example-view'))
 }
 
 setup()
