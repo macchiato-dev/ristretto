@@ -38,12 +38,21 @@ export class Dropdown extends HTMLElement {
         color: #ddd;
         padding: 3px;
         margin-top: var(--anchor-bottom);
-        margin-right: calc(
-          100% - var(--anchor-right)
-        );
-        margin-left: auto;
         margin-bottom: auto;
+        margin-left: var(--anchor-left);
+        margin-right: auto;
         position: static;
+      }
+      dialog.hflip {
+        margin-left: auto;
+        margin-right: var(--anchor-right);
+      }
+      dialog.vflip {
+        margin-top: auto;
+        margin-bottom: var(--anchor-top);
+      }
+      dialog.invisible {
+        opacity: 0;
       }
       dialog[open] {
         display: flex;
@@ -74,11 +83,18 @@ export class Dropdown extends HTMLElement {
     const rect = anchor.getBoundingClientRect()
     const style = this.shadowRoot.host.style
     style.setProperty(
-      '--anchor-right', `${rect.right}px`
+      '--anchor-left', `${rect.left}px`
+    )
+    style.setProperty(
+      '--anchor-right', `${anchor.offsetParent.clientWidth - rect.right}px`
+    )
+    style.setProperty(
+      '--anchor-top',
+      `${anchor.offsetParent.clientHeight - rect.top}px`
     )
     style.setProperty(
       '--anchor-bottom',
-      `${window.scrollY + rect.bottom - 3}px`
+      `${rect.bottom}px`
     )
     style.setProperty(
       '--window-height', `${window.height}px`
@@ -86,7 +102,28 @@ export class Dropdown extends HTMLElement {
     style.setProperty(
       '--window-width', `${window.width}px`
     )
+    this.dialogEl.classList.add('invisible')
     this.dialogEl.showModal()
+    const menuRect = this.dialogEl.getBoundingClientRect()
+    const hflip = rect.left + menuRect.width > anchor.offsetParent.clientWidth
+    if (hflip) {
+      this.dialogEl.classList.add('hflip')
+      if (rect.left - menuRect.width < 0) {
+        style.setProperty('--anchor-right', '5px')
+      }
+    } else {
+      this.dialogEl.classList.remove('hflip')
+    }
+    const vflip = rect.top + menuRect.height > anchor.offsetParent.clientHeight
+    if (vflip) {
+      this.dialogEl.classList.add('vflip')
+      if (rect.top - menuRect.height < 0) {
+        style.setProperty('--anchor-top', '5px')
+      }
+    } else {
+      this.dialogEl.classList.remove('vflip')
+    }
+    this.dialogEl.classList.remove('invisible')
   }
 
   close() {
@@ -122,6 +159,7 @@ export class ExampleView extends HTMLElement {
       ['start', 'center', 'end'].map(h => {
         const btn = document.createElement('button')
         btn.innerText = '⬇️'
+        btn.addEventListener('click', () => this.openMenu(btn))
         const btnWrap = document.createElement('div')
         btnWrap.classList.add(`v-${v}`)
         btnWrap.classList.add(`h-${h}`)
@@ -129,7 +167,8 @@ export class ExampleView extends HTMLElement {
         return btnWrap
       })
     )).flat()
-    this.shadowRoot.append(...buttons)
+    this.menu = document.createElement('m-menu-dropdown')
+    this.shadowRoot.append(...buttons, this.menu)
   }
 
   connectedCallback() {
@@ -186,8 +225,19 @@ export class ExampleView extends HTMLElement {
     `
     this.shadowRoot.append(style)
   }
+
+  openMenu(btn) {
+    this.menu.clear()
+    for (const name of [
+      'Test Item A', 'Item with long text here', 'Test Item A', 'Test Item A', 'Test Item A'
+    ]) {
+      this.menu.add(name, () => null)
+    }
+    this.menu.open(btn)
+  }
 }
 ```
+
 
 `app.js`
 
