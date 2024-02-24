@@ -105,19 +105,19 @@ export class Dropdown extends HTMLElement {
     this.dialogEl.classList.add('invisible')
     this.dialogEl.showModal()
     const menuRect = this.dialogEl.getBoundingClientRect()
-    const hflip = rect.left + menuRect.width > anchor.offsetParent.clientWidth
+    const hflip = rect.left + menuRect.width + 5 > window.innerWidth
     if (hflip) {
       this.dialogEl.classList.add('hflip')
-      if (rect.left - menuRect.width < 0) {
+      if (rect.left - menuRect.width < 5) {
         style.setProperty('--anchor-right', '5px')
       }
     } else {
       this.dialogEl.classList.remove('hflip')
     }
-    const vflip = rect.top + menuRect.height > anchor.offsetParent.clientHeight
+    const vflip = rect.bottom + menuRect.height + 5 > window.innerHeight
     if (vflip) {
       this.dialogEl.classList.add('vflip')
-      if (rect.top - menuRect.height < 0) {
+      if (rect.top - menuRect.height < 5) {
         style.setProperty('--anchor-top', '5px')
       }
     } else {
