@@ -8,6 +8,8 @@ export class Dropdown extends HTMLElement {
     super()
     this.alignX = 'right'
     this.alignY = 'bottom'
+    this.offsetX = 0
+    this.offsetY = 5
     this.attachShadow({mode: 'open'})
     this.dialogEl = document.createElement('dialog')
     this.dialogEl.addEventListener('click', e => {
@@ -74,14 +76,33 @@ export class Dropdown extends HTMLElement {
   }
 
   open(anchor) {
-    const rect = anchor.getBoundingClientRect()
+    const _rect = anchor.getBoundingClientRect()
+    const rect = {
+      left: _rect.left - this.offsetX,
+      right: _rect.right + this.offsetX,
+      width: _rect.width + 2 * this.offsetX,
+      top: _rect.top - this.offsetY,
+      bottom: _rect.bottom + this.offsetY,
+      height: _rect.height + 2 * this.offsetY,
+    }
     this.dialogEl.classList.add('invisible')
     this.dialogEl.showModal()
     const menuRect = this.dialogEl.getBoundingClientRect()
     const style = this.shadowRoot.host.style
     const fitsLeft = rect.left + menuRect.width + 5 < window.innerWidth
     const fitsRight = rect.right - menuRect.width - 5 > 0
-    if (
+    if (this.alignX === 'center') {
+      const center = Math.round(rect.left + rect.width / 2)
+      const leftSpace = center - menuRect.width / 2 - 5
+      const rightSpace = window.innerWidth - center - menuRect.width / 2 - 5
+      if (leftSpace < rightSpace) {
+        style.setProperty('--dialog-left', `${Math.max(5, leftSpace)}px`)
+        style.setProperty('--dialog-right', 'auto')
+      } else {
+        style.setProperty('--dialog-left', 'auto')
+        style.setProperty('--dialog-right', `${Math.max(5, rightSpace)}px`)
+      }
+    } else if (
       (this.alignX === 'left' && (fitsLeft || !fitsRight)) ||
       (this.alignX === 'right' && (!fitsRight && fitsLeft))
     ) {
@@ -146,7 +167,6 @@ export class Dropdown extends HTMLElement {
 export class ExampleView extends HTMLElement {
   constructor() {
     super()
-    this.alignLeft = false
     this.attachShadow({mode: 'open'})
     const buttons = ['start', 'center', 'end'].map(v => (
       ['start', 'center', 'end'].map(h => {
@@ -221,17 +241,12 @@ export class ExampleView extends HTMLElement {
 
   openMenu(btn) {
     this.menu.clear()
-    this.menu.alignLeft = this.alignLeft
+    //this.menu.alignX = 'center'
+    //this.menu.offsetY = 0
     for (const name of [
-      'Test Item A', 'Item with long text here', 'Test Item B', 'Align Left', 'Align Right'
+      'Test Item A', 'Item with long text here', 'Test Item B', 'Test Item C', 'Test Item D'
     ]) {
-      this.menu.add(name, () => {
-        if (name === 'Align Left') {
-          this.alignLeft = true
-        } else if (name === 'Align Right') {
-          this.alignLeft = false
-        }
-      })
+      this.menu.add(name, () => null)
     }
     this.menu.open(btn)
   }
