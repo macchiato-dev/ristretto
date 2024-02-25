@@ -6,6 +6,8 @@
 export class Dropdown extends HTMLElement {
   constructor() {
     super()
+    this.alignX = 'right'
+    this.alignY = 'bottom'
     this.attachShadow({mode: 'open'})
     this.dialogEl = document.createElement('dialog')
     this.dialogEl.addEventListener('click', e => {
@@ -37,19 +39,11 @@ export class Dropdown extends HTMLElement {
         background: #222;
         color: #ddd;
         padding: 3px;
-        margin-top: var(--anchor-bottom);
-        margin-bottom: auto;
-        margin-left: var(--anchor-left);
-        margin-right: auto;
+        margin-left: var(--dialog-left);
+        margin-right: var(--dialog-right);
+        margin-top: var(--dialog-top);
+        margin-bottom: var(--dialog-bottom);
         position: static;
-      }
-      dialog.hflip {
-        margin-left: auto;
-        margin-right: var(--anchor-right);
-      }
-      dialog.vflip {
-        margin-top: auto;
-        margin-bottom: var(--anchor-top);
       }
       dialog.invisible {
         opacity: 0;
@@ -81,48 +75,46 @@ export class Dropdown extends HTMLElement {
 
   open(anchor) {
     const rect = anchor.getBoundingClientRect()
-    const style = this.shadowRoot.host.style
-    style.setProperty(
-      '--anchor-left', `${rect.left}px`
-    )
-    style.setProperty(
-      '--anchor-right', `${anchor.offsetParent.clientWidth - rect.right}px`
-    )
-    style.setProperty(
-      '--anchor-top',
-      `${anchor.offsetParent.clientHeight - rect.top}px`
-    )
-    style.setProperty(
-      '--anchor-bottom',
-      `${rect.bottom}px`
-    )
-    style.setProperty(
-      '--window-height', `${window.height}px`
-    )
-    style.setProperty(
-      '--window-width', `${window.width}px`
-    )
     this.dialogEl.classList.add('invisible')
     this.dialogEl.showModal()
     const menuRect = this.dialogEl.getBoundingClientRect()
-    const hflip = rect.left + menuRect.width + 5 > window.innerWidth
-    if (hflip) {
-      this.dialogEl.classList.add('hflip')
-      if (rect.left - menuRect.width < 5) {
-        style.setProperty('--anchor-right', '5px')
-      }
+    const style = this.shadowRoot.host.style
+    const fitsLeft = rect.left + menuRect.width + 5 < window.innerWidth
+    const fitsRight = rect.right - menuRect.width - 5 > 0
+    if (
+      (this.alignX === 'left' && (fitsLeft || !fitsRight)) ||
+      (this.alignX === 'right' && (!fitsRight && fitsLeft))
+    ) {
+      style.setProperty('--dialog-left', `${Math.max(5, rect.left)}px`)
+      style.setProperty('--dialog-right', 'auto')
+    } else if (this.alignX === 'left' || this.alignX == 'right') {
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', `${Math.max(5, window.innerWidth - rect.right)}px`)
     } else {
-      this.dialogEl.classList.remove('hflip')
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', 'auto')
     }
-    const vflip = rect.bottom + menuRect.height + 5 > window.innerHeight
-    if (vflip) {
-      this.dialogEl.classList.add('vflip')
-      if (rect.top - menuRect.height < 5) {
-        style.setProperty('--anchor-top', '5px')
-      }
+    const fitsTop = rect.bottom + menuRect.height + 5 < window.innerHeight
+    const fitsBottom = rect.top - menuRect.height - 5 > 0
+    if (
+      (this.alignY === 'top' && (fitsTop || !fitsBottom)) ||
+      (this.alignY === 'bottom' && (!fitsBottom && fitsTop))
+    ) {
+      style.setProperty('--dialog-top', `${rect.bottom}px`)
+      style.setProperty('--dialog-bottom', 'auto')
+    } else if (this.alignY === 'top' || this.alignY == 'bottom') {
+      style.setProperty('--dialog-top', 'auto')
+      style.setProperty('--dialog-bottom', `${fitsBottom ? window.innerHeight - rect.top : 5}px`)
     } else {
-      this.dialogEl.classList.remove('vflip')
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', 'auto')
     }
+    style.setProperty(
+      '--window-height', `${window.innerHeight}px`
+    )
+    style.setProperty(
+      '--window-width', `${window.innerWidth}px`
+    )
     this.dialogEl.classList.remove('invisible')
   }
 
@@ -154,6 +146,7 @@ export class Dropdown extends HTMLElement {
 export class ExampleView extends HTMLElement {
   constructor() {
     super()
+    this.alignLeft = false
     this.attachShadow({mode: 'open'})
     const buttons = ['start', 'center', 'end'].map(v => (
       ['start', 'center', 'end'].map(h => {
@@ -228,10 +221,17 @@ export class ExampleView extends HTMLElement {
 
   openMenu(btn) {
     this.menu.clear()
+    this.menu.alignLeft = this.alignLeft
     for (const name of [
-      'Test Item A', 'Item with long text here', 'Test Item A', 'Test Item A', 'Test Item A'
+      'Test Item A', 'Item with long text here', 'Test Item B', 'Align Left', 'Align Right'
     ]) {
-      this.menu.add(name, () => null)
+      this.menu.add(name, () => {
+        if (name === 'Align Left') {
+          this.alignLeft = true
+        } else if (name === 'Align Right') {
+          this.alignLeft = false
+        }
+      })
     }
     this.menu.open(btn)
   }
