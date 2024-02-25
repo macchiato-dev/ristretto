@@ -71,6 +71,9 @@ export class TabItem extends HTMLElement {
         return false
       }
     })
+    this.nameEl.addEventListener('dblclick', () => {
+      this.rename()
+    })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
     this.menuBtn.innerHTML = this.icons.menu
@@ -137,6 +140,7 @@ export class TabItem extends HTMLElement {
       }
       button {
         padding: 0 4px;
+        border-radius: 5px;
       }
       svg {
         height: 24px;
@@ -174,21 +178,24 @@ export class TabItem extends HTMLElement {
     }
     if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
-        this.contentEl.remove()
         this.remove()
       })
     }
     this.menu.add(this.text.rename, () => {
-      this.nameEl.setAttribute('contenteditable', '')
-      const range = document.createRange()
-      const sel = window.getSelection()
-      range.setStart(this.nameEl, this.nameEl.childNodes.length)
-      range.collapse(true)
-      sel.removeAllRanges()
-      sel.addRange(range)
-      this.nameEl.focus()
+      this.rename()
     })
     this.menu.open(this.menuBtn)
+  }
+
+  rename() {
+    this.nameEl.setAttribute('contenteditable', '')
+    const range = document.createRange()
+    const sel = window.getSelection()
+    range.setStart(this.nameEl, this.nameEl.childNodes.length)
+    range.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(range)
+    this.nameEl.focus()
   }
 
   set name(name) {
