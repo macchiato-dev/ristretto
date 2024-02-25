@@ -178,6 +178,7 @@ export class TabItem extends HTMLElement {
     }
     if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
+        this.contentEl.remove()
         this.remove()
       })
     }
