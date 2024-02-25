@@ -57,9 +57,7 @@ export class TabItem extends HTMLElement {
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
     this.nameEl.addEventListener('input', e => {
-      this.dispatchEvent(new CustomEvent(
-        'tab-update', {detail: {property: 'name'}, bubbles: true}
-      ))
+      this.contentEl.name = this.nameEl.innerText
     })
     this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
@@ -215,8 +213,10 @@ export class TabItem extends HTMLElement {
   set selected(value) {
     if (value) {      
       this.classList.add('selected')
+      this.contentEl.selected = true
     } else {
       this.classList.remove('selected')
+      this.contentEl.selected = false
     }
     if (value === true) {
       for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
@@ -282,12 +282,12 @@ export class TabList extends HTMLElement {
   handleAdd(e) {
     const direction = e.detail.direction
     const tabEl = document.createElement('tab-item')
-    const contentEl = document.createElement('m-editor-file-content-view')
+    const contentEl = this.createContentEl(tabEl)
     tabEl.contentEl = contentEl
     contentEl.codeMirror = this.codeMirror
     const position = direction == 'left' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, tabEl)
-    //e.target.contentEl.insertAdjacentElement(position, contentEl)
+    e.target.contentEl.insertAdjacentElement(position, contentEl)
     setTimeout(() => {
       tabEl.nameEl.setAttribute('contenteditable', '')
       tabEl.nameEl.focus()
@@ -338,15 +338,24 @@ export class ExampleView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.tabList = document.createElement('tab-list')
-    this.tabList.items = ['One', 'Two', 'Three'].map(name => {
+    const tabItems = ['One', 'Two', 'Three'].map(name => {
       const el = document.createElement('tab-item')
       el.name = name
+      el.contentEl = document.createElement('example-item')
+      el.contentEl.name = name
       if (name === 'One') {
         el.selected = true
+        el.contentEl.selected = true
       }
       return el
     })
-    this.shadowRoot.append(this.tabList)
+    this.tabList.items = tabItems
+    this.tabList.createContentEl = tabEl => {
+      return document.createElement('example-item')
+    }
+    this.tabContent = document.createElement('div')
+    this.tabContent.append(...tabItems.map(tabItem => tabItem.contentEl))
+    this.shadowRoot.append(this.tabList, this.tabContent)
   }
 
   connectedCallback() {
@@ -395,11 +404,13 @@ export class ExampleView extends HTMLElement {
 import {Dropdown} from "/menu/dropdown.js"
 import {TabItem} from '/TabItem.js'
 import {TabList} from '/TabList.js'
+import {ExampleItem} from '/ExampleItem.js'
 import {ExampleView} from '/ExampleView.js'
 
 customElements.define('m-menu-dropdown', Dropdown)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
+customElements.define('example-item', ExampleItem)
 customElements.define('example-view', ExampleView)
 
 async function setup() {
@@ -407,4 +418,46 @@ async function setup() {
 }
 
 setup()
+```
+
+`ExampleItem.js`
+
+```js
+export class ExampleItem extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.p = document.createElement('p')
+    this.shadowRoot.append(this.p)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: none;
+      }
+      :host(.selected) {
+        display: block;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  set selected(value) {
+    if (value) {
+      this.classList.add('selected')
+    } else {
+      this.classList.remove('selected')
+    }
+  }
+
+  set name(value) {
+    this.p.innerText = value
+  }
+
+  get name() {
+    return this.p.innerText
+  }
+}
 ```
