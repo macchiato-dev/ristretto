@@ -98,15 +98,24 @@ export class FileCardList extends HTMLElement {
 
   constructor() {
     super()
-    const leftBtn = document.createElement('button')
-    leftBtn.innerHTML = this.icons.left
-    leftBtn.addEventListener('click', () => {
-      //scroll left
+    this.leftBtn = document.createElement('button')
+    this.leftBtn.innerHTML = this.icons.left
+    this.leftBtn.addEventListener('click', () => {
+      this.listEl.scroll({
+        left: Math.min(0, this.listEl.scrollLeft - this.listEl.offsetWidth),
+        behavior: 'smooth',
+      })
     })
-    const rightBtn = document.createElement('button')
-    rightBtn.innerHTML = this.icons.right
-    rightBtn.addEventListener('click', () => {
-      //scroll right
+    this.rightBtn = document.createElement('button')
+    this.rightBtn.innerHTML = this.icons.right
+    this.rightBtn.addEventListener('click', () => {
+      this.listEl.scroll({
+        left: Math.max(
+          this.listEl.scrollWidth - this.listEl.offsetWidth,
+          this.listEl.scrollLeft + this.listEl.offsetWidth
+        ),
+        behavior: 'smooth',
+      })
     })
     this.attachShadow({mode: 'open'})
     this.headerEl = document.createElement('h2')
@@ -120,9 +129,11 @@ export class FileCardList extends HTMLElement {
         this.childClicked(e)
       }
     })
-    // TODO: make the arrows work and comment this out
-    // listWrapEl.append(leftBtn, this.listEl, rightBtn)
-    listWrapEl.append(this.listEl)
+    this.listEl.addEventListener('scroll', () => {
+      this.updateArrows()
+    })
+    listWrapEl.append(this.leftBtn, this.listEl, this.rightBtn)
+    // listWrapEl.append(this.listEl)
     this.shadowRoot.append(this.headerEl, listWrapEl)
   }
 
@@ -141,6 +152,7 @@ export class FileCardList extends HTMLElement {
         align-items: center;
       }
       .list {
+        flex-grow: 1;
         display: flex;
         flex-direction: row;
         gap: 10px;
@@ -158,8 +170,14 @@ export class FileCardList extends HTMLElement {
         width: 32px;
         height: 32px;
       }
+      button:disabled svg {
+        color: #888;
+      }
     `
     this.shadowRoot.append(style)
+    setTimeout(() => {
+      this.updateArrows()
+    }, 10)
   }
 
   childClicked(e) {
@@ -169,6 +187,20 @@ export class FileCardList extends HTMLElement {
       })
       e.target.setAttribute('selected', '')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
+    }
+  }
+
+  updateArrows() {
+    const listEl = this.listEl
+    if (listEl.scrollLeft < 3) {
+      this.leftBtn.setAttribute('disabled', '')
+    } else {
+      this.leftBtn.removeAttribute('disabled')
+    }
+    if (listEl.scrollLeft + listEl.offsetWidth > listEl.scrollWidth - 3) {
+      this.rightBtn.setAttribute('disabled', '')
+    } else {
+      this.rightBtn.removeAttribute('disabled')
     }
   }
 
