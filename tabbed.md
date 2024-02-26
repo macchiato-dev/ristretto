@@ -134,7 +134,6 @@ export class FileContentView extends HTMLElement {
   }
 
   get data() {
-    console.log(this.editEl.value)
     return this.editEl.value
   }
 
