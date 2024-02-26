@@ -32,9 +32,10 @@ export class FileCard extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
         gap: 12px;
         min-width: 120px;
-        padding: 10px 0px;
+        min-height: 120px;
         font-family: monospace;
         font-weight: 700;
         font-size: 11px;
@@ -44,8 +45,8 @@ export class FileCard extends HTMLElement {
         border-color: blue;
       }
       .icon {
-        width: 96px;
-        height: 96px;
+        width: 84px;
+        height: 84px;
         background: #bbb;
         display: flex;
         flex-direction: column;
