@@ -33,7 +33,7 @@ export class FileCard extends HTMLElement {
         flex-direction: column;
         align-items: center;
         gap: 12px;
-        min-width: 140px;
+        min-width: 120px;
         padding: 10px 0px;
         font-family: monospace;
         font-weight: 700;
