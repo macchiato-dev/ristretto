@@ -23,6 +23,13 @@ export class FileCard extends HTMLElement {
     this.iconEl.classList.add('icon')
     this.nameEl = document.createElement('div')
     this.shadowRoot.append(this.iconEl, this.nameEl)
+    this.addEventListener('focus', () => {
+      if (this.scrollIntoViewIfNeeded) {
+        this.scrollIntoViewIfNeeded()
+      } else {
+        this.scrollIntoView?.({smooth: true})
+      }
+    })
   }
 
   connectedCallback() {
@@ -33,12 +40,12 @@ export class FileCard extends HTMLElement {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 12px;
-        min-width: 120px;
-        min-height: 120px;
+        gap: 10px;
+        min-width: 128px;
+        min-height: 128px;
         font-family: monospace;
         font-weight: 700;
-        font-size: 11px;
+        font-size: 10.5px;
         border: 2px solid transparent;
       }
       :host([selected]) {
@@ -147,7 +154,7 @@ export class FileCardList extends HTMLElement {
         gap: 0px;
         color: #bfcfcd;
         background-color: #2b172a;
-        padding: 10px;
+        padding: 5px 2px;
         border-radius: 10px;
         overflow-x: auto;
         align-items: center;
@@ -156,7 +163,7 @@ export class FileCardList extends HTMLElement {
         flex-grow: 1;
         display: flex;
         flex-direction: row;
-        gap: 10px;
+        gap: 8px;
         color: #bfcfcd;
         background-color: #2b172a;
         padding: 6px 0;

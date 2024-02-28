@@ -60,3 +60,51 @@ const data = [
 ]
 data.map(row => row.map(cell => cell.match(/[,"]/) ? `"${cell.replaceAll('"', '""')}"` : cell).join(',')).join('\r\n')
 ```
+
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" fill="#111">
+  <style>
+    svg {
+      background-color: #000;
+    }
+    .color1 {
+      fill: #78c;
+    }
+    .color2 {
+      fill: #aaa;
+    }
+  </style>
+  <g transform="translate(10, 20)">
+    <rect x="20" y="20" width="60" height="20" class="color1" />
+    <rect x="90" y="20" width="60" height="20" class="color1" />
+    <rect x="160" y="20" width="60" height="20" class="color1" />
+  </g>
+  <g transform="translate(10, 50)">
+    <rect x="20" y="20" width="60" height="20" class="color2" />
+    <rect x="90" y="20" width="60" height="20" class="color2" />
+    <rect x="160" y="20" width="60" height="20" class="color2" />
+  </g>
+  <g transform="translate(10, 80)">
+    <rect x="20" y="20" width="60" height="20" class="color2" />
+    <rect x="90" y="20" width="60" height="20" class="color2" />
+    <rect x="160" y="20" width="60" height="20" class="color2" />
+  </g>
+  <g transform="translate(10, 110)">
+    <rect x="20" y="20" width="60" height="20" class="color2" />
+    <rect x="90" y="20" width="60" height="20" class="color2" />
+    <rect x="160" y="20" width="60" height="20" class="color2" />
+  </g>
+  <g transform="translate(10, 140)">
+    <rect x="20" y="20" width="60" height="20" class="color2" />
+    <rect x="90" y="20" width="60" height="20" class="color2" />
+    <rect x="160" y="20" width="60" height="20" class="color2" />
+  </g>
+  <g transform="translate(10, 170)">
+    <rect x="20" y="20" width="60" height="20" class="color2" />
+    <rect x="90" y="20" width="60" height="20" class="color2" />
+    <rect x="160" y="20" width="60" height="20" class="color2" />
+  </g>
+</svg>
+```

@@ -30,7 +30,7 @@ export class ExploreApp extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.dataTemplates = [
-      'colors.json', 'image.png', 'example-notebook.md'
+      'colors.json', 'image.png', 'example-notebook.md', 'planets.csv'
     ]
     this.notebookTemplates = {
       'colors.json': [
@@ -45,6 +45,9 @@ export class ExploreApp extends HTMLElement {
         'list.md',
         'tabbed.md',
         // 'overlay.md',  # TODO
+      ],
+      'planets.csv': [
+        'table.md',
       ],
     }
     this.dataSelect = document.createElement('file-card-list')
@@ -176,7 +179,7 @@ export class ExploreApp extends HTMLElement {
         for (const subBlock of readBlocksWithNames(blockSrc)) {
           if (
             thumbnail === undefined && (subBlock.name || '').match(/\.(png|jpe?g|svg|webm)/) ||
-            subBlock.name.startsWith('thumbnail.')
+            subBlock.name?.startsWith?.('thumbnail.')
           ) {
             thumbnail = subBlock
           }
