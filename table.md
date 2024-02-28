@@ -12,11 +12,18 @@ export class DataTable extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      th, td {
+        padding: 3px 5px;
+      }
       th {
         background-color: #78c;
       }
       td {
         background-color: #aaa;
+        text-align: right;
+      }
+      td:first-child {
+        text-align: left;
       }
     `
     this.shadowRoot.append(style)
