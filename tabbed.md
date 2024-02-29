@@ -380,9 +380,13 @@ export class AppView extends HTMLElement {
       this.showNotebookCode()
     }
     this.editor = document.createElement('m-tab-editor')
+    this.viewFrameWrap = document.createElement('div')
+    this.viewFrameWrap.classList.add('view-frame-wrap')
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrame)
+    this.viewFrame.height = 0
+    this.viewFrameWrap.append(this.viewFrame)
+    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrameWrap)
     this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
@@ -421,11 +425,19 @@ export class AppView extends HTMLElement {
       m-tab-editor {
         overflow-y: auto;
       }
+      .view-frame-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
       iframe {
-        width: 100%;
-        height: 100%;
         padding: 0;
         border: none;
+        overflow: inherit;
+        overflow-clip-margin: inherit;
+        grid-row: 3;
+        grid-column: 1;
+        flex-grow: 1;
       }
       .notebook-code {
         position: absolute;
@@ -465,7 +477,8 @@ export class AppView extends HTMLElement {
   renderView() {
     const viewFrame = document.createElement('iframe')
     viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.appendChild(viewFrame)
+    viewFrame.height = 0
+    this.viewFrameWrap.appendChild(viewFrame)
     this.viewFrame.remove()
     this.viewFrame = viewFrame
     this.displayNotebook()
