@@ -157,6 +157,21 @@ export class FileContentView extends HTMLElement {
 
   set name(value) {
     this._name = value
+    this.setFileType(value)
+  }
+
+  setFileType(value) {
+    let fileType
+    if (value.endsWith('.js')) {
+      fileType = 'js'
+    } else if (value.endsWith('.html')) {
+      fileType = 'html'
+    } else if (value.endsWith('.css')) {
+      fileType = 'css'
+    } else if (value.endsWith('.json')) {
+      fileType = 'json'
+    }
+    this.editEl.fileType = fileType
   }
 }
 ```
