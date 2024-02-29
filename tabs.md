@@ -119,6 +119,7 @@ export class TabItem extends HTMLElement {
         font: inherit;
         font-family: monospace;
         outline: none;
+        white-space: nowrap;
       }
       div.header button svg {
         margin-bottom: -3px;
@@ -338,9 +339,9 @@ export class ExampleView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.tabList = document.createElement('tab-list')
-    const tabItems = ['One', 'Two', 'Three'].map(name => {
+    const tabItems = Array(20).fill('').map((_, i) => {
       const el = document.createElement('tab-item')
-      el.name = name
+      el.name = `Tab ${i}`
       el.contentEl = document.createElement('example-item')
       el.contentEl.name = name
       if (name === 'One') {
