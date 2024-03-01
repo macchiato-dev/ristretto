@@ -571,8 +571,9 @@ export class AppView extends HTMLElement {
       :host {
         display: grid;
         grid-template-rows: 30px calc(50% - 15px) 1fr;
-        grid-template-columns: 1fr;
+        grid-template-columns: 100%;
         height: 100vh;
+        width: 100vw;
       }
       .view-frame-wrap {
         display: flex;
