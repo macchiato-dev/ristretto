@@ -127,11 +127,16 @@ export class CodeEdit extends HTMLElement {
         ...cm.lintKeymap
       ]),
     ]
+    const viewTheme = cm.EditorView.theme({
+      '&': {flexGrow: '1'},
+      '.cm-scroller': {overflow: 'auto'}
+    })
     this.view = new cm.EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
+        viewTheme,
         cm.EditorView.updateListener.of(e => {
           if (e.docChanged) {
             this.dispatchEvent(new CustomEvent(
@@ -151,12 +156,6 @@ export class CodeEdit extends HTMLElement {
       flex-direction: column;
       align-items: stretch;
       background-color: #fff;
-    }
-    :host > * {
-      flex-grow: 1;
-    }
-    .cm-editor.cm-focused {
-      outline: none;
     }
   `
 }
@@ -182,9 +181,9 @@ export class FileGroup extends HTMLElement {
       fileView.tabEl = tabEl
       return fileView
     }
-    this.contentEl = document.createElement('div')
-    this.contentEl.classList.add('content')
-    this.shadowRoot.append(this.tabListEl, this.contentEl)
+    this.filesEl = document.createElement('div')
+    this.filesEl.classList.add('files')
+    this.shadowRoot.append(this.tabListEl, this.filesEl)
   }
 
   connectedCallback() {
@@ -196,14 +195,25 @@ export class FileGroup extends HTMLElement {
         align-items: stretch;
       }
       div.files {
+        display: grid;
+        grid-template-rows: 1fr;
+        grid-template-columns: 1fr;
+      }
+      div.files file-content-view {
+        display: none;
+        grid-row: 1;
+        grid-column: 1;
+      }
+      div.files file-content-view {
         display: flex;
+        grid-row: 1;
+        grid-column: 1;
         flex-direction: column;
         flex-grow: 1;
-        overflow-y: auto;
       }
     `
     this.shadowRoot.appendChild(style)
-    if (this.contentEl.childNodes.length === 0) {
+    if (this.filesEl.childNodes.length === 0) {
       this.addFile()
     }
   }
@@ -217,7 +227,7 @@ export class FileGroup extends HTMLElement {
       contentEl.name = name
     }
     this.tabListEl.listEl.appendChild(tabEl)
-    this.contentEl.appendChild(contentEl)
+    this.filesEl.appendChild(contentEl)
     contentEl.codeMirror = this.codeMirror
     if (data !== undefined) {
       contentEl.data = data
@@ -239,7 +249,7 @@ export class FileGroup extends HTMLElement {
   }
 
   get files() {
-    return [...this.contentEl.children]
+    return [...this.filesEl.children]
   }
 }
 ```
@@ -259,14 +269,6 @@ export class FileContentView extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
-      :host {
-        display: none;
-        flex-direction: column;
-        align-items: stretch;
-      }
-      :host(.selected) {
-        display: flex;
-      }
     `
     this.shadowRoot.appendChild(style)
   }
@@ -563,9 +565,6 @@ export class AppView extends HTMLElement {
         grid-template-rows: auto 1fr 1fr;
         grid-template-columns: 1fr;
         height: 100vh;
-      }
-      m-tab-editor {
-        overflow-y: auto;
       }
       .view-frame-wrap {
         display: flex;
