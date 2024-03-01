@@ -37,6 +37,7 @@ export class CodeEdit extends HTMLElement {
         align-items: stretch;
         flex-grow: 1;
         background-color: #fff;
+        height: 100%;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -136,7 +137,7 @@ export class CodeEdit extends HTMLElement {
       ]),
     ]
     const viewTheme = cm.EditorView.theme({
-      '&': {flexGrow: '1'},
+      '&': {flexGrow: '1', height: '100%'},
       '.cm-scroller': {overflow: 'auto'}
     })
     this.view = new cm.EditorView({
@@ -193,16 +194,19 @@ export class FileGroup extends HTMLElement {
         flex-direction: column;
         align-items: stretch;
         flex-grow: 1;
+        height: 100%;
+      }
+      tab-list {
+        height: 30px;
       }
       div.files {
         flex-grow: 1;
-        display: grid;
-        grid-template-rows: 1fr;
-        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+        height: calc(100% - 30px);
       }
       div.files m-editor-file-content-view {
-        grid-row: 1;
-        grid-column: 1;
+        flex-grow: 1;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -268,6 +272,7 @@ export class FileContentView extends HTMLElement {
       :host(.selected) {
         display: flex;
         flex-direction: column;
+        height: 100%;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -340,7 +345,10 @@ export class TabEditor extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        margin: 8px;
+        margin: 0;
+        padding: 5px;
+        box-sizing: border-box;
+        height: 100%;
       }
     `
     this.shadowRoot.append(style)
@@ -562,7 +570,7 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-rows: auto 1fr 1fr;
+        grid-template-rows: 30px calc(50% - 15px) 1fr;
         grid-template-columns: 1fr;
         height: 100vh;
       }
