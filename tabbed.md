@@ -26,12 +26,20 @@ export class CodeEdit extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [
-      this.constructor.styleSheet
-    ]
   }
 
   connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        flex-grow: 1;
+        background-color: #fff;
+      }
+    `
+    this.shadowRoot.appendChild(style)
     this.initEditor()
   }
 
@@ -149,15 +157,6 @@ export class CodeEdit extends HTMLElement {
     })
     this.shadowRoot.append(this.view.dom)
   }
-
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      background-color: #fff;
-    }
-  `
 }
 ```
 
@@ -193,23 +192,17 @@ export class FileGroup extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: stretch;
+        flex-grow: 1;
       }
       div.files {
+        flex-grow: 1;
         display: grid;
         grid-template-rows: 1fr;
         grid-template-columns: 1fr;
       }
-      div.files file-content-view {
-        display: none;
+      div.files m-editor-file-content-view {
         grid-row: 1;
         grid-column: 1;
-      }
-      div.files file-content-view {
-        display: flex;
-        grid-row: 1;
-        grid-column: 1;
-        flex-direction: column;
-        flex-grow: 1;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -269,6 +262,13 @@ export class FileContentView extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      :host {
+        display: none;
+      }
+      :host(.selected) {
+        display: flex;
+        flex-direction: column;
+      }
     `
     this.shadowRoot.appendChild(style)
   }
