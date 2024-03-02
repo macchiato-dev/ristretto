@@ -48,6 +48,7 @@ export class ExploreApp extends HTMLElement {
       ],
       'planets.csv': [
         'table.md',
+        'data-cards.md',
       ],
     }
     this.dataSelect = document.createElement('file-card-list')
