@@ -20,9 +20,11 @@ export class DataCards extends HTMLElement {
       .card {
         background-color: #bbb;
         padding: 20px;
+        border-radius: 10px;
       }
       .card .title {
         font-size: 20px;
+        font-weight: bold;
       }
     `
     this.shadowRoot.append(style)
@@ -32,10 +34,15 @@ export class DataCards extends HTMLElement {
     this.shadowRoot.replaceChildren(...data.slice(1).map(row => {
       const el = document.createElement('div')
       el.classList.add('card')
-      const title = document.createElement('p')
+      const title = document.createElement('div')
       title.classList.add('title')
       title.innerText = row[0]
-      el.append(title)
+      const info = data[0].slice(1).map((name, i) => {
+        const item = document.createElement('div')
+        item.innerText = `${name}: ${row[i + 1]}`
+        return item
+      })
+      el.append(title, ...info)
       return el
     }))
   }
