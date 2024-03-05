@@ -319,6 +319,8 @@ export class FileContentView extends HTMLElement {
       fileType = 'css'
     } else if (value.endsWith('.json')) {
       fileType = 'json'
+    } else if (value.endsWith('.md')) {
+      fileType = 'md'
     }
     this.editEl.fileType = fileType
   }
@@ -393,6 +395,7 @@ export class NotebookCode extends HTMLElement {
     const editorContainer = document.createElement('div')
     editorContainer.classList.add('editor-container')
     this.editor = document.createElement('m-editor-code-edit')
+    this.editor.fileType = 'md'
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }
