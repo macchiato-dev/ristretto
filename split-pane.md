@@ -28,14 +28,14 @@ export class SplitView extends HTMLElement {
     this.shadowRoot.appendChild(style)
   }
 
-  start({offsetX}) {
+  start(e) {
+    const {offsetX} = e
+    e.preventDefault()
+    e.stopPropagation()
     document.body.removeEventListener('mousemove', this.mousemove)
     document.body.removeEventListener('mouseup', this.mouseup)
     document.body.addEventListener('mousemove', this.mousemove)
     document.body.addEventListener('mouseup', this.mouseup)
-    setTimeout(() => {
-      document.body.addEventListener('mousedown', this.mousedown)
-    }, 10)
     if (!this.tempStyle) {
       this.tempStyle = document.createElement('style')
       this.tempStyle.textContent = `body { cursor: col-resize !important }`
@@ -46,17 +46,26 @@ export class SplitView extends HTMLElement {
     ))
   }
 
-  mousemove({offsetX}) {
+  mousemove(e) {
+    const {offsetX} = e
+    e.preventDefault()
+    e.stopPropagation()
     this.dispatchEvent(new CustomEvent(
       'split-view-resize', {bubbles: true, detail: {offsetX}}
     ))
   }
 
-  mouseup({offsetX}) {
+  mouseup(e) {
+    const {offsetX} = e
+    e.preventDefault()
+    e.stopPropagation()
     this.end({offsetX})
   }
 
-  mousedown({offsetX}) {
+  mousedown(e) {
+    const {offsetX} = e
+    e.preventDefault()
+    e.stopPropagation()
     this.end({offsetX})
   }
 

@@ -47,6 +47,7 @@ export class FileCard extends HTMLElement {
         font-weight: 700;
         font-size: 10.5px;
         border: 2px solid transparent;
+        user-select: none;
       }
       :host([selected]) {
         border-color: blue;
