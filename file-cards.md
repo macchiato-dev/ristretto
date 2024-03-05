@@ -27,7 +27,7 @@ export class FileCard extends HTMLElement {
       if (this.scrollIntoViewIfNeeded) {
         this.scrollIntoViewIfNeeded()
       } else {
-        this.scrollIntoView?.({smooth: true})
+        this.scrollIntoView?.()
       }
     })
   }
@@ -173,7 +173,12 @@ export class FileCardList extends HTMLElement {
         background-color: #2b172a;
         padding: 6px 0;
         border-radius: 10px;
-        overflow-x: auto;
+        overflow-x: scroll;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .list::-webkit-scrollbar {
+        display: none;
       }
       button {
         all: unset;
