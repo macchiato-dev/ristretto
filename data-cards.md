@@ -16,6 +16,7 @@ export class DataCards extends HTMLElement {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 20px;
+        padding: 20px;
       }
       .card {
         background-color: #bbb;
