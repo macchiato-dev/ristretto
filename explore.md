@@ -85,10 +85,10 @@ export class ExploreApp extends HTMLElement {
       this.style.setProperty('--sidebar-width', `${x - 4}px`)
     })
     this.split.addEventListener('split-view-start', e => {
-      this.classList.add('split-move')
+      this.viewPane.classList.add('split-move')
     })
-    this.split.addEventListener('split-view-start', e => {
-      this.classList.remove('split-move')
+    this.split.addEventListener('split-view-end', e => {
+      this.viewPane.classList.remove('split-move')
     })
     this.split.setAttribute('draggable', 'false')
     this.displayNotebook()
@@ -117,7 +117,7 @@ export class ExploreApp extends HTMLElement {
         padding: 0;
         color: #bfcfcd;
       }
-      :host(.split-move) iframe, :host(.split-move) div.select, :host(.split-move) div.view-pane {
+      div.view-pane.split-move iframe {
         pointer-events: none;
       }
       split-view {
