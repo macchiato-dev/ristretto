@@ -160,11 +160,16 @@ export class CodeEdit extends HTMLElement {
         ...cmLint.lintKeymap,
       ]),
     ]
+    const viewTheme = cmView.EditorView.theme({
+      '&': {flexGrow: '1', height: '100%'},
+      '.cm-scroller': {overflow: 'auto'}
+    })
     this.view = new cmView.EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
+        viewTheme,
         cmView.EditorView.updateListener.of(e => {
           if (e.docChanged) {
             this.dispatchEvent(new CustomEvent(
@@ -183,13 +188,9 @@ export class CodeEdit extends HTMLElement {
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      background-color: #fff;
-    }
-    :host > * {
       flex-grow: 1;
-    }
-    .cm-editor.cm-focused {
-      outline: none;
+      background-color: #fff;
+      height: 100%;
     }
   `
 }
