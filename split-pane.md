@@ -11,9 +11,11 @@ export class SplitView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.addEventListener('mousedown', () => this.start())
+    this.start = this.start.bind(this)
     this.mousemove = this.mousemove.bind(this)
     this.mouseup = this.mouseup.bind(this)
+    this.mousedown = this.mousedown.bind(this)
+    this.addEventListener('mousedown', this.start)
   }
 
   connectedCallback() {
@@ -26,12 +28,22 @@ export class SplitView extends HTMLElement {
     this.shadowRoot.appendChild(style)
   }
 
-  start() {
+  start({offsetX}) {
+    document.body.removeEventListener('mousemove', this.mousemove)
+    document.body.removeEventListener('mouseup', this.mouseup)
     document.body.addEventListener('mousemove', this.mousemove)
     document.body.addEventListener('mouseup', this.mouseup)
-    this.tempStyle = document.createElement('style')
-    this.tempStyle.textContent = `body { cursor: col-resize !important }`
+    setTimeout(() => {
+      document.body.addEventListener('mousedown', this.mousedown)
+    }, 10)
+    if (!this.tempStyle) {
+      this.tempStyle = document.createElement('style')
+      this.tempStyle.textContent = `body { cursor: col-resize !important }`
+    }
     document.head.append(this.tempStyle)
+    this.dispatchEvent(new CustomEvent(
+      'split-view-start', {bubbles: true, detail: {offsetX}}
+    ))
   }
 
   mousemove({offsetX}) {
@@ -40,14 +52,23 @@ export class SplitView extends HTMLElement {
     ))
   }
 
-  mouseup() {
-    this.end()
+  mouseup({offsetX}) {
+    this.end({offsetX})
   }
 
-  end() {
+  mousedown({offsetX}) {
+    this.end({offsetX})
+  }
+
+  end({offsetX}) {
     document.body.removeEventListener('mousemove', this.mousemove)
     document.body.removeEventListener('mouseup', this.mouseup)
+    document.body.removeEventListener('mousedown', this.mousedown)
     this.tempStyle.remove()
+    this.tempStyle = undefined
+    this.dispatchEvent(new CustomEvent(
+      'split-view-end', {bubbles: true, detail: {offsetX}}
+    ))
   }
 }
 ```

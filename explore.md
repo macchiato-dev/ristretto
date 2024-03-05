@@ -82,6 +82,12 @@ export class ExploreApp extends HTMLElement {
       const x = e.detail.offsetX - this.offsetLeft
       this.style.setProperty('--sidebar-width', `${x - 4}px`)
     })
+    this.split.addEventListener('split-view-start', e => {
+      this.classList.add('split-move')
+    })
+    this.split.addEventListener('split-view-start', e => {
+      this.classList.remove('split-move')
+    })
     this.displayNotebook()
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
   }
@@ -107,6 +113,9 @@ export class ExploreApp extends HTMLElement {
         margin: 0;
         padding: 0;
         color: #bfcfcd;
+      }
+      :host(.split-move) iframe, :host(.split-move) div.select, :host(.split-move) div.view-pane {
+        pointer-events: none;
       }
       split-view {
         min-width: 4px;

@@ -110,7 +110,7 @@ export class FileCardList extends HTMLElement {
     this.leftBtn.innerHTML = this.icons.left
     this.leftBtn.addEventListener('click', () => {
       this.listEl.scroll({
-        left: Math.min(0, this.listEl.scrollLeft - this.listEl.offsetWidth),
+        left: Math.max(0, this.listEl.scrollLeft - this.listEl.clientWidth),
         behavior: 'smooth',
       })
     })
@@ -118,9 +118,9 @@ export class FileCardList extends HTMLElement {
     this.rightBtn.innerHTML = this.icons.right
     this.rightBtn.addEventListener('click', () => {
       this.listEl.scroll({
-        left: Math.max(
-          this.listEl.scrollWidth - this.listEl.offsetWidth,
-          this.listEl.scrollLeft + this.listEl.offsetWidth
+        left: Math.min(
+          this.listEl.scrollWidth - this.listEl.clientWidth,
+          this.listEl.scrollLeft + this.listEl.clientWidth
         ),
         behavior: 'smooth',
       })
@@ -140,6 +140,10 @@ export class FileCardList extends HTMLElement {
     this.listEl.addEventListener('scroll', () => {
       this.updateArrows()
     })
+    this.listResizeObserver = new ResizeObserver(() => {
+      this.updateArrows()
+    })
+    this.listResizeObserver.observe(this.listEl)
     listWrapEl.append(this.leftBtn, this.listEl, this.rightBtn)
     // listWrapEl.append(this.listEl)
     this.shadowRoot.append(this.headerEl, listWrapEl)
@@ -205,7 +209,7 @@ export class FileCardList extends HTMLElement {
     } else {
       this.leftBtn.removeAttribute('disabled')
     }
-    if (listEl.scrollLeft + listEl.offsetWidth > listEl.scrollWidth - 3) {
+    if (listEl.scrollLeft + listEl.offsetWidth > listEl.scrollWidth - 20) {
       this.rightBtn.setAttribute('disabled', '')
     } else {
       this.rightBtn.removeAttribute('disabled')
