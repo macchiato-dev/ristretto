@@ -115,7 +115,7 @@ export class FileCardList extends HTMLElement {
     this.leftBtn.innerHTML = this.icons.left
     this.leftBtn.addEventListener('click', () => {
       this.listEl.scroll({
-        left: Math.max(0, this.listEl.scrollLeft - this.listEl.clientWidth),
+        left: Math.max(0, this.listEl.scrollLeft - Math.floor(this.listEl.clientWidth * 0.85)),
         behavior: 'smooth',
       })
     })
@@ -125,7 +125,7 @@ export class FileCardList extends HTMLElement {
       this.listEl.scroll({
         left: Math.min(
           this.listEl.scrollWidth - this.listEl.clientWidth,
-          this.listEl.scrollLeft + this.listEl.clientWidth
+          this.listEl.scrollLeft + Math.floor(this.listEl.clientWidth * 0.85)
         ),
         behavior: 'smooth',
       })
