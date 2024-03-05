@@ -64,8 +64,10 @@ export class SplitView extends HTMLElement {
     document.body.removeEventListener('mousemove', this.mousemove)
     document.body.removeEventListener('mouseup', this.mouseup)
     document.body.removeEventListener('mousedown', this.mousedown)
-    this.tempStyle.remove()
-    this.tempStyle = undefined
+    if (this.tempStyle) {
+      this.tempStyle.remove()
+      this.tempStyle = undefined
+    }
     this.dispatchEvent(new CustomEvent(
       'split-view-end', {bubbles: true, detail: {offsetX}}
     ))

@@ -75,8 +75,10 @@ export class ExploreApp extends HTMLElement {
     this.selectPane = document.createElement('div')
     this.selectPane.append(this.dataSelect, this.notebookSelect)
     this.selectPane.classList.add('select')
+    this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
     this.viewPane.classList.add('view-pane')
+    this.viewPane.setAttribute('draggable', 'false')
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
@@ -88,6 +90,7 @@ export class ExploreApp extends HTMLElement {
     this.split.addEventListener('split-view-start', e => {
       this.classList.remove('split-move')
     })
+    this.split.setAttribute('draggable', 'false')
     this.displayNotebook()
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
   }
@@ -311,7 +314,9 @@ customElements.define('file-card-list', FileCardList)
 customElements.define('explore-app', ExploreApp)
 
 async function setup() {
-  document.body.append(document.createElement('explore-app'))
+  const exploreApp = document.createElement('explore-app')
+  exploreApp.setAttribute('draggable', 'false')
+  document.body.append(exploreApp)
 }
 
 setup()
