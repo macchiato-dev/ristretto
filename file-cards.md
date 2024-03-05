@@ -49,6 +49,10 @@ export class FileCard extends HTMLElement {
         border: 2px solid transparent;
         user-select: none;
       }
+      :host(:focus-visible), :host(:focus-visible[selected]) {
+        outline: none;
+        border: 2px solid color-mix(in srgb, blue, white 40%);
+      }
       :host([selected]) {
         border-color: blue;
       }
