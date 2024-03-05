@@ -9,7 +9,8 @@ This is an interface to explore different notebooks for different types of conte
   "importFiles": [
     ["loader.md", "builder.js"],
     ["file-cards.md", "FileCard.js"],
-    ["file-cards.md", "FileCardList.js"]
+    ["file-cards.md", "FileCardList.js"],
+    ["split-pane.md", "split-view.js"]
   ]
 }
 ```
@@ -76,8 +77,13 @@ export class ExploreApp extends HTMLElement {
     this.selectPane.classList.add('select')
     this.viewPane = document.createElement('div')
     this.viewPane.classList.add('view-pane')
+    this.split = document.createElement('split-view')
+    this.split.addEventListener('split-view-resize', e => {
+      const x = e.detail.offsetX - this.offsetLeft
+      this.style.setProperty('--sidebar-width', `${x - 4}px`)
+    })
     this.displayNotebook()
-    this.shadowRoot.append(this.selectPane, this.viewPane)
+    this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
   }
 
   connectedCallback() {
@@ -94,19 +100,26 @@ export class ExploreApp extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-columns: 1fr 1.8fr;
+        grid-template-columns: var(--sidebar-width, 1fr) auto 1.8fr;
         grid-template-rows: 1fr;
-        gap: 12px;
+        gap: 4px;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
+      }
+      split-view {
+        min-width: 4px;
       }
       @media (max-width: 600px) {
         :host {
           height: auto;
           grid-template-columns: 1fr;
           grid-template-rows: auto 100vh;
+          gap: 12px;
+        }
+        split-view {
+          display: none;
         }
       }
       div.select {
@@ -278,10 +291,12 @@ ${runEntry}
 `app.js`
 
 ```js
+import {SplitView} from '/split-pane/split-view.js'
 import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
 import {ExploreApp} from '/ExploreApp.js'
 
+customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
 customElements.define('explore-app', ExploreApp)
