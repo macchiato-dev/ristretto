@@ -69,13 +69,20 @@ export class TabItem extends HTMLElement {
         return false
       }
     })
-    this.nameEl.addEventListener('dblclick', () => {
+
+    this.nameEl.addEventListener('mousedown', e => {
+      if (e.detail > 1) {
+        e.preventDefault()
+      }
+    })
+    this.nameEl.addEventListener('dblclick', e => {
       this.rename()
+      e.preventDefault()
     })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
     this.menuBtn.innerHTML = this.icons.menu
-    this.menuBtn.addEventListener('click', () => {
+    this.menuBtn.addEventListener('click', e => {
       this.openMenu()
     })
     this.headerEl.appendChild(this.menuBtn)
