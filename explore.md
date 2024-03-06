@@ -31,7 +31,7 @@ export class ExploreApp extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.dataTemplates = [
-      'colors.json', 'image.png', 'example-notebook.md', 'planets.csv'
+      'colors.json', 'image.png', 'example-notebook.md', 'planets.csv', 'font.woff2'
     ]
     this.notebookTemplates = {
       'colors.json': [
@@ -50,6 +50,9 @@ export class ExploreApp extends HTMLElement {
       'planets.csv': [
         'table.md',
         'data-cards.md',
+      ],
+      'font.woff2': [
+        'heading.md',
       ],
     }
     this.dataSelect = document.createElement('file-card-list')
