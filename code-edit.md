@@ -91,21 +91,21 @@ export class CodeEdit extends HTMLElement {
         cmLanguage.LanguageDescription.of({
           name: 'css',
           async load() {
-            return new LanguageSupport(cmCss.cssLanguage)
+            return new cmLanguage.LanguageSupport(cmCss.cssLanguage)
           },
         }),
         cmLanguage.LanguageDescription.of({
           name: 'json',
           async load() {
-            return new LanguageSupport(cmJson.jsonLanguage)
+            return new cmLanguage.LanguageSupport(cmJson.jsonLanguage)
           },
         }),
         cmLanguage.LanguageDescription.of({
           name: 'html',
           async load() {
-            const javascript = new LanguageSupport(cmJavaScript.javascriptLanguage)
-            const css = new LanguageSupport(cmCss.cssLanguage)
-            return new LanguageSupport(cmHtml.htmlLanguage, [css, javascript])
+            const javascript = new cmLanguage.LanguageSupport(cmJavaScript.javascriptLanguage)
+            const css = new cmLanguage.LanguageSupport(cmCss.cssLanguage)
+            return new cmLanguage.LanguageSupport(cmHtml.htmlLanguage, [css, javascript])
           },
         }),
       ]
