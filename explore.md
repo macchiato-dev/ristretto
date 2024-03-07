@@ -150,7 +150,7 @@ export class ExploreApp extends HTMLElement {
         :host {
           height: auto;
           grid-template-columns: 1fr;
-          grid-template-rows: auto 100vh;
+          grid-template-rows: auto 100svh;
           gap: 12px;
         }
         split-view {
