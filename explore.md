@@ -126,17 +126,6 @@ export class ExploreApp extends HTMLElement {
       split-view {
         min-width: 4px;
       }
-      @media (max-width: 600px) {
-        :host {
-          height: auto;
-          grid-template-columns: 1fr;
-          grid-template-rows: auto 100vh;
-          gap: 12px;
-        }
-        split-view {
-          display: none;
-        }
-      }
       div.select {
         display: flex;
         flex-direction: column;
@@ -156,6 +145,23 @@ export class ExploreApp extends HTMLElement {
         padding: 10px;
         border-radius: 10px;
         background-color: #2b172a;
+      }
+      @media (max-width: 600px) {
+        :host {
+          height: auto;
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 100vh;
+          gap: 12px;
+        }
+        split-view {
+          display: none;
+        }
+        div.select {
+          padding-right: 10px;
+        }
+        div.view-pane {
+          padding-left: 10px;
+        }
       }
     `
     this.shadowRoot.append(style)
