@@ -398,7 +398,7 @@ export class AppView extends HTMLElement {
     this.viewFrameWrap.classList.add('view-frame-wrap')
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.viewFrame.height = 0
+    this.viewFrame.height = 30
     this.viewFrameWrap.append(this.viewFrame)
     this.shadowRoot.append(this.toolbar, this.editor, this.viewFrameWrap)
     this.shadowRoot.addEventListener('code-input', (e) => {
@@ -619,11 +619,11 @@ addEventListener('message', async e => {
   }
 }, {once: true})
     `.trim()
-    this.viewFrame.srcdoc = `
+    const src = `
 <!doctype html>
 <html>
 <head>
-  <title></title>
+  <title>preview</title>
 <script type="module">
 ${runEntry}
 </script>
@@ -632,6 +632,8 @@ ${runEntry}
 </body>
 </html>
 `.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const messageText = `\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)

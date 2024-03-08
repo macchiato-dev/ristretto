@@ -106,6 +106,12 @@ export class ExploreApp extends HTMLElement {
         padding: 0;
         background-color: #55391b;
       }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
     `
     document.head.append(globalStyle)
     const style = document.createElement('style')
@@ -150,7 +156,7 @@ export class ExploreApp extends HTMLElement {
         :host {
           height: auto;
           grid-template-columns: 1fr;
-          grid-template-rows: auto 100svh;
+          grid-template-rows: auto 100vh;
           gap: 12px;
         }
         split-view {
@@ -161,19 +167,22 @@ export class ExploreApp extends HTMLElement {
         }
         div.view-pane {
           padding-left: 10px;
+          padding-bottom: 100px;
         }
       }
     `
     this.shadowRoot.append(style)
     this.initImages(this.dataSelect.items)
     addEventListener('message', async e => {
-      const [cmd, ...args] = e.data
-      const port = e.ports[0]
-      if (cmd === 'getDeps') {
-        const [notebookSrc] = args
-        const builder = new Builder({src: notebookSrc, parentSrc: __source})
-        const deps = builder.getDeps()
-        port.postMessage(deps)
+      if (e.target === this.viewFrame?.contentWindow) {
+        const [cmd, ...args] = e.data
+        const port = e.ports[0]
+        if (cmd === 'getDeps') {
+          const [notebookSrc] = args
+          const builder = new Builder({src: notebookSrc, parentSrc: __source})
+          const deps = builder.getDeps()
+          port.postMessage(deps)
+        }
       }
     })
   }
@@ -261,11 +270,11 @@ addEventListener('message', async e => {
   }
 }, {once: true})
     `.trim()
-    this.viewFrame.srcdoc = `
+    const src = `
 <!doctype html>
 <html>
 <head>
-  <title></title>
+  <title>doc</title>
 <script type="module">
 ${runEntry}
 </script>
@@ -274,6 +283,8 @@ ${runEntry}
 </body>
 </html>
 `.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
       let dataSrc = '', notebookSrc = ''
