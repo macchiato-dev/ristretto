@@ -174,7 +174,7 @@ export class ExploreApp extends HTMLElement {
     this.shadowRoot.append(style)
     this.initImages(this.dataSelect.items)
     addEventListener('message', async e => {
-      if (e.target === this.viewFrame?.contentWindow) {
+      if (e.source === this.viewFrame?.contentWindow) {
         const [cmd, ...args] = e.data
         const port = e.ports[0]
         if (cmd === 'getDeps') {
