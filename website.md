@@ -12,13 +12,16 @@
     ["forms.md", "button-group.js"],
     ["code-edit.md", "code-edit.js"],
     ["menu.md", "dropdown.js"]
+  ],
+  "dataFiles": [
+    ["font.woff2.md", "font.woff2"]
   ]
 }
 ```
 
 `overview.md`
 
-```
+```md
 # Overview
 
 ## Play
@@ -199,9 +202,6 @@ export class AppView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.depsConfig = {bundleFiles: [], importFiles: []}
-    this.notebook = this.getBlockContent('notebook.md') ?? (
-      `\n\n\`app.js\`\n\n${this.fence(`document.body.innerText = 'hello'`)}`
-    )
     this.loaded = false
     this.toolbar = document.createElement('m-toolbar')
     this.toolbar.onShowNotebookCode = () => {
@@ -209,7 +209,8 @@ export class AppView extends HTMLElement {
     }
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrame)
+    this.renderView()
+    this.shadowRoot.append(this.toolbar, this.viewFrame)
     this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
@@ -263,13 +264,47 @@ export class AppView extends HTMLElement {
     this.renderView()
   }
 
+  pages = {
+    '/': 'pages/index.html',
+  }
+
+  renderPage(path = '/', output = false) {
+    const pageFile = this.pages[path]
+    const data = {
+      'layout.html': null,
+      'style.css': null,
+      'app-redirect-dialog.js': null,
+      [pageFile]: null,
+    }
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name in data) {
+        data[block.name] = __source.slice(...block.contentRange)
+      }
+    }
+    let page = data['layout.html']
+    page = page.replace(
+      '/* {{style}} */',
+      data['style.css'].replace(
+        /(,)(\).*\{\{font\}\})/,
+        (match, p1, p2) => {
+          return p1 + Macchiato.data['font.woff2/font.woff2'].replaceAll(/\s+/g, '') + p2
+        }
+      )
+    )
+    if (path === '/' && output) {
+      page = page.replace('// {{script}}', data['app-redirect-dialog.js'])
+    }
+    page = page.replace('<!-- {{content}} -->', data[pageFile])
+    return page
+  }
+
   renderView() {
     const viewFrame = document.createElement('iframe')
     viewFrame.sandbox = 'allow-scripts'
+    viewFrame.srcdoc = this.renderPage()
     this.shadowRoot.appendChild(viewFrame)
     this.viewFrame.remove()
     this.viewFrame = viewFrame
-    this.displayNotebook()
   }
 
   fence(text, info = '') {
@@ -279,8 +314,11 @@ export class AppView extends HTMLElement {
     return `\n${quotes}${info}\n${text}\n${quotes}\n`
   }
 
-  async buildNotebook(notebook, files) {
-    return ''
+  async buildNotebook() {
+    const pages = Object.entries(this.pages).map(([path, file]) => (
+      `\`${file.replace('pages/', '')}\`\n${this.fence(this.renderPage(path, true), 'html')}`
+    ))
+    return '# Output\n\n' + pages.join('\n') + '\n\n'
   }
 
   async showNotebookCode() {
@@ -337,4 +375,205 @@ class App {
 }
 
 new App().run()
+```
+
+`layout.html`
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+<style>
+/* {{style}} */
+</style>
+<script type="module">
+// {{script}}
+</script>
+</head>
+<body>
+  <main>
+    <!-- {{content}} -->
+  </main>
+  <aside>
+    <nav aria-label="primary">
+      <ul>
+        <li><a href="/">Home</a></li>
+      </ul>
+    </nav>
+  </aside>
+  <app-redirect-dialog></app-redirect-dialog>
+</body>
+</html>
+```
+
+
+`style.css`
+
+```css
+body {
+  background: #2d1d0e;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: stretch;
+  margin: 0;
+  padding: 0;
+  color: #eee;
+  min-height: 100vh;
+  box-sizing: border-box;
+  font-family: sans-serif;
+}
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+main {
+  flex-grow: 1;
+}
+aside {
+  width: 280px;
+  background-color: #57391b;
+}
+nav ul {
+  list-style-type: none;
+  padding: 0;
+}
+nav {
+  padding: 20px;
+  font-size: 24px;
+}
+nav a {
+  color: inherit;
+  text-decoration: none;
+}
+nav a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@font-face {
+  font-family: 'Mohave';
+  font-display: block;
+  src: url(data:application/octet-stream;base64,) format(woff2) /* {{font}} */;
+}
+h1 {
+  color: #fff596;
+  text-align: center;
+  font-size: 48px;
+  letter-spacing: 2px;
+  font-family: Mohave;
+}
+```
+
+
+`app-redirect-dialog.js`
+
+```js
+export class AppRedirectDialog extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.dontShowAgain = false
+    this.dialogEl = document.createElement('dialog')
+    const title = document.createElement('h1')
+    title.innerText = 'Notebook Data Found'
+    const text1 = document.createElement('p')
+    text1.innerText = (
+      'The previous site at this domain, a side by side markdown editing notebook, ' +
+      'has been replaced with a new page about the macchiato.dev project.'
+    )
+    const text2 = document.createElement('p')
+    text2.innerText = 'The notebook has moved to:'
+    const link = document.createElement('a')
+    link.setAttribute('href', 'https://notebook.macchiato.dev/')
+    link.setAttribute('target', '_blank')
+    link.innerText = 'https://notebook.macchiato.dev/'
+    const linkRow = document.createElement('div')
+    linkRow.append(link)
+    linkRow.classList.add('link')
+    const text3 = document.createElement('p')
+    text3.innerText = "Any data stored in the browser's local storage area related to the notebook may be found there."
+    const dontShowCheckRow = document.createElement('div')
+    const checkLabel = document.createElement('label')
+    const checkInput = document.createElement('input')
+    checkInput.setAttribute('type', 'checkbox')
+    const checkTextEl = document.createElement('span')
+    checkTextEl.innerText = "Don't show this dialog again"
+    checkLabel.append(checkInput, checkTextEl)
+    checkInput.checked = this.dontShowAgain
+    checkInput.addEventListener('input', ({target: {checked}}) => {
+      this.dontShowAgain = checked
+    })
+    dontShowCheckRow.append(checkLabel)
+    const btn = document.createElement('button')
+    btn.innerText = 'Close'
+    btn.addEventListener('click', () => {
+      if (this.dontShowAgain) {
+        this.dispatchEvent(new CustomEvent('dont-show-again', {bubbles: true}))
+      }
+      this.dialogEl.close()
+    })
+    const btnRow = document.createElement('div')
+    btnRow.classList.add('btn-row')
+    btnRow.append(btn)
+    this.dialogEl.append(title, text1, text2, linkRow, text3, dontShowCheckRow, btnRow)
+    this.shadowRoot.append(this.dialogEl)
+  }
+
+  connectedCallback() {
+    const style = document.createElement('style')
+    style.textContent = `
+      dialog {
+        margin-top: 5vh;
+        margin-left: auto;
+        margin-right: auto;
+        background: #ccc;
+        border: 5px solid #222;
+        border-radius: 5px;
+        color: #111;
+        max-height: 60vh;
+        max-width: 85vh;
+        overflow: auto;
+      }
+      a {
+        color: #115;
+        font-size: 140%;
+      }
+      .btn-row {
+        display: flex;
+        justify-content: center;
+      }
+    `
+    this.shadowRoot.appendChild(style)
+  }
+
+  run(data) {
+    if (data.notebookPresent && !data.showNotebookMessageIsFalse) {
+      this.dialogEl.showModal()
+    }
+  }
+}
+
+customElements.define('app-redirect-dialog', AppRedirectDialog)
+
+document.addEventListener('DOMContentLoaded', () => {
+  const notebookPresent = !!localStorage.getItem('rco/settings/color-scheme')
+  if (!notebookPresent) {
+    localStorage.setItem('rco/showNotebookMessage', 'false')
+  }
+  const showNotebookMessageIsFalse = localStorage.getItem('rco/showNotebookMessage') === 'false'
+  const dialog = document.querySelector('app-redirect-dialog')
+  dialog.addEventListener('dont-show-again', () => {
+    localStorage.setItem('rco/showNotebookMessage', 'false')
+  })
+  dialog.run({notebookPresent, showNotebookMessageIsFalse})
+})
+```
+
+
+`pages/index.html`
+
+```html
+<h1>macchiato.dev</h1>
+<p></p>
 ```
