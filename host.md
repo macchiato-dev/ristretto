@@ -10,7 +10,7 @@ Requests are sent through postMessage with a MessageChannel.
 
 ## Modal Dialog
 
-This shows a modal dialog with a backdrop, that can be called from inside the container. This dialog contains
+This shows a modal dialog with a backdrop, that can be called from inside the container. This dialog contains an upload area, a link to download a file, or a link to open in a new window.
 
 ## Uploading
 
