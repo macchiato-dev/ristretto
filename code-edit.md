@@ -12,10 +12,14 @@ export class CodeEdit extends HTMLElement {
     this.shadowRoot.adoptedStyleSheets = [
       this.constructor.styleSheet
     ]
+    this.loaded = false
   }
 
   connectedCallback() {
-    this.initEditor()
+    if (!this.loaded) {
+      this.initEditor()
+      this.loaded = true
+    }
   }
 
   static get styleSheet() {

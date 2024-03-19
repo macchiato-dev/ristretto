@@ -90,8 +90,11 @@ export class TabItem extends HTMLElement {
       'm-menu-dropdown'
     )
     this.shadowRoot.appendChild(this.menu)
-    this.addEventListener('click', () => { this.selected = true })
-    this.addEventListener('focus', () => { this.selected = true })
+    this.shadowRoot.addEventListener('click', e => {
+      if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
+        this.selected = true
+      }
+    })
   }
 
   connectedCallback() {
