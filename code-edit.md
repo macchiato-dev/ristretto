@@ -187,6 +187,10 @@ export class CodeEdit extends HTMLElement {
     this.shadowRoot.append(this.view.dom)
   }
 
+  focus() {
+    this.view.focus()
+  }
+
   static css = `
     :host {
       display: flex;

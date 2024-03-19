@@ -38,6 +38,9 @@ export class FileGroup extends HTMLElement {
     this.tabListEl.createContentEl = tabEl => {
       const fileView = document.createElement('m-editor-file-content-view')
       fileView.tabEl = tabEl
+      tabEl.addEventListener('ready-to-edit', () => {
+        fileView.focus()
+      })
       return fileView
     }
     this.filesEl = document.createElement('div')
@@ -182,6 +185,10 @@ export class FileContentView extends HTMLElement {
       fileType = 'md'
     }
     this.editEl.fileType = fileType
+  }
+
+  focus() {
+    this.editEl.focus()
   }
 }
 ```

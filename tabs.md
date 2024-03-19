@@ -61,11 +61,21 @@ export class TabItem extends HTMLElement {
     })
     this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
+      if (this.isNew) {
+        this.selected = true
+        this.isNew = false
+      }
     })
     this.nameEl.addEventListener('keydown', e => {
       if (e.which === 13) {
         e.preventDefault()
+        const isNew = this.isNew
         this.nameEl.blur()
+        if (isNew) {
+          this.dispatchEvent(new CustomEvent(
+            'ready-to-edit', {bubbles: true}
+          ))
+        }
         return false
       }
     })
@@ -187,6 +197,7 @@ export class TabItem extends HTMLElement {
     }
     if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
+        (this.previousElementSibling ?? this.nextElementSibling).selected = true
         this.contentEl.remove()
         this.remove()
       })
@@ -300,6 +311,7 @@ export class TabList extends HTMLElement {
     e.target.insertAdjacentElement(position, tabEl)
     e.target.contentEl.insertAdjacentElement(position, contentEl)
     setTimeout(() => {
+      tabEl.isNew = true
       tabEl.nameEl.setAttribute('contenteditable', '')
       tabEl.nameEl.focus()
     }, 50)
