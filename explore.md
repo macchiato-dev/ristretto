@@ -30,9 +30,6 @@ export class ExploreApp extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.dataTemplates = [
-      'colors.json', 'image.png', 'example-notebook.md', 'planets.csv', 'font.woff2'
-    ]
     this.notebookTemplates = {
       'colors.json': [
         'palette.md',
@@ -54,7 +51,11 @@ export class ExploreApp extends HTMLElement {
       'font.woff2': [
         'heading.md',
       ],
+      'wiki-response.json': [
+        'json-tree.md',
+      ],
     }
+    this.dataTemplates = Object.keys(this.notebookTemplates)
     this.dataSelect = document.createElement('file-card-list')
     this.dataSelect.name = 'Data'
     this.dataSelect.items = this.dataTemplates.map((template, i) => {
