@@ -12,13 +12,21 @@ export class JsonTree extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
-      
+      * {
+        color: #ffffffbb;
+      }
     `
     this.shadowRoot.append(style)
   }
 
   set data(data) {
-    
+    const ul = document.createElement('ul')
+    ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
+      const li = document.createElement('li')
+      li.innerText = `${key}: ${JSON.stringify(value)}`
+      return li
+    }))
+    this.shadowRoot.replaceChildren(ul)
   }
 }
 ```
