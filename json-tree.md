@@ -19,13 +19,24 @@ export class JsonTree extends HTMLElement {
     this.shadowRoot.append(style)
   }
 
-  set data(data) {
-    const ul = document.createElement('ul')
+  renderObject(ul, data) {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
-      li.innerText = `${key}: ${JSON.stringify(value)}`
+      if (typeof value === 'object' && value !== null) {
+        li.innerText = JSON.stringify(key)
+        const child = document.createElement('ul')
+        li.append(child)
+        this.renderObject(child, value)
+      } else {
+        li.innerText = `${JSON.stringify(key)}: ${JSON.stringify(value)}`
+      }
       return li
     }))
+  }
+
+  set data(data) {
+    const ul = document.createElement('ul')
+    this.renderObject(ul, data)
     this.shadowRoot.replaceChildren(ul)
   }
 }
