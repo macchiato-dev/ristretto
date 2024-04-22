@@ -76,8 +76,20 @@ export class ExploreApp extends HTMLElement {
     this.notebookSelect.addEventListener('select-item', e => {
       this.displayNotebook()
     })
+    this.selectTabs = document.createElement('div')
+    this.selectTabs.append(...['Explore', 'Source'].map(name => {
+      const el = document.createElement('a')
+      el.innerText = name
+      if (name === 'Explore') {
+        el.classList.add('active')
+      }
+      return el
+    }))
+    this.selectTabs.classList.add('select-tabs')
+    this.exploreView = document.createElement('div')
+    this.exploreView.append(this.dataSelect, this.notebookSelect)
     this.selectPane = document.createElement('div')
-    this.selectPane.append(this.dataSelect, this.notebookSelect)
+    this.selectPane.append(this.selectTabs, this.exploreView)
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
@@ -139,6 +151,23 @@ export class ExploreApp extends HTMLElement {
         padding: 10px;
         padding-right: 0px;
         overflow-y: auto;
+      }
+      div.select-tabs {
+        display: flex;
+        flex-direction: row;
+        gap: 5px;
+        padding: 5px;
+      }
+      div.select-tabs a {
+        flex-grow: 1;
+        text-align: center;
+        font-family: sans-serif;
+        font-size: 14px;
+        padding: 5px;
+      }
+      div.select-tabs a.active {
+        color: #d1cf3b;
+        background: #00000040;
       }
       div.view-pane {
         display: flex;
