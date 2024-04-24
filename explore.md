@@ -83,13 +83,32 @@ export class ExploreApp extends HTMLElement {
       if (name === 'Explore') {
         el.classList.add('active')
       }
+      el.addEventListener('click', () => {
+        for (const child of el.parentElement.children) {
+          child.classList.remove('active')
+        }
+        for (const [tabName, el] of [
+          ['Explore', this.exploreView], ['Source', this.sourceView]
+        ]) {
+          if (tabName === name) {
+            el.classList.add('active')
+          } else {
+            el.classList.remove('active')
+          }
+        }
+        el.classList.add('active')
+      })
       return el
     }))
     this.selectTabs.classList.add('select-tabs')
     this.exploreView = document.createElement('div')
     this.exploreView.append(this.dataSelect, this.notebookSelect)
+    this.exploreView.classList.add('explore', 'tab-content', 'active')
+    this.sourceView = document.createElement('div')
+    this.sourceView.classList.add('source', 'tab-content')
+    this.sourceView.innerText = 'Source'
     this.selectPane = document.createElement('div')
-    this.selectPane.append(this.selectTabs, this.exploreView)
+    this.selectPane.append(this.selectTabs, this.exploreView, this.sourceView)
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
@@ -164,10 +183,17 @@ export class ExploreApp extends HTMLElement {
         font-family: sans-serif;
         font-size: 14px;
         padding: 5px;
+        cursor: pointer;
       }
       div.select-tabs a.active {
         color: #d1cf3b;
         background: #00000040;
+      }
+      div.select .tab-content {
+        display: none;
+      }
+      div.select .tab-content.active {
+        display: flex;
       }
       div.view-pane {
         display: flex;
