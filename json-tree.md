@@ -11,10 +11,7 @@ export class JsonTree extends HTMLElement {
 
   connectedCallback() {
     const style = document.createElement('style')
-    style.textContent = `
-      * {
-        color: #ffffffbb;
-      }
+    style.textContent = `      
     `
     this.shadowRoot.append(style)
   }
@@ -60,6 +57,7 @@ export class AppView extends HTMLElement {
       body {
         margin: 0;
         padding: 0;
+        color: #ffffffbb;
       }
       html {
         box-sizing: border-box;
