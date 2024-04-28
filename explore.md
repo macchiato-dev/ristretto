@@ -54,6 +54,9 @@ export class ExploreApp extends HTMLElement {
       'wiki-response.json': [
         'json-tree.md',
       ],
+      'files.json': [
+        'json-tree.md',
+      ],
     }
     this.dataTemplates = Object.keys(this.notebookTemplates)
     this.dataSelect = document.createElement('file-card-list')
