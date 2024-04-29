@@ -11,7 +11,10 @@ export class JsonTree extends HTMLElement {
 
   connectedCallback() {
     const style = document.createElement('style')
-    style.textContent = `      
+    style.textContent = `
+      ul {
+        list-style-type: none;
+      }
     `
     this.shadowRoot.append(style)
   }
@@ -20,12 +23,12 @@ export class JsonTree extends HTMLElement {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
       if (typeof value === 'object' && value !== null) {
-        li.innerText = JSON.stringify(key)
+        li.innerText = key
         const child = document.createElement('ul')
         li.append(child)
         this.renderObject(child, value)
       } else {
-        li.innerText = `${JSON.stringify(key)}: ${JSON.stringify(value)}`
+        li.innerText = key
       }
       return li
     }))

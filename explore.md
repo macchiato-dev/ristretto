@@ -55,6 +55,7 @@ export class ExploreApp extends HTMLElement {
         'json-tree.md',
       ],
       'files.json': [
+        'file-tree.md',
         'json-tree.md',
       ],
     }

@@ -1,6 +1,6 @@
 # Files JSON Example
 
-`wiki-response.json`
+`files.json`
 
 ```json
 {
