@@ -174,6 +174,10 @@ export class ExploreApp extends HTMLElement {
         padding-right: 0px;
         overflow-y: auto;
       }
+      div.explore {
+        display: flex;
+        flex-direction: column;
+      }
       div.select-tabs {
         display: flex;
         flex-direction: row;
