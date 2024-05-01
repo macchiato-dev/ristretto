@@ -1,9 +1,9 @@
 # JSON Tree
 
-`json-tree.js`
+`file-tree.js`
 
 ```js
-export class JsonTree extends HTMLElement {
+export class FileTree extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -49,7 +49,7 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.dataTable = document.createElement('json-tree')
+    this.dataTable = document.createElement('file-tree')
     this.shadowRoot.append(this.dataTable)
     this.dataTable.data = this.data
   }
@@ -93,10 +93,10 @@ export class AppView extends HTMLElement {
 `app.js`
 
 ```js
-import {JsonTree} from '/json-tree.js'
+import {FileTree} from '/file-tree.js'
 import {AppView} from '/app-view.js'
 
-customElements.define('json-tree', JsonTree)
+customElements.define('file-tree', FileTree)
 customElements.define('app-view', AppView)
 
 async function setup() {

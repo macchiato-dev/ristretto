@@ -10,7 +10,8 @@ This is an interface to explore different notebooks for different types of conte
     ["loader.md", "builder.js"],
     ["file-cards.md", "FileCard.js"],
     ["file-cards.md", "FileCardList.js"],
-    ["split-pane.md", "split-view.js"]
+    ["split-pane.md", "split-view.js"],
+    ["file-tree.md", "file-tree.js"]
   ]
 }
 ```
@@ -110,7 +111,9 @@ export class ExploreApp extends HTMLElement {
     this.exploreView.classList.add('explore', 'tab-content', 'active')
     this.sourceView = document.createElement('div')
     this.sourceView.classList.add('source', 'tab-content')
-    this.sourceView.innerText = 'Source'
+    this.fileTree = document.createElement('file-tree')
+    this.fileTree.data = this.sourceFiles
+    this.sourceView.append(this.fileTree)
     this.selectPane = document.createElement('div')
     this.selectPane.append(this.selectTabs, this.exploreView, this.sourceView)
     this.selectPane.classList.add('select')
@@ -381,6 +384,24 @@ ${runEntry}
   get selectedNotebook() {
     return this.notebookSelect
   }
+
+  get sourceFiles() {
+    const result = {}
+    for (const block of readBlocksWithNames(__source)) {
+      const parts = block.name.split('/')
+      const dirs = parts.slice(0, -1)
+      const file = parts.at(-1)
+      let parent = result
+      for (const dir of dirs) {
+        if (!(dir in parent)) {
+          parent[dir] = {}
+        }
+        parent = parent[dir]
+      }
+      parent[file] = true
+    }
+    return result
+  }
 }
 ```
 
@@ -390,11 +411,13 @@ ${runEntry}
 import {SplitView} from '/split-pane/split-view.js'
 import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
+import {FileTree} from '/file-tree/file-tree.js'
 import {ExploreApp} from '/ExploreApp.js'
 
 customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
+customElements.define('file-tree', FileTree)
 customElements.define('explore-app', ExploreApp)
 
 async function setup() {
