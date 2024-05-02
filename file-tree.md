@@ -14,6 +14,7 @@ export class FileTree extends HTMLElement {
     style.textContent = `
       ul {
         list-style-type: none;
+        padding-inline-start: 15px;
       }
     `
     this.shadowRoot.append(style)

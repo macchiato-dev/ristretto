@@ -400,7 +400,12 @@ ${runEntry}
       }
       parent[file] = true
     }
-    return result
+    function sortNested(result) {
+      return Object.fromEntries(Object.entries(result).map(([k, v]) => (
+        [k, (typeof v === 'object' && v !== null && !Array.isArray(v)) ? sortNested(v) : v]
+      )).toSorted((a, b) => a[0].localeCompare(b[0])))
+    }
+    return sortNested(result)
   }
 }
 ```
