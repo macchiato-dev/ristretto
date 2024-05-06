@@ -33,7 +33,7 @@ async function initWrite() {
 async function* readPaths(suffix = '.md', parent = []) {
   const dirs = []
   for await (const file of Deno.readDir(join('.', ...parent))) {
-    if (!file.name.startsWith('.')) {
+    if (!(file.name.startsWith('.') || file.name === '_notas')) {
       if (file.isDirectory) {
         dirs.push(file.name)
       } else if (file.name.endsWith(suffix)) {
@@ -273,6 +273,11 @@ async function buildScripts() {
     ['bundle-libraries.md'],
     'run-bundle-libraries.js',
     ['build', 'build-libraries', 'run-bundle-libraries.js']
+  )
+  await buildScript(
+    ['bundle-libraries.md'],
+    'run-bundle-libraries.js',
+    ['run-build.js']
   )
 }
 

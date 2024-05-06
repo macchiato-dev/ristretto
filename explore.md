@@ -387,7 +387,7 @@ ${runEntry}
 
   get sourceFiles() {
     const result = {}
-    for (const block of readBlocksWithNames(__source)) {
+    for (const block of readBlocksWithNames(__source).filter(({name}) => name.endsWith('.md'))) {
       const parts = block.name.split('/')
       const dirs = parts.slice(0, -1)
       const file = parts.at(-1)
