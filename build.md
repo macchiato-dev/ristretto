@@ -274,11 +274,6 @@ async function buildScripts() {
     'run-bundle-libraries.js',
     ['build', 'build-libraries', 'run-bundle-libraries.js']
   )
-  await buildScript(
-    ['bundle-libraries.md'],
-    'run-bundle-libraries.js',
-    ['run-build.js']
-  )
 }
 
 async function build() {
