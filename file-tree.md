@@ -16,20 +16,30 @@ export class FileTree extends HTMLElement {
         list-style-type: none;
         padding-inline-start: 15px;
       }
+      li.active > .item {
+        background: #fff5;
+      }
     `
     this.shadowRoot.append(style)
+    this.shadowRoot.addEventListener('click', e => {
+      this.shadowRoot.querySelector('li.active').classList.remove('active')
+      e.target.closest('li').classList.add('active')
+    })
   }
 
   renderObject(ul, data) {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
+      const item = document.createElement('div')
+      item.classList.add('item')
+      li.append(item)
       if (typeof value === 'object' && value !== null) {
-        li.innerText = key
+        item.innerText = key
         const child = document.createElement('ul')
         li.append(child)
         this.renderObject(child, value)
       } else {
-        li.innerText = key
+        item.innerText = key
       }
       return li
     }))
@@ -38,6 +48,7 @@ export class FileTree extends HTMLElement {
   set data(data) {
     const ul = document.createElement('ul')
     this.renderObject(ul, data)
+    ul.querySelector('li').classList.add('active')
     this.shadowRoot.replaceChildren(ul)
   }
 }
