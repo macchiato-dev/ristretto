@@ -23,11 +23,15 @@ export class FileTree extends HTMLElement {
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('click', e => {
       this.shadowRoot.querySelector('li.active').classList.remove('active')
-      e.target.closest('li').classList.add('active')
+      const el = e.target.closest('li')
+      el.classList.add('active')
+      this.dispatchEvent(new CustomEvent('select-item'), {
+        bubbles: true, detail: el.dataset.path
+      })
     })
   }
 
-  renderObject(ul, data) {
+  renderObject(ul, data, parents) {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
       const item = document.createElement('div')
@@ -35,11 +39,13 @@ export class FileTree extends HTMLElement {
       li.append(item)
       if (typeof value === 'object' && value !== null) {
         item.innerText = key
+        item.dataset.path = [...parents, key]
         const child = document.createElement('ul')
         li.append(child)
-        this.renderObject(child, value)
+        this.renderObject(child, value, [...parents, key])
       } else {
         item.innerText = key
+        item.dataset.path = [...parents, key]
       }
       return li
     }))
@@ -47,7 +53,7 @@ export class FileTree extends HTMLElement {
 
   set data(data) {
     const ul = document.createElement('ul')
-    this.renderObject(ul, data)
+    this.renderObject(ul, data, [])
     ul.querySelector('li').classList.add('active')
     this.shadowRoot.replaceChildren(ul)
   }
