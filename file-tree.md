@@ -25,9 +25,7 @@ export class FileTree extends HTMLElement {
       this.shadowRoot.querySelector('li.active').classList.remove('active')
       const el = e.target.closest('li')
       el.classList.add('active')
-      this.dispatchEvent(new CustomEvent('select-item'), {
-        bubbles: true, detail: el.dataset.path
-      })
+      this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
     })
   }
 
@@ -39,13 +37,13 @@ export class FileTree extends HTMLElement {
       li.append(item)
       if (typeof value === 'object' && value !== null) {
         item.innerText = key
-        item.dataset.path = [...parents, key]
+        item.dataset.path = JSON.stringify([...parents, key])
         const child = document.createElement('ul')
         li.append(child)
         this.renderObject(child, value, [...parents, key])
       } else {
         item.innerText = key
-        item.dataset.path = [...parents, key]
+        item.dataset.path = JSON.stringify([...parents, key])
       }
       return li
     }))
@@ -56,6 +54,27 @@ export class FileTree extends HTMLElement {
     this.renderObject(ul, data, [])
     ul.querySelector('li').classList.add('active')
     this.shadowRoot.replaceChildren(ul)
+  }
+
+  get selected() {
+    const el = this.shadowRoot.querySelector('li.active > .item')
+    return el ? JSON.parse(el.dataset.path) : undefined
+  }
+
+  set selected(path) {
+    const el = this.shadowRoot.querySelector('li.active')
+    if (el) {
+      el.classList.remove('active')
+    }
+    if (path !== undefined) {
+      const pathStr = JSON.stringify(path)
+      const el = [...this.shadowRoot.querySelectorAll('li > .item')].find(el => (
+        el.dataset.path === pathStr
+      ))
+      if (el) {
+        el.closest('li').classList.add('active')
+      }
+    }
   }
 }
 ```
