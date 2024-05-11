@@ -102,6 +102,12 @@ export class ExploreApp extends HTMLElement {
           }
         }
         el.classList.add('active')
+        if (name === 'Explore') {
+          this.mode = 'explore'
+        } else {
+          this.mode = 'source'
+        }
+        this.displayNotebook()
       })
       return el
     }))
@@ -113,6 +119,9 @@ export class ExploreApp extends HTMLElement {
     this.sourceView.classList.add('source', 'tab-content')
     this.fileTree = document.createElement('file-tree')
     this.fileTree.data = this.sourceFiles
+    this.fileTree.addEventListener('select-item', () => {
+      this.displayNotebook()
+    })
     this.sourceView.append(this.fileTree)
     this.selectPane = document.createElement('div')
     this.selectPane.append(this.selectTabs, this.exploreView, this.sourceView)
@@ -133,6 +142,7 @@ export class ExploreApp extends HTMLElement {
       this.viewPane.classList.remove('split-move')
     })
     this.split.setAttribute('draggable', 'false')
+    this.mode = 'explore'
     this.displayNotebook()
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
   }
@@ -309,6 +319,13 @@ export class ExploreApp extends HTMLElement {
     }
   }
 
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
+  }
+
   updateNotebookItems() {
     this.notebookSelect.items = this.notebookTemplates[
       this.dataSelect.selectedItem.name
@@ -355,8 +372,8 @@ ${runEntry}
     this.viewFrame.addEventListener('load', () => {
       const src = __source
       let dataSrc = '', notebookSrc = ''
-      const notebookFile = this.notebookSelect.selectedItem?.name
-      const dataFile = this.dataSelect.selectedItem?.filename
+      const notebookFile = this.mode === 'explore' ? this.notebookSelect.selectedItem?.name : 'tabbed.md'
+      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -367,7 +384,11 @@ ${runEntry}
       const depsSrc = builder.getDeps()
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
-          dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+          if (this.mode === 'explore') {
+            dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+          } else {
+            dataSrc += `\n\n\`notebook.md\`\n\n` + this.fence(src.slice(...block.contentRange), 'md')
+          }
         }
       }
       const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
