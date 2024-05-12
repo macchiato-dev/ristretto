@@ -7,6 +7,7 @@ This is an interface to explore different notebooks for different types of conte
 ```json
 {
   "importFiles": [
+    ["storage.md", "storage.js"],
     ["loader.md", "builder.js"],
     ["file-cards.md", "FileCard.js"],
     ["file-cards.md", "FileCardList.js"],
@@ -438,6 +439,7 @@ import {SplitView} from '/split-pane/split-view.js'
 import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
 import {FileTree} from '/file-tree/file-tree.js'
+import {Storage} from '/storage/storage.js'
 import {ExploreApp} from '/ExploreApp.js'
 
 customElements.define('split-view', SplitView)
@@ -448,6 +450,7 @@ customElements.define('explore-app', ExploreApp)
 
 async function setup() {
   const exploreApp = document.createElement('explore-app')
+  exploreApp.storage = new Storage()
   exploreApp.setAttribute('draggable', 'false')
   document.body.append(exploreApp)
 }
