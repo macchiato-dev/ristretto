@@ -1,4 +1,16 @@
-# JSON Tree
+# File Tree
+
+This displays a tree of files.
+
+`notebook.json`
+
+```json
+{
+  "dataFiles": [
+    ["files.json.md", "files.json"]
+  ]
+}
+```
 
 `file-tree.js`
 
@@ -117,8 +129,20 @@ export class AppView extends HTMLElement {
   get data() {
     if (!this._data) {
       for (const block of readBlocksWithNames(__source)) {
-        if (block.name.endsWith('.json')) {
-          return JSON.parse(__source.slice(...block.contentRange))
+        if (block.name !== 'notebook.json' && block.name.endsWith('.json')) {
+          this._data = JSON.parse(__source.slice(...block.contentRange))
+          return this._data
+        }
+      }
+      for (const block of readBlocksWithNames(__source)) {
+        if (block.name === 'files.json.md') {
+          const blockContent = __source.slice(...block.contentRange)
+          for (const subBlock of readBlocksWithNames(blockContent)) {
+            if (subBlock.name === 'files.json') {
+              this._data = JSON.parse(blockContent.slice(...subBlock.contentRange))
+              return this._data
+            }
+          }
         }
       }
     }
