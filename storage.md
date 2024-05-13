@@ -67,7 +67,7 @@ export class Storage {
     return keys
   }
 
-  static function* readBlocks(input) {
+  static *readBlocks(input) {
     const re = /(?:^|\n)([ \t]*)(`{3,}|~{3,})([^\n]*\n)/
     let index = 0
     while (index < input.length) {
@@ -91,7 +91,7 @@ export class Storage {
     }
   }
 
-  static function* readBlocksWithNames(input) {
+  static *readBlocksWithNames(input) {
     for (const block of readBlocks(input)) {
       const match = input.slice(0, block.blockRange[0]).match(
         new RegExp('(?<=\\n\\r?[ \\t]*\\n\\r?)`([^`]+)`\\s*\\n\\s*$')
