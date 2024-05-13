@@ -16,6 +16,8 @@ This is a component for lists of cards representing files, that have an icon and
 
 ```js
 export class FileCard extends HTMLElement {
+  static observedAttributes = ['selected']
+
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -69,7 +71,7 @@ export class FileCard extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-    this.setAttribute('tabindex', '0')
+    this.updateTabIndex()
   }
 
   get name() {
@@ -88,6 +90,14 @@ export class FileCard extends HTMLElement {
     this.iconEl.replaceChildren(Object.assign(
       document.createElement('img'), {src: data}
     ))
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    this.updateTabIndex()
+  }
+
+  updateTabIndex() {
+    this.tabIndex = this.hasAttribute('selected') ? 0 : -1
   }
 }
 ```
@@ -136,10 +146,24 @@ export class FileCardList extends HTMLElement {
     listWrapEl.classList.add('list-wrap')
     this.listEl = document.createElement('div')
     this.listEl.classList.add('list')
-    this.listEl.addEventListener('click', e => this.childClicked(e))
-    this.listEl.addEventListener('keypress', e => {
+    this.listEl.addEventListener('click', e => this.childClicked(e.target))
+    this.listEl.addEventListener('keydown', e => {
       if (e.which === 13) {
-        this.childClicked(e)
+        this.childClicked(e.target)
+      }
+      if (e.which == 37) {
+        const prev = e.target.previousElementSibling
+        if (prev) {
+          prev.focus()
+          this.childClicked(prev)
+        }
+      }
+      if (e.which == 39) {
+        const next = e.target.nextElementSibling
+        if (next) {
+          next.focus()
+          this.childClicked(next)
+        }
       }
     })
     this.listEl.addEventListener('scroll', () => {
@@ -202,12 +226,12 @@ export class FileCardList extends HTMLElement {
     }, 10)
   }
 
-  childClicked(e) {
-    if (e.target !== this.listEl && !e.target.hasAttribute('selected')) {
+  childClicked(target) {
+    if (target !== this.listEl && !target.hasAttribute('selected')) {
       this.listEl.querySelectorAll('[selected]')?.forEach?.(el => {
         el.removeAttribute('selected')
       })
-      e.target.setAttribute('selected', '')
+      target.setAttribute('selected', '')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
     }
   }
