@@ -365,8 +365,8 @@ export class ExampleView extends HTMLElement {
       const el = document.createElement('tab-item')
       el.name = `Tab ${i}`
       el.contentEl = document.createElement('example-item')
-      el.contentEl.name = name
-      if (name === 'One') {
+      el.contentEl.name = el.name
+      if (i === 0) {
         el.selected = true
         el.contentEl.selected = true
       }
@@ -405,42 +405,7 @@ export class ExampleView extends HTMLElement {
     `
     this.shadowRoot.append(style)
   }
-
-  updateNotebookItems() {
-    this.notebookSelect.items = this.notebookTemplates[
-      this.dataSelect.selectedItem.name
-    ].map((template, i) => {
-      const el = document.createElement('file-card')
-      el.name = template
-      if (i === 0) {
-        el.setAttribute('selected', true)
-      }
-      return el
-    })
-  }
 }
-```
-
-`app.js`
-
-```js
-import {Dropdown} from "/menu/dropdown.js"
-import {TabItem} from '/TabItem.js'
-import {TabList} from '/TabList.js'
-import {ExampleItem} from '/ExampleItem.js'
-import {ExampleView} from '/ExampleView.js'
-
-customElements.define('m-menu-dropdown', Dropdown)
-customElements.define('tab-item', TabItem)
-customElements.define('tab-list', TabList)
-customElements.define('example-item', ExampleItem)
-customElements.define('example-view', ExampleView)
-
-async function setup() {
-  document.body.append(document.createElement('example-view'))
-}
-
-setup()
 ```
 
 `ExampleItem.js`
@@ -483,4 +448,26 @@ export class ExampleItem extends HTMLElement {
     return this.p.innerText
   }
 }
+```
+
+`app.js`
+
+```js
+import {Dropdown} from "/menu/dropdown.js"
+import {TabItem} from '/TabItem.js'
+import {TabList} from '/TabList.js'
+import {ExampleItem} from '/ExampleItem.js'
+import {ExampleView} from '/ExampleView.js'
+
+customElements.define('m-menu-dropdown', Dropdown)
+customElements.define('tab-item', TabItem)
+customElements.define('tab-list', TabList)
+customElements.define('example-item', ExampleItem)
+customElements.define('example-view', ExampleView)
+
+async function setup() {
+  document.body.append(document.createElement('example-view'))
+}
+
+setup()
 ```
