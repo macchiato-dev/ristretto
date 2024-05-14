@@ -120,13 +120,14 @@ export class TabItem extends HTMLElement {
         flex-direction: row;
         align-items: stretch;
         padding-left: 3px 0;
-        border-radius: 5px;
-        background-color: rgb(212,212,216);
+        border-radius: var(--radius, 5px);
+        color: var(--fg, #070707);
+        background-color: var(--bg, rgb(212,212,216));
         align-items: center;
       }
       :host(.selected) div.header {
-        background-color: rgb(15,118,110);
-        color: #e7e7e7;
+        background-color: var(--bg-selected, rgb(15,118,110));
+        color: var(--fg-selected, #e7e7e7);
       }
       div.header > * {
         background: inherit;
