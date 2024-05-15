@@ -9,18 +9,23 @@ export class CodeEdit extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [
-      this.constructor.styleSheet
-    ]
-    this.loaded = false
   }
 
   connectedCallback() {
-    if (!this.loaded) {
-      this.initEditor()
-      this.loaded = true
-    }
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styleSheet]
+    this.initEditor()
   }
+
+  static css = `
+    :host {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      flex-grow: 1;
+      background-color: #fff;
+      height: 100%;
+    }
+  `
 
   static get styleSheet() {
     if (this._styleSheet === undefined) {
@@ -190,16 +195,5 @@ export class CodeEdit extends HTMLElement {
   focus() {
     this.view.focus()
   }
-
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      flex-grow: 1;
-      background-color: #fff;
-      height: 100%;
-    }
-  `
 }
 ```
