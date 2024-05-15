@@ -49,8 +49,8 @@ export class ExampleView extends HTMLElement {
       }
       tab-list.e1 {
         --bg: #339;
-        --bg-selected: #fff4;
-        --fg: #291;
+        --bg-selected: #77a;
+        --fg: #3a3;
         --fg-selected: #5e7;
       }
       tab-list.e2 {
