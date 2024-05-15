@@ -24,14 +24,6 @@ export class FileCard extends HTMLElement {
     this.iconEl = document.createElement('div')
     this.iconEl.classList.add('icon')
     this.nameEl = document.createElement('div')
-    this.shadowRoot.append(this.iconEl, this.nameEl)
-    this.addEventListener('focus', () => {
-      if (this.scrollIntoViewIfNeeded) {
-        this.scrollIntoViewIfNeeded()
-      } else {
-        this.scrollIntoView?.()
-      }
-    })
   }
 
   connectedCallback() {
@@ -71,7 +63,20 @@ export class FileCard extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-    this.updateTabIndex()
+
+    this.tabIndex = -1
+    this.shadowRoot.append(this.iconEl, this.nameEl)
+    this.addEventListener('focus', e => {
+      if (this.scrollIntoViewIfNeeded) {
+        this.scrollIntoViewIfNeeded()
+      } else {
+        this.scrollIntoView?.()
+      }
+      this.tabIndex = 0
+      if (e.relatedTarget?.parentElement === this.parentElement) {
+        e.relatedTarget.tabIndex = -1
+      }
+    })
   }
 
   get name() {
@@ -90,14 +95,6 @@ export class FileCard extends HTMLElement {
     this.iconEl.replaceChildren(Object.assign(
       document.createElement('img'), {src: data}
     ))
-  }
-
-  attributeChangedCallback(name, oldValue, newValue) {
-    this.updateTabIndex()
-  }
-
-  updateTabIndex() {
-    this.tabIndex = this.hasAttribute('selected') ? 0 : -1
   }
 }
 ```
@@ -122,6 +119,7 @@ export class FileCardList extends HTMLElement {
   constructor() {
     super()
     this.leftBtn = document.createElement('button')
+    this.leftBtn.tabIndex = -1
     this.leftBtn.innerHTML = this.icons.left
     this.leftBtn.addEventListener('click', () => {
       this.listEl.scroll({
@@ -130,6 +128,7 @@ export class FileCardList extends HTMLElement {
       })
     })
     this.rightBtn = document.createElement('button')
+    this.rightBtn.tabIndex = -1
     this.rightBtn.innerHTML = this.icons.right
     this.rightBtn.addEventListener('click', () => {
       this.listEl.scroll({
@@ -264,6 +263,9 @@ export class FileCardList extends HTMLElement {
 
   set items(value) {
     this.listEl.replaceChildren(...value)
+    if (value.length > 0) {
+      value[0].tabIndex = 0
+    }
   }
 
   get selectedItem() {
