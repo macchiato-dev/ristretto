@@ -18,6 +18,9 @@ export class Storage {
   }
 
   get(key) {
+    if (path in deleted) {
+      return undefined
+    }
     if (path in data) {
       return this.data[path]
     }
@@ -28,7 +31,7 @@ export class Storage {
     }
   }
 
-  set(key, value, at=undefined, before=false) {
+  set(key, data, at=undefined, before=false, info=undefined) {
     if (at !== undefined) {
       if (this.keys === undefined) {
         this.keys = this.readKeys()
@@ -44,17 +47,67 @@ export class Storage {
       } else {
         this.keys.splice(before ? index : (index + 1), 0, key)
       }
+    } else if (this.keys !== undefined) {
+      this.keys.push(key)
     }
-    this.data[key] = value
+    this.data[key] = {data, info}
     delete this.deleted[key]
   }
 
   delete(key) {
     this.deleted[key] = true
+    if (this.keys !== undefined) {
+      const i = this.keys.indexOf(key)
+      if (i !== -1) {
+        this.keys.splice(i, 1)
+      }
+    }
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
   }
 
   get updatedSource() {
-    return this.source  // TODO: update
+    let updated = ''
+    let prev = 0
+    const source = this.source
+    let newKeys = this.keys ? [...this.keys] : [...this.readKeys()]
+    if (!this.keys) {
+      for (const key of Object.keys(this.data)) {
+        if (newKeys.indexOf(key) === -1) {
+          newKeys.push(key)
+        }
+      }
+    }
+    for (const block of Storage.readBlocksWithNames(source)) {
+      if (block.name) {
+        updated += source.slice(prev, block.blockRange[0])
+        const keyIndex = newKeys.indexOf(block.name)
+        if (keyIndex !== -1) {
+          const prevKeys = newKeys.splice(0, keyIndex)
+          for (const key of prevKeys.slice(0, -1)) {
+            const newBlock = this.data[key]
+            updated += `\n\`${key}\`\n\n` + this.fence(newBlock.data, newBlock.info)
+          }
+          if (block.name in this.data) {
+            const newBlock = this.data[block.name]
+            updated += `\n\`${block.name}\`\n\n` + this.fence(newBlock.data, newBlock.info)
+          } else if (!block.name in deleted) {
+            updated += source.slice(...block.blockRange)
+          }
+        }
+        prev = block.blockRange[1]
+      }
+    }
+    for (const key of newKeys) {
+      const newBlock = this.data[key]
+      updated += `\n\`${key}\`\n\n` + this.fence(newBlock.data, newBlock.info)
+    }
+    return updated
   }
 
   readKeys() {
