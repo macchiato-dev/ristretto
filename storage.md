@@ -42,9 +42,15 @@ export class Storage {
         }
       }
       const index = this.keys.index(at)
+      const existingIndex = this.keys.index(key)
       if (at === -1) {
-        this.keys.push(key)
+        if (existingIndex === -1) {
+          this.keys.push(key)
+        }
       } else {
+        if (existingIndex !== -1) {
+          this.keys.splice(existingIndex, 1)
+        }
         this.keys.splice(before ? index : (index + 1), 0, key)
       }
     } else if (this.keys !== undefined) {
@@ -56,12 +62,7 @@ export class Storage {
 
   delete(key) {
     this.deleted[key] = true
-    if (this.keys !== undefined) {
-      const i = this.keys.indexOf(key)
-      if (i !== -1) {
-        this.keys.splice(i, 1)
-      }
-    }
+    // Don't delete from keys so it will appear in the same place
   }
 
   fence(text, info = '') {
@@ -72,42 +73,29 @@ export class Storage {
   }
 
   get updatedSource() {
-    let updated = ''
-    let prev = 0
-    const source = this.source
-    let newKeys = this.keys ? [...this.keys] : [...this.readKeys()]
-    if (!this.keys) {
-      for (const key of Object.keys(this.data)) {
-        if (newKeys.indexOf(key) === -1) {
-          newKeys.push(key)
-        }
+    let blocks = []
+    for (const block of Storage.readBlocksWithNames(this.source)) {
+      if (block.name !== undefined) {
+        blocks.push(block)
       }
     }
-    for (const block of Storage.readBlocksWithNames(source)) {
-      if (block.name) {
-        updated += source.slice(prev, block.blockRange[0])
-        const keyIndex = newKeys.indexOf(block.name)
-        if (keyIndex !== -1) {
-          const prevKeys = newKeys.splice(0, keyIndex)
-          for (const key of prevKeys.slice(0, -1)) {
-            const newBlock = this.data[key]
-            updated += `\n\`${key}\`\n\n` + this.fence(newBlock.data, newBlock.info)
-          }
-          if (block.name in this.data) {
-            const newBlock = this.data[block.name]
-            updated += `\n\`${block.name}\`\n\n` + this.fence(newBlock.data, newBlock.info)
-          } else if (!block.name in deleted) {
-            updated += source.slice(...block.blockRange)
-          }
+    if (this.keys !== undefined) {
+      let result = []
+      let keysForBlock = []
+      let blockIndex = 0
+      for (const key of this.keys) {
+        const block = blocks[blockIndex]
+        if (block.name === key) {
+          result = [...result, ...keysForBlock]
+        } else {
+          keysForBlock.push(this.data[key])
         }
-        prev = block.blockRange[1]
       }
+      blocks = result
+    } else {
+      blocks = [...blocks, keys.map(key => {key, ...this.data[key]})]
     }
-    for (const key of newKeys) {
-      const newBlock = this.data[key]
-      updated += `\n\`${key}\`\n\n` + this.fence(newBlock.data, newBlock.info)
-    }
-    return updated
+    // Write out blocks, replacing ones in data with content from data
   }
 
   readKeys() {
