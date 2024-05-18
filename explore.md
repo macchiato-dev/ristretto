@@ -409,18 +409,20 @@ ${runEntry}
 
   get sourceFiles() {
     const result = {}
-    for (const block of readBlocksWithNames(__source).filter(({name}) => name.endsWith('.md'))) {
-      const parts = block.name.split('/')
-      const dirs = parts.slice(0, -1)
-      const file = parts.at(-1)
-      let parent = result
-      for (const dir of dirs) {
-        if (!(dir in parent)) {
-          parent[dir] = {}
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name.endsWith('.md')) {
+        const parts = block.name.split('/')
+        const dirs = parts.slice(0, -1)
+        const file = parts.at(-1)
+        let parent = result
+        for (const dir of dirs) {
+          if (!(dir in parent)) {
+            parent[dir] = {}
+          }
+          parent = parent[dir]
         }
-        parent = parent[dir]
+        parent[file] = true
       }
-      parent[file] = true
     }
     function sortNested(result) {
       return Object.fromEntries(Object.entries(result).map(([k, v]) => (
