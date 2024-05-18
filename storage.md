@@ -73,28 +73,28 @@ export class Storage {
   }
 
   get updatedSource() {
-    let blocks = []
-    for (const block of Storage.readBlocksWithNames(this.source)) {
-      if (block.name !== undefined) {
-        blocks.push(block)
-      }
-    }
-    if (this.keys !== undefined) {
-      let result = []
-      let keysForBlock = []
-      let blockIndex = 0
-      for (const key of this.keys) {
-        const block = blocks[blockIndex]
-        if (block.name === key) {
-          result = [...result, ...keysForBlock]
-        } else {
-          keysForBlock.push(this.data[key])
-        }
-      }
-      blocks = result
-    } else {
-      blocks = [...blocks, keys.map(key => {key, ...this.data[key]})]
-    }
+    // let blocks = []
+    // for (const block of Storage.readBlocksWithNames(this.source)) {
+    //   if (block.name !== undefined) {
+    //     blocks.push(block)
+    //   }
+    // }
+    // if (this.keys !== undefined) {
+    //   let result = []
+    //   let keysForBlock = []
+    //   let blockIndex = 0
+    //   for (const key of this.keys) {
+    //     const block = blocks[blockIndex]
+    //     if (block.name === key) {
+    //       result = [...result, ...keysForBlock]
+    //     } else {
+    //       keysForBlock.push(this.data[key])
+    //     }
+    //   }
+    //   blocks = result
+    // } else {
+    //   blocks = [...blocks, keys.map(key => {key, ...this.data[key]})]
+    // }
     // Write out blocks, replacing ones in data with content from data
   }
 
