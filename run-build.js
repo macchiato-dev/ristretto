@@ -20,7 +20,7 @@ async function initWrite() {
 async function* readPaths(suffix = '.md', parent = []) {
   const dirs = []
   for await (const file of Deno.readDir(join('.', ...parent))) {
-    if (!file.name.startsWith('.')) {
+    if (!(file.name.startsWith('.') || file.name === '_notas')) {
       if (file.isDirectory) {
         dirs.push(file.name)
       } else if (file.name.endsWith(suffix)) {

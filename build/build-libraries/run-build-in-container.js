@@ -30,6 +30,12 @@ const packages = [
   '@codemirror/lang-css',
   '@codemirror/lang-json',
   '@codemirror/lang-javascript',
+  '@codemirror/lang-markdown',
+  '@codemirror/lang-python',
+  '@codemirror/lang-rust',
+  '@codemirror/lang-xml',
+  '@codemirror/lang-sql',
+  '@codemirror/lang-wast',
 ]
 
 async function* getFiles(path) {

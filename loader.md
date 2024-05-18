@@ -7,6 +7,7 @@ const defaultIntro = `
 
 window.Macchiato = {
   modules: {},
+  data: {}
 }
 
 `.trim()
@@ -34,7 +35,7 @@ export class Loader {
 
   getConfig() {
     const configBlock = this.getBlockContent('notebook.json')
-    const defaultConfig = {bundleFiles: [], importFiles: []}
+    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
     if (configBlock) {
       try {
         return {...defaultConfig, ...JSON.parse(configBlock)}
@@ -48,11 +49,12 @@ export class Loader {
 
   read() {
     this.config = this.getConfig()
-    const {importFiles, bundleFiles} = this.config
-    const importNotebooks = [...importFiles, ...bundleFiles].map(a => a[0])
+    const {importFiles, bundleFiles, dataFiles} = this.config
+    const importNotebooks = [...importFiles, ...bundleFiles, ...dataFiles].map(a => a[0])
     const files = []
     const importFileData = importFiles.map(v => undefined)
     const bundleFileData = bundleFiles.map(v => undefined)
+    const dataFileData = dataFiles.map(v => undefined)
     for (const block of readBlocksWithNames(this.src)) {
       if ((block.name || '').endsWith('.js') && block.name !== 'entry.js') {
         files.push({name: block.name, data: this.src.slice(...block.contentRange)})
@@ -65,11 +67,15 @@ export class Loader {
         for (const subBlock of readBlocksWithNames(blockSource)) {
           const bundleIndex = bundleFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
           const importIndex = importFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
+          const dataIndex = dataFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
           if (bundleIndex !== -1) {
             bundleFileData[bundleIndex] = {path: bundleFiles[bundleIndex], content: blockSource.slice(...subBlock.contentRange)}
           }
           if (importIndex !== -1) {
             importFileData[importIndex] = {name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)}
+          }
+          if (dataIndex !== -1) {
+            dataFileData[dataIndex] = {name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)}
           }
         }
       }
@@ -77,6 +83,7 @@ export class Loader {
     this.bundles = bundleFileData.filter(v => v !== undefined)
     const depFiles = importFileData.filter(v => v !== undefined)
     this.files = [...depFiles, ...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')]
+    this.dataFiles = dataFileData.filter(v => v !== undefined)
   }
 
   buildStyle(file) {
@@ -116,6 +123,13 @@ export class Loader {
     return (
       out + initAppend + append
     )
+  }
+
+  buildDataModule(name, data) {
+    const path = JSON.stringify(name)
+    const mref = `Macchiato.data[${path}]`
+    const dataStr = JSON.stringify(data)
+    return `${mref} = ${dataStr}`
   }
 
   buildReplace(filesMap) {
@@ -161,13 +175,16 @@ export class Loader {
         replace({...file, files: this.files}),
       )
     ))
+    const dataModules = this.dataFiles.map(file => (
+      this.buildDataModule(file.name, file.data)
+    ))
     const styles = this.files.filter(({name}) => (
       name.endsWith('.css')
     )).map(file => (
       this.buildStyle(file)
     ))
     this.styles = styles
-    this.scripts = [intro, ...modules]
+    this.scripts = [intro, ...dataModules, ...modules]
   }
 
   loadBundles(document) {
@@ -206,7 +223,7 @@ export class Builder {
   }
 
   getConfig() {
-    const defaultConfig = {bundleFiles: [], importFiles: []}
+    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
     for (const block of readBlocksWithNames(this.src)) {
       if (block.name === 'notebook.json') {
         return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
@@ -220,7 +237,7 @@ export class Builder {
     let entry = ''
     let loader = ''
     const config = this.getConfig()
-    const deps = [...config.bundleFiles, ...config.importFiles].map(a => a[0])
+    const deps = [...config.bundleFiles, ...config.importFiles, ...config.dataFiles].map(a => a[0])
     for (const block of readBlocksWithNames(this.parentSrc)) {
       if (block.name === 'loader.md') {
         loader = `\n\n` + this.parentSrc.slice(...block.blockRange)

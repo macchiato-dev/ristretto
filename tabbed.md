@@ -12,6 +12,8 @@ This is a tabbed notebook view. Each of the files is given a tab, which can be c
   "importFiles": [
     ["loader.md", "builder.js"],
     ["forms.md", "button-group.js"],
+    ["tabs.md", "TabItem.js"],
+    ["tabs.md", "TabList.js"],
     ["code-edit.md", "code-edit.js"],
     ["menu.md", "dropdown.js"]
   ]
@@ -32,20 +34,18 @@ export class FileGroup extends HTMLElement {
     super()
     this.language = navigator.language
     this.attachShadow({mode: 'open'})
-    this.headerEl = document.createElement('div')
-    this.headerEl.classList.add('header')
-    this.contentEl = document.createElement('div')
-    this.contentEl.classList.add('content')
-    this.shadowRoot.appendChild(this.headerEl)
-    this.shadowRoot.appendChild(this.contentEl)
-    const bGroup = document.createElement(
-      'm-forms-button-group'
-    )
-    this.shadowRoot.appendChild(bGroup)
-    this.headerEl.addEventListener('click-add-left', e => { this.handleAdd(e, 'left') })
-    this.headerEl.addEventListener('click-add-right', e => { this.handleAdd(e, 'right') })
-    this.headerEl.addEventListener('click-move-left', e => { this.handleMove(e, 'left') })
-    this.headerEl.addEventListener('click-move-right', e => { this.handleMove(e, 'right') })
+    this.tabListEl = document.createElement('tab-list')
+    this.tabListEl.createContentEl = tabEl => {
+      const fileView = document.createElement('m-editor-file-content-view')
+      fileView.tabEl = tabEl
+      tabEl.addEventListener('ready-to-edit', () => {
+        fileView.focus()
+      })
+      return fileView
+    }
+    this.filesEl = document.createElement('div')
+    this.filesEl.classList.add('files')
+    this.shadowRoot.append(this.tabListEl, this.filesEl)
   }
 
   connectedCallback() {
@@ -55,71 +55,43 @@ export class FileGroup extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: stretch;
+        flex-grow: 1;
+        height: 100%;
       }
-      div.header {
-        display: flex;
-        flex-direction: row;
-        gap: 3px;
+      tab-list {
+        height: 30px;
       }
       div.files {
+        flex-grow: 1;
         display: flex;
         flex-direction: column;
+        height: calc(100% - 30px);
+      }
+      div.files m-editor-file-content-view {
         flex-grow: 1;
-        overflow-y: auto;
       }
     `
     this.shadowRoot.appendChild(style)
-    if (this.contentEl.childNodes.length === 0) {
+    if (this.filesEl.childNodes.length === 0) {
       this.addFile()
     }
   }
 
   addFile({name, data, collapsed} = {}) {
-    const tabEl = document.createElement('m-editor-file-tab-view')
+    const tabEl = document.createElement('tab-item')
     const contentEl = document.createElement('m-editor-file-content-view')
     tabEl.contentEl = contentEl
     if (name !== undefined) {
       tabEl.name = name
+      contentEl.name = name
     }
-    this.headerEl.appendChild(tabEl)
-    this.contentEl.appendChild(contentEl)
+    this.tabListEl.listEl.appendChild(tabEl)
+    this.filesEl.appendChild(contentEl)
     contentEl.codeMirror = this.codeMirror
     if (data !== undefined) {
       contentEl.data = data
     }
     return tabEl
-  }
-
-  handleAdd(e, direction) {
-    const tabEl = document.createElement('m-editor-file-tab-view')
-    const contentEl = document.createElement('m-editor-file-content-view')
-    tabEl.contentEl = contentEl
-    contentEl.codeMirror = this.codeMirror
-    const position = direction == 'left' ? 'beforebegin' : 'afterend'
-    e.target.insertAdjacentElement(position, tabEl)
-    e.target.contentEl.insertAdjacentElement(position, contentEl)
-    tabEl.selected = true
-  }
-
-  handleMove(e, direction) {
-    const siblingEl = (
-      direction == 'left' ?
-      e.target.previousElementSibling :
-      e.target.nextElementSibling
-    )
-    if (siblingEl) {
-      const position = direction == 'left' ? 'beforebegin' : 'afterend'
-      siblingEl.insertAdjacentElement(position, e.target)
-    }
-    const contentSiblingEl = (
-      direction == 'left' ?
-      e.target.contentEl.previousElementSibling :
-      e.target.contentEl.nextElementSibling
-    )
-    if (contentSiblingEl) {
-      const position = direction == 'left' ? 'beforebegin' : 'afterend'
-      contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
-    }
   }
 
   get language() {
@@ -136,223 +108,7 @@ export class FileGroup extends HTMLElement {
   }
 
   get files() {
-    return [...this.headerEl.children]
-  }
-}
-```
-
-`file-tab-view.js`
-
-```js
-export class FileTabView extends HTMLElement {
-  icons = {
-    menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
-      </svg>
-    `,
-  }
-
-  textEn = {
-    addLeft: 'Add left',
-    addRight: 'Add right',
-    moveLeft: 'Move left',
-    moveRight: 'Move right',
-    delete: 'Delete',
-  }
-
-  textEs = {
-    addLeft: 'Añadir izquierda',
-    addRight: 'Añadir derecha',
-    moveLeft: 'Mover izquierda',
-    moveRight: 'Mover derecha',
-    delete: 'Borrar',
-  }
-
-  constructor() {
-    super()
-    this.language = navigator.language
-    this.attachShadow({mode: 'open'})
-    this.codeMirror = true
-    this.headerEl = document.createElement('div')
-    this.headerEl.classList.add('header')
-    this.shadowRoot.appendChild(this.headerEl)
-    this.nameEl = document.createElement('input')
-    this.nameEl.classList.add('name')
-    this.nameEl.setAttribute('spellcheck', 'false')
-    this.nameEl.addEventListener('input', e => {
-      this.setFileType(e.target.value)
-    })
-    this.headerEl.appendChild(this.nameEl)
-    this.menuBtn = document.createElement('button')
-    this.menuBtn.innerHTML = this.icons.menu
-    this.menuBtn.addEventListener('click', () => {
-      this.openMenu()
-    })
-    this.headerEl.appendChild(this.menuBtn)
-    this.menu = document.createElement(
-      'm-menu-dropdown'
-    )
-    this.shadowRoot.appendChild(this.menu)
-    this.addEventListener('click', () => { this.selected = true })
-    this.addEventListener('focus', () => { this.selected = true })
-  }
-
-  connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-      }
-      div.header {
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        padding: 3px 0;
-        border-radius: 5px;
-        background-color: rgb(212,212,216);
-      }
-      :host(.selected) div.header {
-        background-color: rgb(15,118,110);
-        color: #e7e7e7;
-      }
-      div.header > * {
-        background: inherit;
-        color: inherit;
-        border: none;
-      }
-      .name {
-        flex-grow: 1;
-        padding: 0 5px;
-        font: inherit;
-        font-family: monospace;
-        outline: none;
-      }
-      div.header button svg {
-        margin-bottom: -3px;
-      }
-      div.content {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        min-height: 5px;
-      }
-      div.content.collapsed > * {
-        display: none;
-      }
-      svg {
-        height: 20px;
-        width: 20px;
-      }
-    `
-    this.shadowRoot.appendChild(style)
-  }
-
-  openMenu() {
-    this.menu.clear()
-    this.menu.add(this.text.addLeft, () => {
-      this.dispatchEvent(new CustomEvent(
-        'click-add-left', {bubbles: true}
-      ))
-    })
-    this.menu.add(this.text.addRight, () => {
-      this.dispatchEvent(new CustomEvent(
-        'click-add-right', {bubbles: true}
-      ))
-    })
-    if (this.previousElementSibling) {
-      this.menu.add(this.text.moveLeft, () => {
-        this.dispatchEvent(new CustomEvent(
-          'click-move-left', {bubbles: true}
-        ))
-      })
-    }
-    if (this.nextElementSibling) {
-      this.menu.add(this.text.moveRight, () => {
-        this.dispatchEvent(new CustomEvent(
-          'click-move-right', {bubbles: true}
-        ))
-      })
-    }
-    if (this.nextElementSibling || this.previousElementSibling) {
-      this.menu.add(this.text.delete, () => {
-        this.contentEl.remove()
-        this.remove()
-      })
-    }
-    this.menu.open(this.menuBtn)
-  }
-
-  get editEl() {
-    return this.contentEl.editEl
-  }
-
-  set name(name) {
-    this.nameEl.value = name
-    this.setFileType(name)
-  }
-
-  get name() {
-    return this.nameEl.value
-  }
-
-  set data(data) {
-    this.editEl.value = data
-  }
-
-  get data() {
-    return this.editEl.value
-  }
-
-  setFileType(value) {
-    if (this.codeMirror && this.editEl) {
-      let fileType
-      if (value.endsWith('.js')) {
-        fileType = 'js'
-      } else if (value.endsWith('.html')) {
-        fileType = 'html'
-      } else if (value.endsWith('.css')) {
-        fileType = 'css'
-      } else if (value.endsWith('.json')) {
-        fileType = 'json'
-      }
-      this.editEl.fileType = fileType
-    }
-  }
-
-  get selected() {
-    return this.classList.contains('selected')
-  }
-
-  set selected(value) {
-    if (this.selected !== value) {
-      if (value) {      
-        this.classList.add('selected')
-      } else {
-        this.classList.remove('selected')
-      }
-      for (const el of [...this.parentElement.children].filter(el => el !== this)) {
-        el.selected = false
-      }
-      if (this.contentEl) {
-        this.contentEl.selected = value
-      }
-    }
-  }
-
-  get language() {
-    return this._language
-  }
-
-  set language(language) {
-    this._language = language
-    this.text = this.langEs ? this.textEs : this.textEn
-  }
-
-  get langEs() {
-    return /^es\b/.test(this.language)
+    return [...this.filesEl.children]
   }
 }
 ```
@@ -364,7 +120,9 @@ export class FileContentView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.codeMirror = true
+    this.editEl = document.createElement('m-editor-code-edit')
+    this.shadowRoot.replaceChildren(this.editEl)
+    this._name = ''
   }
 
   connectedCallback() {
@@ -372,28 +130,14 @@ export class FileContentView extends HTMLElement {
     style.textContent = `
       :host {
         display: none;
-        flex-direction: column;
-        align-items: stretch;
       }
       :host(.selected) {
         display: flex;
+        flex-direction: column;
+        height: 100%;
       }
     `
     this.shadowRoot.appendChild(style)
-  }
-
-  set codeMirror(value) {
-    this._codeMirror = value
-    const tagName = (
-      this.codeMirror ?
-      'm-editor-code-edit' : 'm-editor-text-edit'
-    )
-    this.editEl = document.createElement(tagName)
-    this.shadowRoot.replaceChildren(this.editEl)
-  }
-
-  get codeMirror() {
-    return this._codeMirror
   }
 
   set data(data) {
@@ -417,77 +161,42 @@ export class FileContentView extends HTMLElement {
       }
     }
   }
-}
-```
 
-`text-edit.js`
-
-```js
-export class TextEdit extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-    this.stackEl = document.createElement('div')
-    this.stackEl.classList.add('stack')
-    this.textEl = document.createElement('textarea')
-    this.textEl.classList.add('text')
-    this.textEl.setAttribute('spellcheck', 'false')
-    this.textEl.rows = 1
-    this.stackEl.appendChild(this.textEl)
-    this.shadowRoot.appendChild(this.stackEl)
-    this.textEl.addEventListener('input', () => {
-      this.stackEl.dataset.copy = this.textEl.value
-    })
+  get name() {
+    return this._name
   }
 
-  connectedCallback() {
-    // https://css-tricks.com/the-cleanest-trick-for-autogrowing-textareas/
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        margin: 5px 0;
-      }
-      div.stack {
-        display: grid;
-      }
-      div.stack::after {
-        content: attr(data-copy) " ";
-        visibility: hidden;
-        overflow: hidden;
-      }
-      div.stack::after, div.stack > textarea {
-        white-space: pre-wrap;
-        border: 1px solid #888;
-        padding: 3px;
-        font: inherit;
-        font-family: monospace;
-        grid-area: 1 / 1 / 2 / 2;
-        min-height: 1em;
-        border-radius: 2px;
-        resize: none;
-      }
-    `
-    this.shadowRoot.appendChild(style)
+  set name(value) {
+    this._name = value
+    this.setFileType(value)
   }
 
-  set value(value) {
-    this.textEl.value = value
-    this.stackEl.dataset.copy = this.textEl.value
+  setFileType(value) {
+    let fileType
+    if (value.endsWith('.js')) {
+      fileType = 'js'
+    } else if (value.endsWith('.html')) {
+      fileType = 'html'
+    } else if (value.endsWith('.css')) {
+      fileType = 'css'
+    } else if (value.endsWith('.json')) {
+      fileType = 'json'
+    } else if (value.endsWith('.md')) {
+      fileType = 'md'
+    }
+    this.editEl.fileType = fileType
   }
 
-  get value() {
-    return this.textEl.value
+  focus() {
+    this.editEl.focus()
   }
 }
 ```
 
-`list-editor.js`
+`tab-editor.js`
 
 ```js
-export class ListEditor extends HTMLElement {
+export class TabEditor extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -504,7 +213,10 @@ export class ListEditor extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        margin: 8px;
+        margin: 0;
+        padding: 5px;
+        box-sizing: border-box;
+        height: 100%;
       }
     `
     this.shadowRoot.append(style)
@@ -515,7 +227,7 @@ export class ListEditor extends HTMLElement {
     for (const file of files) {
       this.el.addFile(file)
     }
-    const first = this.el.headerEl.firstElementChild
+    const first = this.el.tabListEl.listEl.firstElementChild
     if (first) {
       first.selected = true
     }
@@ -549,6 +261,7 @@ export class NotebookCode extends HTMLElement {
     const editorContainer = document.createElement('div')
     editorContainer.classList.add('editor-container')
     this.editor = document.createElement('m-editor-code-edit')
+    this.editor.fileType = 'md'
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }
@@ -687,10 +400,14 @@ export class AppView extends HTMLElement {
     this.toolbar.onShowNotebookCode = () => {
       this.showNotebookCode()
     }
-    this.editor = document.createElement('m-list-editor')
+    this.editor = document.createElement('m-tab-editor')
+    this.viewFrameWrap = document.createElement('div')
+    this.viewFrameWrap.classList.add('view-frame-wrap')
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrame)
+    this.viewFrame.height = 30
+    this.viewFrameWrap.append(this.viewFrame)
+    this.shadowRoot.append(this.toolbar, this.editor, this.viewFrameWrap)
     this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
@@ -722,18 +439,24 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-rows: auto 1fr 1fr;
-        grid-template-columns: 1fr;
+        grid-template-rows: 30px calc(50% - 15px) 1fr;
+        grid-template-columns: 100%;
         height: 100vh;
+        width: 100vw;
       }
-      m-list-editor {
-        overflow-y: auto;
+      .view-frame-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
       }
       iframe {
-        width: 100%;
-        height: 100%;
         padding: 0;
         border: none;
+        overflow: inherit;
+        overflow-clip-margin: inherit;
+        grid-row: 3;
+        grid-column: 1;
+        flex-grow: 1;
       }
       .notebook-code {
         position: absolute;
@@ -773,7 +496,8 @@ export class AppView extends HTMLElement {
   renderView() {
     const viewFrame = document.createElement('iframe')
     viewFrame.sandbox = 'allow-scripts'
-    this.shadowRoot.appendChild(viewFrame)
+    viewFrame.height = 0
+    this.viewFrameWrap.appendChild(viewFrame)
     this.viewFrame.remove()
     this.viewFrame = viewFrame
     this.displayNotebook()
@@ -902,11 +626,11 @@ addEventListener('message', async e => {
   }
 }, {once: true})
     `.trim()
-    this.viewFrame.srcdoc = `
+    const src = `
 <!doctype html>
 <html>
 <head>
-  <title></title>
+  <title>preview</title>
 <script type="module">
 ${runEntry}
 </script>
@@ -915,6 +639,8 @@ ${runEntry}
 </body>
 </html>
 `.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const messageText = `\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
@@ -945,7 +671,7 @@ ${runEntry}
       if (this.notebookCodeEl.value.trim() !== this.notebookCodeEl.initialValue.trim()) {
         const oldEditor = this.editor
         this.notebook = this.notebookCodeEl.value
-        this.editor = document.createElement('m-list-editor')
+        this.editor = document.createElement('m-tab-editor')
         this.shadowRoot.replaceChild(this.editor, oldEditor)
         this.editor.load(this.readNotebookFiles(this.notebook))
         this.renderView()
@@ -962,24 +688,24 @@ ${runEntry}
 ```js
 import { ButtonGroup } from "/forms/button-group.js"
 import { Dropdown } from "/menu/dropdown.js"
-import { TextEdit } from "/text-edit.js"
+import { TabList } from "/tabs/TabList.js"
+import { TabItem } from "/tabs/TabItem.js"
 import { CodeEdit } from "/code-edit/code-edit.js"
-import { FileTabView } from "/file-tab-view.js"
 import { FileContentView } from "/file-content-view.js"
 import { FileGroup } from "/file-group.js"
-import { ListEditor } from "/list-editor.js"
+import { TabEditor } from "/tab-editor.js"
 import { NotebookCode } from "/notebook-code.js"
 import { Toolbar } from "/toolbar.js"
 import { AppView } from "/app-view.js"
 
 customElements.define('m-forms-button-group', ButtonGroup)
 customElements.define('m-menu-dropdown', Dropdown)
-customElements.define('m-editor-text-edit', TextEdit)
+customElements.define('tab-list', TabList)
+customElements.define('tab-item', TabItem)
 customElements.define('m-editor-code-edit', CodeEdit)
-customElements.define('m-editor-file-tab-view', FileTabView)
 customElements.define('m-editor-file-content-view', FileContentView)
 customElements.define('m-editor-file-group', FileGroup)
-customElements.define('m-list-editor', ListEditor)
+customElements.define('m-tab-editor', TabEditor)
 customElements.define('m-notebook-code', NotebookCode)
 customElements.define('m-toolbar', Toolbar)
 customElements.define('m-app-view', AppView)

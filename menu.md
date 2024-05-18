@@ -6,6 +6,10 @@
 export class Dropdown extends HTMLElement {
   constructor() {
     super()
+    this.alignX = 'right'
+    this.alignY = 'bottom'
+    this.offsetX = 0
+    this.offsetY = 5
     this.attachShadow({mode: 'open'})
     this.dialogEl = document.createElement('dialog')
     this.dialogEl.addEventListener('click', e => {
@@ -37,13 +41,14 @@ export class Dropdown extends HTMLElement {
         background: #222;
         color: #ddd;
         padding: 3px;
-        margin-top: var(--anchor-bottom);
-        margin-right: calc(
-          100% - var(--anchor-right)
-        );
-        margin-left: auto;
-        margin-bottom: auto;
+        margin-left: var(--dialog-left);
+        margin-right: var(--dialog-right);
+        margin-top: var(--dialog-top);
+        margin-bottom: var(--dialog-bottom);
         position: static;
+      }
+      dialog.invisible {
+        opacity: 0;
       }
       dialog[open] {
         display: flex;
@@ -71,22 +76,67 @@ export class Dropdown extends HTMLElement {
   }
 
   open(anchor) {
-    const rect = anchor.getBoundingClientRect()
-    const style = this.shadowRoot.host.style
-    style.setProperty(
-      '--anchor-right', `${rect.right}px`
-    )
-    style.setProperty(
-      '--anchor-bottom',
-      `${window.scrollY + rect.bottom - 3}px`
-    )
-    style.setProperty(
-      '--window-height', `${window.height}px`
-    )
-    style.setProperty(
-      '--window-width', `${window.width}px`
-    )
+    const _rect = anchor.getBoundingClientRect()
+    const rect = {
+      left: _rect.left - this.offsetX,
+      right: _rect.right + this.offsetX,
+      width: _rect.width + 2 * this.offsetX,
+      top: _rect.top - this.offsetY,
+      bottom: _rect.bottom + this.offsetY,
+      height: _rect.height + 2 * this.offsetY,
+    }
+    this.dialogEl.classList.add('invisible')
     this.dialogEl.showModal()
+    const menuRect = this.dialogEl.getBoundingClientRect()
+    const style = this.shadowRoot.host.style
+    const fitsLeft = rect.left + menuRect.width + 5 < window.innerWidth
+    const fitsRight = rect.right - menuRect.width - 5 > 0
+    if (this.alignX === 'center') {
+      const center = Math.round(rect.left + rect.width / 2)
+      const leftSpace = center - menuRect.width / 2 - 5
+      const rightSpace = window.innerWidth - center - menuRect.width / 2 - 5
+      if (leftSpace < rightSpace) {
+        style.setProperty('--dialog-left', `${Math.max(5, leftSpace)}px`)
+        style.setProperty('--dialog-right', 'auto')
+      } else {
+        style.setProperty('--dialog-left', 'auto')
+        style.setProperty('--dialog-right', `${Math.max(5, rightSpace)}px`)
+      }
+    } else if (
+      (this.alignX === 'left' && (fitsLeft || !fitsRight)) ||
+      (this.alignX === 'right' && (!fitsRight && fitsLeft))
+    ) {
+      style.setProperty('--dialog-left', `${Math.max(5, rect.left)}px`)
+      style.setProperty('--dialog-right', 'auto')
+    } else if (this.alignX === 'left' || this.alignX == 'right') {
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', `${Math.max(5, window.innerWidth - rect.right)}px`)
+    } else {
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', 'auto')
+    }
+    const fitsTop = rect.bottom + menuRect.height + 5 < window.innerHeight
+    const fitsBottom = rect.top - menuRect.height - 5 > 0
+    if (
+      (this.alignY === 'top' && (fitsTop || !fitsBottom)) ||
+      (this.alignY === 'bottom' && (!fitsBottom && fitsTop))
+    ) {
+      style.setProperty('--dialog-top', `${rect.bottom}px`)
+      style.setProperty('--dialog-bottom', 'auto')
+    } else if (this.alignY === 'top' || this.alignY == 'bottom') {
+      style.setProperty('--dialog-top', 'auto')
+      style.setProperty('--dialog-bottom', `${fitsBottom ? window.innerHeight - rect.top : 5}px`)
+    } else {
+      style.setProperty('--dialog-left', 'auto')
+      style.setProperty('--dialog-right', 'auto')
+    }
+    style.setProperty(
+      '--window-height', `${window.innerHeight}px`
+    )
+    style.setProperty(
+      '--window-width', `${window.innerWidth}px`
+    )
+    this.dialogEl.classList.remove('invisible')
   }
 
   close() {
@@ -109,4 +159,113 @@ export class Dropdown extends HTMLElement {
     })
   }
 }
+```
+
+`ExampleView.js`
+
+```js
+export class ExampleView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    const buttons = ['start', 'center', 'end'].map(v => (
+      ['start', 'center', 'end'].map(h => {
+        const btn = document.createElement('button')
+        btn.innerText = '⬇️'
+        btn.addEventListener('click', () => this.openMenu(btn))
+        const btnWrap = document.createElement('div')
+        btnWrap.classList.add(`v-${v}`)
+        btnWrap.classList.add(`h-${h}`)
+        btnWrap.append(btn)
+        return btnWrap
+      })
+    )).flat()
+    this.menu = document.createElement('m-menu-dropdown')
+    this.shadowRoot.append(...buttons, this.menu)
+  }
+
+  connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #55391b;
+      }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+    `
+    document.head.append(globalStyle)
+    const style = document.createElement('style')
+    style.textContent = `
+      :host {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
+        width: 100vw;
+        height: 100vh;
+        margin: 0;
+        padding: 10px;
+        color: #bfcfcd;
+        background: #fff;
+      }
+      div {
+        display: flex;
+        flex-direction: column;
+      }
+      .v-start {
+        justify-content: flex-start;
+      }
+      .v-center {
+        justify-content: center;
+      }
+      .v-end {
+        justify-content: flex-end;
+      }
+      .h-start {
+        align-items: flex-start;
+      }
+      .h-center {
+        align-items: center;
+      }
+      .h-end {
+        align-items: flex-end;
+      }
+    `
+    this.shadowRoot.append(style)
+  }
+
+  openMenu(btn) {
+    this.menu.clear()
+    //this.menu.alignX = 'center'
+    //this.menu.offsetY = 0
+    for (const name of [
+      'Test Item A', 'Item with long text here', 'Test Item B', 'Test Item C', 'Test Item D'
+    ]) {
+      this.menu.add(name, () => null)
+    }
+    this.menu.open(btn)
+  }
+}
+```
+
+
+`app.js`
+
+```js
+import {Dropdown} from '/dropdown.js'
+import {ExampleView} from '/ExampleView.js'
+
+customElements.define('m-menu-dropdown', Dropdown)
+customElements.define('example-view', ExampleView)
+
+async function setup() {
+  document.body.append(document.createElement('example-view'))
+}
+
+setup()
 ```

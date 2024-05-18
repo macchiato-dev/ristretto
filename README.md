@@ -119,7 +119,7 @@ addEventListener('message', e => {
       iframe.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
     })
     const re = new RegExp('(?:^|\\n)\\s*\\n`entry.js`\\n\\s*\\n```.*?\\n(.*?)```\\s*(?:\\n|$)', 's')
-    iframe.srcdoc = `
+    iframe.src = `
 <!doctype html>
 <html>
   <head>
@@ -143,6 +143,8 @@ addEventListener('message', e => {
   </body>
 </html>
     `.trim().replace('-script', '/script')
+    iframe.src = `data:text/html;base64,${btoa(src.trim())}`
+    // iframe.srcdoc = src.trim()]
     document.body.replaceChildren(iframe)
   }
 })

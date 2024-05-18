@@ -9,14 +9,23 @@ export class CodeEdit extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [
-      this.constructor.styleSheet
-    ]
   }
 
   connectedCallback() {
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styleSheet]
     this.initEditor()
   }
+
+  static css = `
+    :host {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      flex-grow: 1;
+      background-color: #fff;
+      height: 100%;
+    }
+  `
 
   static get styleSheet() {
     if (this._styleSheet === undefined) {
@@ -62,60 +71,115 @@ export class CodeEdit extends HTMLElement {
   }
 
   get langPlugins() {
-    const cm = window.CodeMirrorBasic
+    const cmView = window.CodeMirrorModules['@codemirror/view']
+    const cmState = window.CodeMirrorModules['@codemirror/state']
+    const cmLanguage = window.CodeMirrorModules['@codemirror/language']
+    const cmJavaScript = window.CodeMirrorModules['@codemirror/lang-javascript']
+    const cmCss = window.CodeMirrorModules['@codemirror/lang-css']
+    const cmHtml = window.CodeMirrorModules['@codemirror/lang-html']
+    const cmJson = window.CodeMirrorModules['@codemirror/lang-json']
+    const cmMarkdown = window.CodeMirrorModules['@codemirror/lang-markdown']
     const langPlugins = []
     if (['js', 'javascript'].includes(this.fileType)) {
-      langPlugins.push(cm.javascriptLanguage)
+      langPlugins.push(cmJavaScript.javascriptLanguage)
     } else if (this.fileType === 'css') {
-      langPlugins.push(cm.cssLanguage)
+      langPlugins.push(cmCss.cssLanguage)
     } else if (this.fileType === 'html') {
-      langPlugins.push(cm.htmlLanguage)
+      langPlugins.push(cmHtml.htmlLanguage)
     } else if (this.fileType === 'json') {
-      langPlugins.push(cm.jsonLanguage)
+      langPlugins.push(cmJson.jsonLanguage)
+    } else if (this.fileType === 'md') {
+      const codeLanguages = [
+        cmLanguage.LanguageDescription.of({
+          name: 'javascript',
+          alias: ['js'],
+          async load() {
+            return new cmLanguage.LanguageSupport(cmJavaScript.javascriptLanguage)
+          },
+        }),
+        cmLanguage.LanguageDescription.of({
+          name: 'css',
+          async load() {
+            return new cmLanguage.LanguageSupport(cmCss.cssLanguage)
+          },
+        }),
+        cmLanguage.LanguageDescription.of({
+          name: 'json',
+          async load() {
+            return new cmLanguage.LanguageSupport(cmJson.jsonLanguage)
+          },
+        }),
+        cmLanguage.LanguageDescription.of({
+          name: 'html',
+          async load() {
+            const javascript = new cmLanguage.LanguageSupport(cmJavaScript.javascriptLanguage)
+            const css = new cmLanguage.LanguageSupport(cmCss.cssLanguage)
+            return new cmLanguage.LanguageSupport(cmHtml.htmlLanguage, [css, javascript])
+          },
+        }),
+      ]
+      const { language, support } = cmMarkdown.markdown({codeLanguages, addKeymap: false})
+      const markdownSupport = new cmLanguage.LanguageSupport(
+        language, [...support, cmState.Prec.high(cmView.keymap.of(cmMarkdown.markdownKeymap))]
+      )
+      langPlugins.push(
+        markdownSupport
+      )
     }
     return langPlugins
   }
 
   initEditor() {
-    const cm = window.CodeMirrorBasic
-    this.languageCompartment = new cm.Compartment()
+    const cmView = window.CodeMirrorModules['@codemirror/view']
+    const cmState = window.CodeMirrorModules['@codemirror/state']
+    const cmLanguage = window.CodeMirrorModules['@codemirror/language']
+    const cmCommands = window.CodeMirrorModules['@codemirror/commands']
+    const cmAutocomplete = window.CodeMirrorModules['@codemirror/autocomplete']
+    const cmSearch = window.CodeMirrorModules['@codemirror/search']
+    const cmLint = window.CodeMirrorModules['@codemirror/lint']
+    this.languageCompartment = new cmState.Compartment()
     const langPlugins = this.langPlugins
     const basicSetup = [
-      cm.lineNumbers(),
-      cm.highlightActiveLineGutter(),
-      cm.highlightSpecialChars(),
-      cm.history(),
-      cm.foldGutter(),
-      cm.drawSelection(),
-      cm.dropCursor(),
-      cm.EditorState.allowMultipleSelections.of(true),
-      cm.indentOnInput(),
-      cm.syntaxHighlighting(
-        cm.defaultHighlightStyle, {fallback: true}
+      cmView.lineNumbers(),
+      cmView.highlightActiveLineGutter(),
+      cmView.highlightSpecialChars(),
+      cmCommands.history(),
+      cmLanguage.foldGutter(),
+      cmView.drawSelection(),
+      cmView.dropCursor(),
+      cmState.EditorState.allowMultipleSelections.of(true),
+      cmLanguage.indentOnInput(),
+      cmLanguage.syntaxHighlighting(
+        cmLanguage.defaultHighlightStyle, {fallback: true}
       ),
-      cm.bracketMatching(),
-      cm.closeBrackets(),
-      cm.autocompletion(),
-      cm.rectangularSelection(),
-      cm.crosshairCursor(),
-      cm.highlightActiveLine(),
-      cm.highlightSelectionMatches(),
-      cm.keymap.of([
-        ...cm.closeBracketsKeymap,
-        ...cm.defaultKeymap,
-        ...cm.searchKeymap,
-        ...cm.historyKeymap,
-        ...cm.foldKeymap,
-        ...cm.completionKeymap,
-        ...cm.lintKeymap
+      cmLanguage.bracketMatching(),
+      cmAutocomplete.closeBrackets(),
+      cmAutocomplete.autocompletion(),
+      cmView.rectangularSelection(),
+      cmView.crosshairCursor(),
+      cmView.highlightActiveLine(),
+      cmSearch.highlightSelectionMatches(),
+      cmView.keymap.of([
+        ...cmAutocomplete.closeBracketsKeymap,
+        ...cmCommands.defaultKeymap,
+        ...cmSearch.searchKeymap,
+        ...cmCommands.historyKeymap,
+        ...cmLanguage.foldKeymap,
+        ...cmAutocomplete.completionKeymap,
+        ...cmLint.lintKeymap,
       ]),
     ]
-    this.view = new cm.EditorView({
+    const viewTheme = cmView.EditorView.theme({
+      '&': {flexGrow: '1', height: '100%'},
+      '.cm-scroller': {overflow: 'auto'}
+    })
+    this.view = new cmView.EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
-        cm.EditorView.updateListener.of(e => {
+        viewTheme,
+        cmView.EditorView.updateListener.of(e => {
           if (e.docChanged) {
             this.dispatchEvent(new CustomEvent(
               'code-input', {bubbles: true, composed: true}
@@ -128,19 +192,8 @@ export class CodeEdit extends HTMLElement {
     this.shadowRoot.append(this.view.dom)
   }
 
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      background-color: #fff;
-    }
-    :host > * {
-      flex-grow: 1;
-    }
-    .cm-editor.cm-focused {
-      outline: none;
-    }
-  `
+  focus() {
+    this.view.focus()
+  }
 }
 ```

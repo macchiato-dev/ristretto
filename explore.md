@@ -7,9 +7,12 @@ This is an interface to explore different notebooks for different types of conte
 ```json
 {
   "importFiles": [
+    ["storage.md", "storage.js"],
     ["loader.md", "builder.js"],
     ["file-cards.md", "FileCard.js"],
-    ["file-cards.md", "FileCardList.js"]
+    ["file-cards.md", "FileCardList.js"],
+    ["split-pane.md", "split-view.js"],
+    ["file-tree.md", "file-tree.js"]
   ]
 }
 ```
@@ -29,9 +32,6 @@ export class ExploreApp extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.dataTemplates = [
-      'colors.json', 'image.png', 'example-notebook.md'
-    ]
     this.notebookTemplates = {
       'colors.json': [
         'palette.md',
@@ -46,7 +46,22 @@ export class ExploreApp extends HTMLElement {
         'tabbed.md',
         // 'overlay.md',  # TODO
       ],
+      'planets.csv': [
+        'table.md',
+        'data-cards.md',
+      ],
+      'font.woff2': [
+        'heading.md',
+      ],
+      'wiki-response.json': [
+        'json-tree.md',
+      ],
+      'files.json': [
+        'file-tree.md',
+        'json-tree.md',
+      ],
     }
+    this.dataTemplates = Object.keys(this.notebookTemplates)
     this.dataSelect = document.createElement('file-card-list')
     this.dataSelect.name = 'Data'
     this.dataSelect.items = this.dataTemplates.map((template, i) => {
@@ -67,13 +82,70 @@ export class ExploreApp extends HTMLElement {
     this.notebookSelect.addEventListener('select-item', e => {
       this.displayNotebook()
     })
+    this.selectTabs = document.createElement('div')
+    this.selectTabs.append(...['Explore', 'Source'].map(name => {
+      const el = document.createElement('a')
+      el.innerText = name
+      if (name === 'Explore') {
+        el.classList.add('active')
+      }
+      el.addEventListener('click', () => {
+        for (const child of el.parentElement.children) {
+          child.classList.remove('active')
+        }
+        for (const [tabName, el] of [
+          ['Explore', this.exploreView], ['Source', this.sourceView]
+        ]) {
+          if (tabName === name) {
+            el.classList.add('active')
+          } else {
+            el.classList.remove('active')
+          }
+        }
+        el.classList.add('active')
+        if (name === 'Explore') {
+          this.mode = 'explore'
+        } else {
+          this.mode = 'source'
+        }
+        this.displayNotebook()
+      })
+      return el
+    }))
+    this.selectTabs.classList.add('select-tabs')
+    this.exploreView = document.createElement('div')
+    this.exploreView.append(this.dataSelect, this.notebookSelect)
+    this.exploreView.classList.add('explore', 'tab-content', 'active')
+    this.sourceView = document.createElement('div')
+    this.sourceView.classList.add('source', 'tab-content')
+    this.fileTree = document.createElement('file-tree')
+    this.fileTree.data = this.sourceFiles
+    this.fileTree.addEventListener('select-item', () => {
+      this.displayNotebook()
+    })
+    this.sourceView.append(this.fileTree)
     this.selectPane = document.createElement('div')
-    this.selectPane.append(this.dataSelect, this.notebookSelect)
+    this.selectPane.append(this.selectTabs, this.exploreView, this.sourceView)
     this.selectPane.classList.add('select')
+    this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
     this.viewPane.classList.add('view-pane')
+    this.viewPane.setAttribute('draggable', 'false')
+    this.split = document.createElement('split-view')
+    this.split.addEventListener('split-view-resize', e => {
+      const x = e.detail.offsetX - this.offsetLeft
+      this.style.setProperty('--sidebar-width', `${x - 4}px`)
+    })
+    this.split.addEventListener('split-view-start', e => {
+      this.viewPane.classList.add('split-move')
+    })
+    this.split.addEventListener('split-view-end', e => {
+      this.viewPane.classList.remove('split-move')
+    })
+    this.split.setAttribute('draggable', 'false')
+    this.mode = 'explore'
     this.displayNotebook()
-    this.shadowRoot.append(this.selectPane, this.viewPane)
+    this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
   }
 
   connectedCallback() {
@@ -84,26 +156,31 @@ export class ExploreApp extends HTMLElement {
         padding: 0;
         background-color: #55391b;
       }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
     `
     document.head.append(globalStyle)
     const style = document.createElement('style')
     style.textContent = `
       :host {
         display: grid;
-        grid-template-columns: 1fr 1.8fr;
+        grid-template-columns: var(--sidebar-width, 1fr) auto 1.8fr;
         grid-template-rows: 1fr;
-        gap: 12px;
+        gap: 4px;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
       }
-      @media (max-width: 600px) {
-        :host {
-          height: auto;
-          grid-template-columns: 1fr;
-          grid-template-rows: auto 100vh;
-        }
+      div.view-pane.split-move iframe {
+        pointer-events: none;
+      }
+      split-view {
+        min-width: 4px;
       }
       div.select {
         display: flex;
@@ -111,6 +188,34 @@ export class ExploreApp extends HTMLElement {
         padding: 10px;
         padding-right: 0px;
         overflow-y: auto;
+      }
+      div.explore {
+        display: flex;
+        flex-direction: column;
+      }
+      div.select-tabs {
+        display: flex;
+        flex-direction: row;
+        gap: 5px;
+        padding: 5px;
+      }
+      div.select-tabs a {
+        flex-grow: 1;
+        text-align: center;
+        font-family: sans-serif;
+        font-size: 14px;
+        padding: 5px;
+        cursor: pointer;
+      }
+      div.select-tabs a.active {
+        color: #d1cf3b;
+        background: #00000040;
+      }
+      div.select .tab-content {
+        display: none;
+      }
+      div.select .tab-content.active {
+        display: flex;
       }
       div.view-pane {
         display: flex;
@@ -125,17 +230,37 @@ export class ExploreApp extends HTMLElement {
         border-radius: 10px;
         background-color: #2b172a;
       }
+      @media (max-width: 600px) {
+        :host {
+          height: auto;
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 100vh;
+          gap: 12px;
+        }
+        split-view {
+          display: none;
+        }
+        div.select {
+          padding-right: 10px;
+        }
+        div.view-pane {
+          padding-left: 10px;
+          padding-bottom: 100px;
+        }
+      }
     `
     this.shadowRoot.append(style)
     this.initImages(this.dataSelect.items)
     addEventListener('message', async e => {
-      const [cmd, ...args] = e.data
-      const port = e.ports[0]
-      if (cmd === 'getDeps') {
-        const [notebookSrc] = args
-        const builder = new Builder({src: notebookSrc, parentSrc: __source})
-        const deps = builder.getDeps()
-        port.postMessage(deps)
+      if (e.source === this.viewFrame?.contentWindow) {
+        const [cmd, ...args] = e.data
+        const port = e.ports[0]
+        if (cmd === 'getDeps') {
+          const [notebookSrc] = args
+          const builder = new Builder({src: notebookSrc, parentSrc: __source})
+          const deps = builder.getDeps()
+          port.postMessage(deps)
+        }
       }
     })
   }
@@ -176,7 +301,7 @@ export class ExploreApp extends HTMLElement {
         for (const subBlock of readBlocksWithNames(blockSrc)) {
           if (
             thumbnail === undefined && (subBlock.name || '').match(/\.(png|jpe?g|svg|webm)/) ||
-            subBlock.name.startsWith('thumbnail.')
+            subBlock.name?.startsWith?.('thumbnail.')
           ) {
             thumbnail = subBlock
           }
@@ -193,6 +318,13 @@ export class ExploreApp extends HTMLElement {
         }
       }
     }
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
   }
 
   updateNotebookItems() {
@@ -223,11 +355,11 @@ addEventListener('message', async e => {
   }
 }, {once: true})
     `.trim()
-    this.viewFrame.srcdoc = `
+    const src = `
 <!doctype html>
 <html>
 <head>
-  <title></title>
+  <title>doc</title>
 <script type="module">
 ${runEntry}
 </script>
@@ -236,11 +368,13 @@ ${runEntry}
 </body>
 </html>
 `.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
       let dataSrc = '', notebookSrc = ''
-      const notebookFile = this.notebookSelect.selectedItem?.name
-      const dataFile = this.dataSelect.selectedItem?.filename
+      const notebookFile = this.mode === 'explore' ? this.notebookSelect.selectedItem?.name : 'tabbed.md'
+      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -251,7 +385,11 @@ ${runEntry}
       const depsSrc = builder.getDeps()
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
-          dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+          if (this.mode === 'explore') {
+            dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+          } else {
+            dataSrc += `\n\n\`notebook.md\`\n\n` + this.fence(src.slice(...block.contentRange), 'md')
+          }
         }
       }
       const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
@@ -268,22 +406,53 @@ ${runEntry}
   get selectedNotebook() {
     return this.notebookSelect
   }
+
+  get sourceFiles() {
+    const result = {}
+    for (const block of readBlocksWithNames(__source).filter(({name}) => name.endsWith('.md'))) {
+      const parts = block.name.split('/')
+      const dirs = parts.slice(0, -1)
+      const file = parts.at(-1)
+      let parent = result
+      for (const dir of dirs) {
+        if (!(dir in parent)) {
+          parent[dir] = {}
+        }
+        parent = parent[dir]
+      }
+      parent[file] = true
+    }
+    function sortNested(result) {
+      return Object.fromEntries(Object.entries(result).map(([k, v]) => (
+        [k, (typeof v === 'object' && v !== null && !Array.isArray(v)) ? sortNested(v) : v]
+      )).toSorted((a, b) => a[0].localeCompare(b[0])))
+    }
+    return sortNested(result)
+  }
 }
 ```
 
 `app.js`
 
 ```js
+import {SplitView} from '/split-pane/split-view.js'
 import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
+import {FileTree} from '/file-tree/file-tree.js'
+import {Storage} from '/storage/storage.js'
 import {ExploreApp} from '/ExploreApp.js'
 
+customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
+customElements.define('file-tree', FileTree)
 customElements.define('explore-app', ExploreApp)
 
 async function setup() {
-  document.body.append(document.createElement('explore-app'))
+  const exploreApp = document.createElement('explore-app')
+  exploreApp.storage = new Storage()
+  exploreApp.setAttribute('draggable', 'false')
+  document.body.append(exploreApp)
 }
 
 setup()

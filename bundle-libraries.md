@@ -12,80 +12,108 @@ import {
   lineNumbers, highlightActiveLineGutter,
   EditorView
 } from '@codemirror/view'
+import { EditorState, Compartment, StateEffect, Prec, Text } from '@codemirror/state'
 import {
-  EditorState,
-  Compartment,
-  StateEffect
-} from '@codemirror/state'
-import {
-  defaultHighlightStyle,
-  syntaxHighlighting,
-  indentOnInput, 
-  bracketMatching,
-  foldGutter,
-  foldKeymap
+  defaultHighlightStyle, syntaxHighlighting, indentOnInput, 
+  bracketMatching, foldGutter, foldKeymap, LanguageDescription,
+  LanguageSupport
 } from '@codemirror/language'
 import {
-  defaultKeymap,
-  history,
-  historyKeymap
+  defaultKeymap, history, historyKeymap
 } from '@codemirror/commands'
 import {
-  searchKeymap,
-  highlightSelectionMatches
+  searchKeymap, highlightSelectionMatches
 } from '@codemirror/search'
 import {
-  autocompletion,
-  completionKeymap,
-  closeBrackets,
-  closeBracketsKeymap
+  autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap
 } from '@codemirror/autocomplete'
 import {lintKeymap} from '@codemirror/lint'
 import { javascriptLanguage } from '@codemirror/lang-javascript'
 import { cssLanguage } from '@codemirror/lang-css'
 import { jsonLanguage } from '@codemirror/lang-json'
 import { htmlLanguage } from '@codemirror/lang-html'
+import {
+  markdown, markdownLanguage, commonmarkLanguage, insertNewlineContinueMarkup, deleteMarkupBackward, markdownKeymap
+} from '@codemirror/lang-markdown'
+import { globalCompletion, localCompletionSource, pythonLanguage, python } from '@codemirror/lang-python'
+import {
+  sql, StandardSQL, PostgreSQL, MySQL, MariaSQL, MSSQL, SQLite, Cassandra, PLSQL,
+  keywordCompletionSource, schemaCompletionSource
+} from '@codemirror/lang-sql'
+import { rust, rustLanguage } from '@codemirror/lang-rust'
+import { wast, wastLanguage } from '@codemirror/lang-wast'
+import { xml, xmlLanguage, completeFromSchema } from '@codemirror/lang-xml'
 
-window.CodeMirrorBasic = {
-  // @codemirror/view
-  keymap, highlightSpecialChars, 
-  drawSelection, highlightActiveLine, dropCursor,
-  rectangularSelection, crosshairCursor,
-  lineNumbers, highlightActiveLineGutter,
-  EditorView,
-  // @codemirror/state
-  EditorState,
-  Compartment,
-  StateEffect,
-  // @codemirror/language
-  defaultHighlightStyle,
-  syntaxHighlighting,
-  indentOnInput, 
-  bracketMatching,
-  foldGutter,
-  foldKeymap,
-  // @codemirror/commands
-  defaultKeymap,
-  history,
-  historyKeymap,
-  // @codemirror/search
-  searchKeymap,
-  highlightSelectionMatches,
-  // @codemirror/autocomplete
-  autocompletion,
-  completionKeymap,
-  closeBrackets,
-  closeBracketsKeymap,
-  // @codemirror/lint
-  lintKeymap,
-  // @codemirror/lang-javascript
-  javascriptLanguage,
-  // @codemirror/lang-css
-  cssLanguage,
-  // @codemirror/lang-json
-  jsonLanguage,
-  // @codemirror/lang-html
-  htmlLanguage,
+window.CodeMirrorModules = {
+  '@codemirror/view': {
+    keymap, highlightSpecialChars, 
+    drawSelection, highlightActiveLine, dropCursor,
+    rectangularSelection, crosshairCursor,
+    lineNumbers, highlightActiveLineGutter,
+    EditorView,
+  },
+  '@codemirror/state': {
+    EditorState, Compartment, StateEffect, Prec, Text
+  },
+  '@codemirror/language': {
+    defaultHighlightStyle,
+    syntaxHighlighting,
+    indentOnInput, 
+    bracketMatching,
+    foldGutter,
+    foldKeymap,
+    LanguageDescription,
+    LanguageSupport,
+  },
+  '@codemirror/commands': {
+    defaultKeymap,
+    history,
+    historyKeymap,
+  },
+  '@codemirror/search': {
+    searchKeymap,
+    highlightSelectionMatches,
+  },
+  '@codemirror/autocomplete': {
+    autocompletion,
+    completionKeymap,
+    closeBrackets,
+    closeBracketsKeymap,
+  },
+  '@codemirror/lint': {
+    lintKeymap,
+  },
+  '@codemirror/lang-javascript': {
+    javascriptLanguage,
+  },
+  '@codemirror/lang-css': {
+    cssLanguage,
+  },
+  '@codemirror/lang-json': {
+    jsonLanguage,
+  },
+  '@codemirror/lang-html': {
+    htmlLanguage,
+  },
+  '@codemirror/lang-markdown': {
+    markdown, markdownLanguage, commonmarkLanguage, insertNewlineContinueMarkup, deleteMarkupBackward, markdownKeymap,
+  },
+  '@codemirror/lang-python': {
+    globalCompletion, localCompletionSource, pythonLanguage, python,
+  },
+  '@codemirror/lang-sql': {
+    sql, StandardSQL, PostgreSQL, MySQL, MariaSQL, MSSQL, SQLite, Cassandra, PLSQL,
+    keywordCompletionSource, schemaCompletionSource,
+  },
+  '@codemirror/lang-rust': {
+    rust, rustLanguage,
+  },
+  '@codemirror/lang-wast': {
+    wast, wastLanguage,
+  },
+  '@codemirror/lang-xml': {
+    xml, xmlLanguage, completeFromSchema,
+  },
 }
 ```
 

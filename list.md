@@ -343,6 +343,8 @@ export class FileView extends HTMLElement {
         fileType = 'css'
       } else if (value.endsWith('.json')) {
         fileType = 'json'
+      } else if (value.endsWith('.md')) {
+        fileType = 'md'
       }
       this.editEl.fileType = fileType
     }
@@ -488,6 +490,7 @@ export class NotebookCode extends HTMLElement {
     const editorContainer = document.createElement('div')
     editorContainer.classList.add('editor-container')
     this.editor = document.createElement('m-editor-code-edit')
+    this.editor.fileType = 'md'
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }
@@ -841,11 +844,11 @@ addEventListener('message', async e => {
   }
 }, {once: true})
     `.trim()
-    this.viewFrame.srcdoc = `
+    const src = `
 <!doctype html>
 <html>
 <head>
-  <title></title>
+  <title>preview</title>
 <script type="module">
 ${runEntry}
 </script>
@@ -853,7 +856,9 @@ ${runEntry}
 <body>
 </body>
 </html>
-`.trim()
+`
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const messageText = `\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
