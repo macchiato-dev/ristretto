@@ -29,7 +29,7 @@ export class FileTree extends HTMLElement {
         padding-inline-start: 15px;
       }
       li.active > .item {
-        background: #fff5;
+        background: var(--bg-selected, #fff5);
       }
     `
     this.shadowRoot.append(style)
