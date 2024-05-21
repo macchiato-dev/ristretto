@@ -10,7 +10,11 @@ Requests are sent through postMessage with a MessageChannel.
 
 ## Modal Dialog
 
-This shows a modal dialog with a backdrop, that can be called from inside the container. This dialog contains an upload area, a link to download a file, or a link to open in a new window.
+This shows a modal dialog with a backdrop, that can be called from inside the container. This dialog contains an upload area that also can be pasted into, or a download that can also be copied.
+
+## Link Popover
+
+A link popover can contain a link that can be tabbed onto or clicked on. The link will only be available immediately if the mouse starts outside and moves inside, otherwise it will only work after a delay to prevent clickjacking.
 
 ## Uploading
 
