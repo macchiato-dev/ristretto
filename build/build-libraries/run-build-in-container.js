@@ -36,6 +36,7 @@ const packages = [
   '@codemirror/lang-xml',
   '@codemirror/lang-sql',
   '@codemirror/lang-wast',
+  '@lezer/highlight',
 ]
 
 async function* getFiles(path) {

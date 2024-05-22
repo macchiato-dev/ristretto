@@ -33124,7 +33124,7 @@ window.CodeMirrorModules = {
   '@codemirror/language': {
     defaultHighlightStyle,
     syntaxHighlighting,
-    indentOnInput, 
+    indentOnInput,
     bracketMatching,
     foldGutter,
     foldKeymap,
@@ -33146,6 +33146,9 @@ window.CodeMirrorModules = {
     completionKeymap,
     closeBrackets,
     closeBracketsKeymap,
+  },
+  '@lezer/highlight': {
+    tags: tags$1,
   },
   '@codemirror/lint': {
     lintKeymap,

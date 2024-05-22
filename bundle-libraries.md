@@ -27,6 +27,7 @@ import {
 import {
   autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap
 } from '@codemirror/autocomplete'
+import {tags} from '@lezer/highlight'
 import {lintKeymap} from '@codemirror/lint'
 import { javascriptLanguage } from '@codemirror/lang-javascript'
 import { cssLanguage } from '@codemirror/lang-css'
@@ -58,7 +59,7 @@ window.CodeMirrorModules = {
   '@codemirror/language': {
     defaultHighlightStyle,
     syntaxHighlighting,
-    indentOnInput, 
+    indentOnInput,
     bracketMatching,
     foldGutter,
     foldKeymap,
@@ -80,6 +81,9 @@ window.CodeMirrorModules = {
     completionKeymap,
     closeBrackets,
     closeBracketsKeymap,
+  },
+  '@lezer/highlight': {
+    tags,
   },
   '@codemirror/lint': {
     lintKeymap,
