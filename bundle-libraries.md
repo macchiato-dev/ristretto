@@ -16,7 +16,7 @@ import { EditorState, Compartment, StateEffect, Prec, Text } from '@codemirror/s
 import {
   defaultHighlightStyle, syntaxHighlighting, indentOnInput, 
   bracketMatching, foldGutter, foldKeymap, LanguageDescription,
-  LanguageSupport
+  LanguageSupport, HighlightStyle
 } from '@codemirror/language'
 import {
   defaultKeymap, history, historyKeymap

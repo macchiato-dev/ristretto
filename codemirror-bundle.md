@@ -19287,7 +19287,7 @@ const baseTheme$1$2 = /*@__PURE__*/EditorView.baseTheme({
 A highlight style associates CSS styles with higlighting
 [tags](https://lezer.codemirror.net/docs/ref#highlight.Tag).
 */
-let HighlightStyle$1 = class HighlightStyle {
+class HighlightStyle {
     constructor(
     /**
     The tag styles used to create this highlight style.
@@ -19331,7 +19331,7 @@ let HighlightStyle$1 = class HighlightStyle {
     static define(specs, options) {
         return new HighlightStyle(specs, options || {});
     }
-};
+}
 const highlighterFacet = /*@__PURE__*/Facet.define();
 const fallbackHighlighter = /*@__PURE__*/Facet.define({
     combine(values) { return values.length ? [values[0]] : null; }
@@ -19349,7 +19349,7 @@ applied is the union of the classes they emit.
 */
 function syntaxHighlighting(highlighter, options) {
     let ext = [treeHighlighter], themeType;
-    if (highlighter instanceof HighlightStyle$1) {
+    if (highlighter instanceof HighlightStyle) {
         if (highlighter.module)
             ext.push(EditorView.styleModule.of(highlighter.module));
         themeType = highlighter.themeType;
@@ -19403,7 +19403,7 @@ const treeHighlighter = /*@__PURE__*/Prec.high(/*@__PURE__*/ViewPlugin.fromClass
 /**
 A default highlight style (works well with light themes).
 */
-const defaultHighlightStyle = /*@__PURE__*/HighlightStyle$1.define([
+const defaultHighlightStyle = /*@__PURE__*/HighlightStyle.define([
     { tag: tags$1.meta,
         color: "#404740" },
     { tag: tags$1.link,
