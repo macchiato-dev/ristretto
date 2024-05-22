@@ -49,6 +49,7 @@ export class ExploreApp extends HTMLElement {
       'planets.csv': [
         'table.md',
         'data-cards.md',
+        'editable-data-table.md',
       ],
       'font.woff2': [
         'heading.md',
