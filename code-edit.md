@@ -1,5 +1,15 @@
 # Code Edit
 
+`notebook.json`
+
+```json
+{
+  "bundleFiles": [
+    ["codemirror-bundle.md", "codemirror-bundle.js"]
+  ]
+}
+```
+
 This sets up CodeMirror. It supports getting and setting the text, and sends the `code-input` event when the text is edited. The filetype can be changed dynamically.
 
 `code-edit.js`
@@ -196,4 +206,59 @@ export class CodeEdit extends HTMLElement {
     this.view.focus()
   }
 }
+```
+
+`app-view.js`
+
+```js
+export class AppView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+  }
+
+  connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+    `
+    document.head.append(globalStyle)
+
+    const style = document.createElement('style')
+    style.textContent = `
+    `
+    this.shadowRoot.append(style)
+
+    const codeEdit = document.createElement('code-edit')
+    codeEdit.fileType = 'js'
+    codeEdit.value = `const x = 9`
+    this.shadowRoot.append(codeEdit)
+  }
+}
+```
+
+`app.js`
+
+```js
+import {CodeEdit} from '/code-edit.js'
+import {AppView} from '/app-view.js'
+
+customElements.define('code-edit', CodeEdit)
+customElements.define('app-view', AppView)
+
+async function setup() {
+  const appView = document.createElement('app-view')
+  document.body.append(appView)
+}
+
+await setup()
 ```
