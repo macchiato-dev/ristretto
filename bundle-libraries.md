@@ -46,7 +46,7 @@ import { xml, xmlLanguage, completeFromSchema } from '@codemirror/lang-xml'
 
 window.CodeMirrorModules = {
   '@codemirror/view': {
-    keymap, highlightSpecialChars, 
+    keymap, highlightSpecialChars,
     drawSelection, highlightActiveLine, dropCursor,
     rectangularSelection, crosshairCursor,
     lineNumbers, highlightActiveLineGutter,
@@ -62,6 +62,7 @@ window.CodeMirrorModules = {
     bracketMatching,
     foldGutter,
     foldKeymap,
+    HighlightStyle,
     LanguageDescription,
     LanguageSupport,
   },
