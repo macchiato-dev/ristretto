@@ -1,5 +1,15 @@
 # Data Cards
 
+`notebook.json`
+
+```json
+{
+  "dataFiles": [
+    ["planets.csv.md", "planets.csv"]
+  ]
+}
+```
+
 `data-cards.js`
 
 ```js
