@@ -37,6 +37,21 @@ export class EditableDataTable extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
+    this.shadowRoot.addEventListener('keydown', e => {
+      const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
+      const y = ({'ArrowUp': -1, 'ArrowDown': 1})[e.code]
+      if (x !== undefined || y !== undefined) {
+        if (y !== undefined) {
+          const colIndex = [...e.target.parentElement.children].indexOf(e.target)
+          const table = e.target.closest('table')
+          const rows = [...table.querySelectorAll('tr')]
+          const rowIndex = rows.indexOf(e.target.parentElement)
+          const newRow = rows[rowIndex + y]
+          const newCol = [...newRow.querySelectorAll('td, th')][colIndex]
+          newCol.focus()
+        }
+      }
+    })
   }
 
   createCell(tag, text) {
