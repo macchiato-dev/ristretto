@@ -15,3 +15,125 @@ Moving in the square in the left to the upper right, S and V in HSV get set to z
 - The blue gets removed, leaving just red. RGB is back to 255, 0, 0 and the hue is 0.
 
 On the left side, saturation and value can be identified. On the left side, it is white to black, indicating that from left to right the saturation goes from 0 to 100. The remaining is value. It goes 0 to 100 from bottom to top.
+
+`ColorPicker.js`
+
+```js
+export class ColorPicker extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.setStyles(true)
+    this.shadeSelect = document.createElement('div')
+    this.shadeSelect.classList.add('shade-select')
+    this.shadeSelectOverlay = document.createElement('div')
+    this.shadeSelectOverlay.classList.add('shade-select-overlay')
+    this.hueSelect = document.createElement('div')
+    this.hueSelect.classList.add('hue-select')
+    this.shadowRoot.append(this.shadeSelect, this.shadeSelectOverlay, this.hueSelect)
+  }
+
+  disconnectedCallback() {
+    this.setStyles(false)
+  }
+
+  setStyles(enabled) {
+    this.shadowRoot.adoptedStyleSheets = enabled ? [this.constructor.styles] : []
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-columns: 200px;
+          grid-template-rows: 200px;
+          background: #000;
+        }
+        .shade-select {
+          background: linear-gradient(to top, #00000000, #0000ffff);
+          grid-row: 1;
+          grid-column: 1;
+          mix-blend-mode: screen;
+        }
+        .shade-select-overlay {
+          background: linear-gradient(to top, #00000000, #ffff00ff);
+          mask-image: linear-gradient(to right, #ffffffff, #00000000);
+          grid-row: 1;
+          grid-column: 1;
+          mix-blend-mode: screen;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+`ExampleView.js`
+
+```js
+export class ExampleView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.setStyles(true)
+    this.colorPicker = document.createElement('color-picker')
+    document.body.append(this.colorPicker)
+  }
+
+  disconnectedCallback() {
+    this.setStyles(false)
+  }
+
+  setStyles(enabled) {
+    this.shadowRoot.adoptedStyleSheets = enabled ? [this.constructor.styles] : []
+    const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
+    document.adoptedStyleSheets = [...sheets, ...(enabled ? [this.constructor.globalStyles] : [])]
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: flex;
+          flex-direction: column;
+          padding: 10px;
+          align-items: center;
+        }
+      `)
+    }
+    return this._styles
+  }
+
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(`
+        body {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+      `)
+    }
+    return this._globalStyles
+  }
+}
+```
+
+`app.js`
+
+```js
+import {ColorPicker} from '/ColorPicker.js'
+import {ExampleView} from '/ExampleView.js'
+
+customElements.define('color-picker', ColorPicker)
+customElements.define('example-view', ExampleView)
+
+async function setup() {
+  const exampleView = document.createElement('example-view')
+  document.body.append(exampleView)
+}
+
+await setup()
+```
