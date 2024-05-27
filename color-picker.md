@@ -27,9 +27,16 @@ export class ColorPicker extends HTMLElement {
     this.shadeSelect.classList.add('shade-select')
     this.shadeSelectOverlay = document.createElement('div')
     this.shadeSelectOverlay.classList.add('shade-select-overlay')
+    this.shadeSelect.append(this.shadeSelectOverlay)
+    this.shadeSelectThumb = document.createElement('div')
+    this.shadeSelectThumb.classList.add('shade-select-thumb')
+    this.shadeSelect.append(this.shadeSelectThumb)
     this.hueSelect = document.createElement('div')
     this.hueSelect.classList.add('hue-select')
-    this.shadowRoot.append(this.shadeSelect, this.shadeSelectOverlay, this.hueSelect)
+    this.hueSelectThumb = document.createElement('div')
+    this.hueSelectThumb.classList.add('hue-select-thumb')
+    this.hueSelect.append(this.hueSelectThumb)
+    this.shadowRoot.append(this.shadeSelect, this.hueSelect)
   }
 
   disconnectedCallback() {
@@ -46,15 +53,20 @@ export class ColorPicker extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-columns: 200px;
-          grid-template-rows: 200px;
-          background: #000;
+          grid-template-columns: max-content max-content;
+          padding: 10px;
+          gap: 10px;
+        }
+        * {
+          box-sizing: border-box;
         }
         .shade-select {
-          background: linear-gradient(to top, #00000000, #0000ffff);
-          grid-row: 1;
-          grid-column: 1;
+          display: grid;
+          grid-template-columns: 200px;
+          grid-template-rows: 200px;
+          background: linear-gradient(to top, #000000, #0000ff);
           mix-blend-mode: screen;
+          position: relative;
         }
         .shade-select-overlay {
           background: linear-gradient(to top, #00000000, #ffff00ff);
@@ -62,6 +74,35 @@ export class ColorPicker extends HTMLElement {
           grid-row: 1;
           grid-column: 1;
           mix-blend-mode: screen;
+        }
+        .shade-select-thumb {
+          position: absolute;
+          margin-top: -8px;
+          margin-left: -8px;
+          top: var(--shade-top, 0px);
+          left: var(--shade-right, 200px);
+          height: 16px;
+          width: 16px;
+          border: 2px solid #cccccc;
+          border-radius: 8px;
+          background-color: var(--shade-select-overlay, #0000ffaa);
+        }
+        .hue-select {
+          background: linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+          display: flex;
+          position: relative;
+          width: 20px;
+        }
+        .hue-select-thumb {
+          position: absolute;
+          margin-top: -8px;
+          margin-left: -5px;
+          top: var(--hue-top, 133.33px);
+          height: 16px;
+          width: 30px;
+          border: 2px solid #cccccc;
+          border-radius: 8px;
+          background-color: var(--hue-overlay, #0000ffaa);
         }
       `)
     }
