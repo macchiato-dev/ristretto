@@ -17,28 +17,31 @@ export class SimulatorNav extends HTMLElement {
     super()
     this.addressInput = document.createElement('input')
     this.addressInput.setAttribute('type', 'text')
+    this.stack = []
+    this.stackPos = -1
   }
 
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    const backButton = document.createElement('button')
-    backButton.innerText = '<'
-    backButton.disabled = true
-    const forwardButton = document.createElement('button')
-    forwardButton.innerText = '>'
-    forwardButton.disabled = true
+    this.backButton = document.createElement('button')
+    this.backButton.innerText = '<'
+    this.forwardButton = document.createElement('button')
+    this.forwardButton.innerText = '>'
+    this.backButton.addEventListener('click', () => this.go(-1))
+    this.forwardButton.addEventListener('click', () => this.go(1))
     const goButton = document.createElement('button')
     goButton.innerText = 'Go'
     goButton.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('nav-go'), {bubbles: true})
+      this.go()
     })
     this.addressInput.addEventListener('keydown', e => {
       if (e.code === 'Enter') {
-        this.dispatchEvent(new CustomEvent('nav-go'), {bubbles: true})
+        this.go()
       }
     })
-    this.shadowRoot.append(backButton, forwardButton, this.addressInput, goButton)
+    this.updateButtons()
+    this.shadowRoot.append(this.backButton, this.forwardButton, this.addressInput, goButton)
   }
 
   static get styles() {
@@ -56,6 +59,29 @@ export class SimulatorNav extends HTMLElement {
       `)
     }
     return this._styles
+  }
+
+  updateButtons() {
+    this.backButton.disabled = this.stack.at(this.stackPos - 1) === undefined
+    this.forwardButton.disabled = this.stackPos === -1
+  }
+
+  go(dir = undefined) {
+    if (dir === undefined) {
+      if (this.stackPos !== -1) {
+        this.stack = this.stack.slice(0, this.stackPos + 1)
+        this.stackPos = -1
+      }
+      this.stack.push(this.url)
+    } else {
+      const newStackPos = this.stackPos + dir
+      if (newStackPos < 0 && this.stack.at(newStackPos) !== undefined) {
+        this.stackPos = newStackPos
+        this.url = this.stack.at(this.stackPos)
+      }
+    }
+    this.dispatchEvent(new CustomEvent('nav-go'), {bubbles: true})
+    this.updateButtons()
   }
 
   get url() {
@@ -86,12 +112,12 @@ export class SimulatorView extends HTMLElement {
     this.nav.addEventListener('nav-go', () => {
       this.load()
     })
-    this.load()
+    this.nav.go()
     addEventListener('message', e => {
       if (e.source === this.frame.contentWindow) {
         if (e.data[0] === 'nav') {
           this.url = e.data[1]
-          this.load()
+          this.nav.go()
         }
       }
     })
@@ -197,6 +223,9 @@ export class ExampleView extends HTMLElement {
         if (url.host === 'localhost:3000') {
           const html = `
             <p><b>Received request from: ${request.url}</b></p>
+            <p><a href="http://localhost:3000/${Math.floor(Math.random() * 100)}">
+              Go to another page on this site
+            </a></p>
             <p><a href="https://wikipedia.org/">Go to other site</a></p>
           `
           return new Response(html, {'content-type': 'text/html'})
