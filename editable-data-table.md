@@ -35,20 +35,25 @@ export class EditableDataTable extends HTMLElement {
       td:first-child {
         text-align: left;
       }
+      th, td {
+        outline: none;
+      }
     `
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('keydown', e => {
       const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
       const y = ({'ArrowUp': -1, 'ArrowDown': 1})[e.code]
       if (x !== undefined || y !== undefined) {
+        let newCell
         if (y !== undefined) {
           const colIndex = [...e.target.parentElement.children].indexOf(e.target)
           const table = e.target.closest('table')
           const rows = [...table.querySelectorAll('tr')]
           const rowIndex = rows.indexOf(e.target.parentElement)
           const newRow = rows[rowIndex + y]
-          const newCol = [...newRow.querySelectorAll('td, th')][colIndex]
-          newCol.focus()
+          if (newRow !== undefined) {
+            newCell = [...newRow.querySelectorAll('td, th')][colIndex]            
+          }
         }
         if (x !== undefined) {
           const sel = this.shadowRoot.getSelection().getRangeAt(0)
@@ -57,11 +62,20 @@ export class EditableDataTable extends HTMLElement {
             const row = e.target.parentElement
             const colIndex = [...row.children].indexOf(e.target)
             const newColIndex = colIndex + x
-            const newCol = [...row.querySelectorAll('td, th')].at(newColIndex)
-            if (newCol !== undefined) {
-              newCol.focus()
-            }
+            newCell = [...row.querySelectorAll('td, th')][newColIndex]
           }
+        }
+        if (newCell !== undefined) {
+          const sel = this.shadowRoot.getSelection()
+          const range = document.createRange()
+          const textNode = newCell.childNodes[0]
+          const moveToEnd = [undefined, -1].includes(x)
+          range.setStart(textNode, moveToEnd ? textNode.length : 0)
+          range.collapse(!moveToEnd)
+          sel.removeAllRanges()
+          sel.addRange(range)
+          newCell.focus()
+          e.preventDefault()
         }
       }
     })
