@@ -50,6 +50,19 @@ export class EditableDataTable extends HTMLElement {
           const newCol = [...newRow.querySelectorAll('td, th')][colIndex]
           newCol.focus()
         }
+        if (x !== undefined) {
+          const sel = this.shadowRoot.getSelection().getRangeAt(0)
+          const atEnd = sel.startOffset === (x === -1 ? 0 : e.target.innerText.length)
+          if (atEnd) {
+            const row = e.target.parentElement
+            const colIndex = [...row.children].indexOf(e.target)
+            const newColIndex = colIndex + x
+            const newCol = [...row.querySelectorAll('td, th')].at(newColIndex)
+            if (newCol !== undefined) {
+              newCol.focus()
+            }
+          }
+        }
       }
     })
   }
