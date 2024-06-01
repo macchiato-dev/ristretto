@@ -85,24 +85,26 @@ export class EditableDataTable extends HTMLElement {
             let newRect = newRange.getClientRects()[0]
             let prevRect = newRect
             let prevRange = newRange
-            const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
-            for (let i=1; i <= newCell.innerText.length; i++) {
-              const newRange = document.createRange()
-              const newPos = startPos + i * dir
-              if (newPos < 0 || newPos > newCell.innerText.length) {
-                break
-              }
-              newRange.setStart(textNode, newPos)
-              sel.removeAllRanges()
-              sel.addRange(newRange)
-              newRect = newRange.getClientRects()[0]
-              if (Math.abs(oldRect.x - newRect.x) >= Math.abs(oldRect.x - prevRect.x)) {
+            if (oldRect) {
+              const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
+              for (let i=1; i <= newCell.innerText.length; i++) {
+                const newRange = document.createRange()
+                const newPos = startPos + i * dir
+                if (newPos < 0 || newPos > newCell.innerText.length) {
+                  break
+                }
+                newRange.setStart(textNode, newPos)
                 sel.removeAllRanges()
-                sel.addRange(prevRange)
-                break
+                sel.addRange(newRange)
+                newRect = newRange.getClientRects()[0]
+                if (Math.abs(oldRect.x - newRect.x) >= Math.abs(oldRect.x - prevRect.x)) {
+                  sel.removeAllRanges()
+                  sel.addRange(prevRange)
+                  break
+                }
+                prevRect = newRect
+                prevRange = newRange
               }
-              prevRect = newRect
-              prevRange = newRange
             }
           } else {
             newRange.setStart(textNode, x === -1 ? textNode.length : 0)
