@@ -43,6 +43,12 @@ export class EditableDataTable extends HTMLElement {
     this.shadowRoot.addEventListener('keydown', e => {
       const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
       const y = ({'ArrowUp': -1, 'ArrowDown': 1})[e.code]
+      const sel = this.getSelection()
+      if (sel.rangeCount === 0) {
+        return
+      }
+      const oldRange = sel.getRangeAt(0)
+      const oldRect = oldRange.getClientRects()[0]
       if (x !== undefined || y !== undefined) {
         let newCell
         if (y !== undefined) {
@@ -56,8 +62,7 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (x !== undefined) {
-          const range = this.getSelection().getRangeAt(0)
-          const atEnd = range.startOffset === (x === -1 ? 0 : e.target.innerText.length)
+          const atEnd = oldRange.startOffset === (x === -1 ? 0 : e.target.innerText.length)
           if (atEnd) {
             const row = e.target.parentElement
             const colIndex = [...row.children].indexOf(e.target)
@@ -66,23 +71,20 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (newCell !== undefined) {
-          const sel = this.getSelection()
-          const range = document.createRange()
+          const newRange = document.createRange()
           const textNode = newCell.childNodes[0]
           const moveToEnd = [undefined, -1].includes(x)
           if (y !== undefined) {
-            const oldRange = this.getSelection().getRangeAt(0)
-            const oldRect = oldRange.getClientRects()[0]
             const oldPosFromEnd = e.target.innerText.length - oldRange.startOffset
             let newPosFromEnd = Math.min(oldPosFromEnd, newCell.innerText.length)
             const startPos = newCell.innerText.length - newPosFromEnd
-            range.setStart(textNode, startPos)
-            range.collapse(!moveToEnd)
+            newRange.setStart(textNode, startPos)
+            newRange.collapse(!moveToEnd)
             sel.removeAllRanges()
-            sel.addRange(range)
-            let newRect = range.getClientRects()[0]
+            sel.addRange(newRange)
+            let newRect = newRange.getClientRects()[0]
             let prevRect = newRect
-            let prevRange = range
+            let prevRange = newRange
             const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
             for (let i=1; i <= newCell.innerText.length; i++) {
               const newRange = document.createRange()
@@ -103,10 +105,10 @@ export class EditableDataTable extends HTMLElement {
               prevRange = newRange
             }
           } else {
-            range.setStart(textNode, x === -1 ? textNode.length : 0)
-            range.collapse(!moveToEnd)
+            newRange.setStart(textNode, x === -1 ? textNode.length : 0)
+            newRange.collapse(!moveToEnd)
             sel.removeAllRanges()
-            sel.addRange(range)
+            sel.addRange(newRange)
           }
           newCell.focus()
           e.preventDefault()
