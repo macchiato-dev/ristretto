@@ -56,7 +56,7 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (x !== undefined) {
-          const range = document.getSelection().getRangeAt(0)
+          const range = this.getSelection().getRangeAt(0)
           const atEnd = range.startOffset === (x === -1 ? 0 : e.target.innerText.length)
           if (atEnd) {
             const row = e.target.parentElement
@@ -66,12 +66,12 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (newCell !== undefined) {
-          const sel = document.getSelection()
+          const sel = this.getSelection()
           const range = document.createRange()
           const textNode = newCell.childNodes[0]
           const moveToEnd = [undefined, -1].includes(x)
           if (y !== undefined) {
-            const oldRange = document.getSelection().getRangeAt(0)
+            const oldRange = this.getSelection().getRangeAt(0)
             const oldRect = oldRange.getClientRects()[0]
             const oldPosFromEnd = e.target.innerText.length - oldRange.startOffset
             let newPosFromEnd = Math.min(oldPosFromEnd, newCell.innerText.length)
@@ -84,7 +84,6 @@ export class EditableDataTable extends HTMLElement {
             let prevRect = newRect
             let prevRange = range
             const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
-            console.log('startPos', startPos, 'delta', oldRect.x - newRect.x)
             for (let i=1; i <= newCell.innerText.length; i++) {
               const newRange = document.createRange()
               const newPos = startPos + i * dir
@@ -95,10 +94,6 @@ export class EditableDataTable extends HTMLElement {
               sel.removeAllRanges()
               sel.addRange(newRange)
               newRect = newRange.getClientRects()[0]
-              console.log(
-                newPos, newRange.getClientRects()[0], 'delta', oldRect.x - newRect.x,
-                'prevDelta', oldRect.x - prevRect.x
-              )
               if (Math.abs(oldRect.x - newRect.x) >= Math.abs(oldRect.x - prevRect.x)) {
                 sel.removeAllRanges()
                 sel.addRange(prevRange)
@@ -118,6 +113,14 @@ export class EditableDataTable extends HTMLElement {
         }
       }
     })
+  }
+
+  getSelection() {
+    if (this.shadowRoot.getSelection) {
+      return this.shadowRoot.getSelection()
+    } else {
+      return document.getSelection()
+    }
   }
 
   createCell(tag, text) {
