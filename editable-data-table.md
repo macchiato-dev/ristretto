@@ -1,4 +1,4 @@
-# Table
+# Editable Data Table
 
 `notebook.json`
 
@@ -56,7 +56,7 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (x !== undefined) {
-          const range = this.shadowRoot.getSelection().getRangeAt(0)
+          const range = document.getSelection().getRangeAt(0)
           const atEnd = range.startOffset === (x === -1 ? 0 : e.target.innerText.length)
           if (atEnd) {
             const row = e.target.parentElement
@@ -66,12 +66,12 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (newCell !== undefined) {
-          const sel = this.shadowRoot.getSelection()
+          const sel = document.getSelection()
           const range = document.createRange()
           const textNode = newCell.childNodes[0]
           const moveToEnd = [undefined, -1].includes(x)
           if (y !== undefined) {
-            const oldRange = this.shadowRoot.getSelection().getRangeAt(0)
+            const oldRange = document.getSelection().getRangeAt(0)
             const oldRect = oldRange.getClientRects()[0]
             const oldPosFromEnd = e.target.innerText.length - oldRange.startOffset
             let newPosFromEnd = Math.min(oldPosFromEnd, newCell.innerText.length)
