@@ -56,8 +56,8 @@ export class EditableDataTable extends HTMLElement {
           }
         }
         if (x !== undefined) {
-          const sel = this.shadowRoot.getSelection().getRangeAt(0)
-          const atEnd = sel.startOffset === (x === -1 ? 0 : e.target.innerText.length)
+          const range = this.shadowRoot.getSelection().getRangeAt(0)
+          const atEnd = range.startOffset === (x === -1 ? 0 : e.target.innerText.length)
           if (atEnd) {
             const row = e.target.parentElement
             const colIndex = [...row.children].indexOf(e.target)
@@ -70,10 +70,49 @@ export class EditableDataTable extends HTMLElement {
           const range = document.createRange()
           const textNode = newCell.childNodes[0]
           const moveToEnd = [undefined, -1].includes(x)
-          range.setStart(textNode, moveToEnd ? textNode.length : 0)
-          range.collapse(!moveToEnd)
-          sel.removeAllRanges()
-          sel.addRange(range)
+          if (y !== undefined) {
+            const oldRange = this.shadowRoot.getSelection().getRangeAt(0)
+            const oldRect = oldRange.getClientRects()[0]
+            const oldPosFromEnd = e.target.innerText.length - oldRange.startOffset
+            let newPosFromEnd = Math.min(oldPosFromEnd, newCell.innerText.length)
+            const startPos = newCell.innerText.length - newPosFromEnd
+            range.setStart(textNode, startPos)
+            range.collapse(!moveToEnd)
+            sel.removeAllRanges()
+            sel.addRange(range)
+            let newRect = range.getClientRects()[0]
+            let prevRect = newRect
+            let prevRange = range
+            const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
+            console.log('startPos', startPos, 'delta', oldRect.x - newRect.x)
+            for (let i=1; i <= newCell.innerText.length; i++) {
+              const newRange = document.createRange()
+              const newPos = startPos + i * dir
+              if (newPos < 0 || newPos > newCell.innerText.length) {
+                break
+              }
+              newRange.setStart(textNode, newPos)
+              sel.removeAllRanges()
+              sel.addRange(newRange)
+              newRect = newRange.getClientRects()[0]
+              console.log(
+                newPos, newRange.getClientRects()[0], 'delta', oldRect.x - newRect.x,
+                'prevDelta', oldRect.x - prevRect.x
+              )
+              if (Math.abs(oldRect.x - newRect.x) >= Math.abs(oldRect.x - prevRect.x)) {
+                sel.removeAllRanges()
+                sel.addRange(prevRange)
+                break
+              }
+              prevRect = newRect
+              prevRange = newRange
+            }
+          } else {
+            range.setStart(textNode, x === -1 ? textNode.length : 0)
+            range.collapse(!moveToEnd)
+            sel.removeAllRanges()
+            sel.addRange(range)
+          }
           newCell.focus()
           e.preventDefault()
         }
