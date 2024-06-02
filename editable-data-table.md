@@ -44,10 +44,10 @@ export class EditableDataTable extends HTMLElement {
       const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
       const y = ({'ArrowUp': -1, 'ArrowDown': 1})[e.code]
       const sel = this.getSelection()
-      if (sel.rangeCount === 0) {
+      const oldRange = this.getSelectionRange(sel)
+      if (!oldRange) {
         return
       }
-      const oldRange = sel.getRangeAt(0)
       const oldRect = oldRange.getClientRects()[0]
       if (x !== undefined || y !== undefined) {
         let newCell
@@ -124,6 +124,16 @@ export class EditableDataTable extends HTMLElement {
       return this.shadowRoot.getSelection()
     } else {
       return document.getSelection()
+    }
+  }
+
+  getSelectionRange(sel) {
+    if (sel.rangeCount === 0) {
+      if (sel.getComposedRanges) {
+        return sel.getComposedRanges(this.shadowRoot)[0]
+      }
+    } else {
+      return sel.getRangeAt(0)
     }
   }
 
