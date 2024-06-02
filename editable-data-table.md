@@ -24,6 +24,10 @@ export class EditableDataTable extends HTMLElement {
     style.textContent = `
       th, td {
         padding: 3px 5px;
+        white-space: nowrap;
+      }
+      th, td * {
+        white-space: nowrap;
       }
       th {
         background-color: #78c;
@@ -41,6 +45,7 @@ export class EditableDataTable extends HTMLElement {
     `
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('keydown', e => {
+      const oldCell = e.target.closest('td, th')
       const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
       const y = ({'ArrowUp': -1, 'ArrowDown': 1})[e.code]
       const sel = this.getSelection()
@@ -48,24 +53,24 @@ export class EditableDataTable extends HTMLElement {
       if (!oldRange) {
         return
       }
-      const oldRect = oldRange.getClientRects()[0]
+      const oldRect = oldRange.getClientRects ? oldRange.getClientRects()[0] : undefined
       if (x !== undefined || y !== undefined) {
         let newCell
         if (y !== undefined) {
-          const colIndex = [...e.target.parentElement.children].indexOf(e.target)
-          const table = e.target.closest('table')
+          const colIndex = [...oldCell.parentElement.children].indexOf(oldCell)
+          const table = oldCell.closest('table')
           const rows = [...table.querySelectorAll('tr')]
-          const rowIndex = rows.indexOf(e.target.parentElement)
+          const rowIndex = rows.indexOf(oldCell.parentElement)
           const newRow = rows[rowIndex + y]
           if (newRow !== undefined) {
             newCell = [...newRow.querySelectorAll('td, th')][colIndex]            
           }
         }
         if (x !== undefined) {
-          const atEnd = oldRange.startOffset === (x === -1 ? 0 : e.target.innerText.length)
+          const atEnd = oldRange.startOffset === (x === -1 ? 0 : oldCell.innerText.length)
           if (atEnd) {
-            const row = e.target.parentElement
-            const colIndex = [...row.children].indexOf(e.target)
+            const row = oldCell.parentElement
+            const colIndex = [...row.children].indexOf(oldCell)
             const newColIndex = colIndex + x
             newCell = [...row.querySelectorAll('td, th')][newColIndex]
           }
@@ -73,9 +78,10 @@ export class EditableDataTable extends HTMLElement {
         if (newCell !== undefined) {
           const newRange = document.createRange()
           const textNode = newCell.childNodes[0]
-          const moveToEnd = [undefined, -1].includes(x)
+          const moveToEnd = [undefined, 1].includes(x)
           if (y !== undefined) {
-            const oldPosFromEnd = e.target.innerText.length - oldRange.startOffset
+            const y = newCell.clientTop + Math.floor(newCell.clientHeight / 2)
+            const oldPosFromEnd = oldCell.innerText.length - oldRange.startOffset
             let newPosFromEnd = Math.min(oldPosFromEnd, newCell.innerText.length)
             const startPos = newCell.innerText.length - newPosFromEnd
             newRange.setStart(textNode, startPos)
@@ -105,12 +111,55 @@ export class EditableDataTable extends HTMLElement {
                 prevRect = newRect
                 prevRange = newRange
               }
+            } else {
+              const oldSplit = oldCell.firstChild.splitText(oldRange.startOffset)
+              const oldSpan = document.createElement('i')
+              oldCell.insertBefore(oldSpan, oldSplit)
+              const oldRect = oldSpan.getBoundingClientRect()
+              oldSpan.remove()
+              oldCell.normalize()
+              const newSplit = newCell.firstChild.splitText(startPos)
+              const newSpan = document.createElement('i')
+              newCell.insertBefore(newSpan, newSplit)
+              newRect = newSpan.getBoundingClientRect()
+              newSpan.remove()
+              newCell.normalize()
+              prevRect = newRect
+              const dir = (oldRect.x - newRect.x) >= 0 ? 1 : -1
+              let finalPos = startPos
+              let prevPos = startPos
+              for (let i=1; i <= newCell.innerText.length; i++) {
+                const newPos = startPos + i * dir
+                if (newPos < 0 || newPos > newCell.innerText.length) {
+                  break
+                }
+                newCell.normalize()
+                const newSplit = newCell.firstChild.splitText(newPos)
+                const newSpan = document.createElement('i')
+                newCell.insertBefore(newSpan, newSplit)
+                newRect = newSpan.getBoundingClientRect()
+                newSpan.remove()
+                newCell.normalize()
+                if (Math.abs(oldRect.x - newRect.x) >= Math.abs(oldRect.x - prevRect.x)) {
+                  finalPos = prevPos
+                  break
+                }
+                prevRect = newRect
+                prevPos = newPos
+              }
+              sel.setPosition(newCell.firstChild, finalPos)
             }
           } else {
-            newRange.setStart(textNode, x === -1 ? textNode.length : 0)
-            newRange.collapse(!moveToEnd)
-            sel.removeAllRanges()
-            sel.addRange(newRange)
+            if (oldRect) {
+              const newRange = new Range()
+              newRange.selectNode(textNode)
+              newRange.setStart(textNode, x === -1 ? textNode.length : 0)
+              newRange.setEnd(textNode, x === -1 ? textNode.length : 0)
+              sel.removeAllRanges()
+              sel.addRange(newRange)
+            } else {
+              sel.setPosition(textNode, x === -1 ? textNode.length : 0)
+            }
           }
           newCell.focus()
           e.preventDefault()
@@ -128,11 +177,9 @@ export class EditableDataTable extends HTMLElement {
   }
 
   getSelectionRange(sel) {
-    if (sel.rangeCount === 0) {
-      if (sel.getComposedRanges) {
-        return sel.getComposedRanges(this.shadowRoot)[0]
-      }
-    } else {
+    if (sel.getComposedRanges) {
+      return sel.getComposedRanges(this.shadowRoot)[0]
+    } else if (sel.rangeCount > 0) {
       return sel.getRangeAt(0)
     }
   }
