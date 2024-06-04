@@ -23,7 +23,39 @@ export class BlankPage extends HTMLElement {
         this.classList.add('edited')
       }
     })
+    this.blankPage.addEventListener('beforeinput', e => {
+      if (e.inputType === 'historyUndo') {
+        e.preventDefault()
+        this.undo()
+      } else if (e.inputType === 'historyRedo') {
+        e.preventDefault()
+        this.redo()
+      }
+    })
+    this.blankPage.addEventListener('keydown', e => {
+      if ((e.code === 'KeyZ' && e.shiftKey && (e.metaKey || e.ctrlKey)) || (e.code === 'KeyY' && e.ctrlKey)) {
+        e.preventDefault()
+        this.redo()
+      } else if ((e.code === 'KeyZ' && e.shiftKey && e.metaKey)) {
+        e.preventDefault()
+        this.undo()
+      }
+    })
     this.shadowRoot.append(this.placeholder, this.blankPage)
+  }
+
+  undo() {
+    if (this.blankPage.innerText.trim() !== '') {
+      this.savedText = this.blankPage.innerText
+    }
+    this.blankPage.innerText = ''
+  }
+
+  redo() {
+    if (this.blankPage.innerText.trim() === '' && this.savedText.trim() !== '') {
+      this.blankPage.innerText = this.savedText
+      this.savedText = undefined
+    }
   }
 
   static get styles() {
