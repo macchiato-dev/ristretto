@@ -20,30 +20,7 @@ export class EditableDataTable extends HTMLElement {
   }
 
   connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      th, td {
-        padding: 3px 5px;
-        white-space: nowrap;
-      }
-      th, td * {
-        white-space: nowrap;
-      }
-      th {
-        background-color: #78c;
-      }
-      td {
-        background-color: #aaa;
-        text-align: right;
-      }
-      td:first-child {
-        text-align: left;
-      }
-      th, td {
-        outline: none;
-      }
-    `
-    this.shadowRoot.append(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.shadowRoot.addEventListener('keydown', e => {
       const oldCell = e.target.closest('td, th')
       const x = ({'ArrowLeft': -1, 'ArrowRight': 1})[e.code]
@@ -210,6 +187,35 @@ export class EditableDataTable extends HTMLElement {
       this.shadowRoot.append(this.table)
     }
   }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        th, td {
+          padding: 3px 5px;
+          white-space: nowrap;
+        }
+        th, td * {
+          white-space: nowrap;
+        }
+        th {
+          background-color: #78c;
+        }
+        td {
+          background-color: #aaa;
+          text-align: right;
+        }
+        td:first-child {
+          text-align: left;
+        }
+        th, td {
+          outline: none;
+        }
+      `)
+    }
+    return this._styles
+  }
 }
 ```
 
@@ -228,25 +234,26 @@ export class AppView extends HTMLElement {
   }
 
   connectedCallback() {
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
+    document.adoptedStyleSheets = [...(document.adoptedStyleSheets ?? []), this.constructor.globalStyles]
+  }
 
-    const style = document.createElement('style')
-    style.textContent = `
-    `
-    this.shadowRoot.append(style)
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(`
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        html {
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+      `)
+    }
+    return this._globalStyles
   }
 
   get data() {
