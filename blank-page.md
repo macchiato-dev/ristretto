@@ -11,7 +11,7 @@ export class BlankPage extends HTMLElement {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.placeholder = document.createElement('div')
     this.placeholder.classList.add('placeholder')
-    this.placeholder.innerText = 'Escribe, arrastra o pega aquí...'
+    this.placeholder.innerHTML = 'Escribe, arrastra o pega aquí...<br><br>Escriba <kbd>/</kbd> para comandos'
     this.blankPage = document.createElement('div')
     this.blankPage.classList.add('blank-page')
     this.blankPage.classList.add('edited')
@@ -82,6 +82,12 @@ export class BlankPage extends HTMLElement {
         }
         :host(:focus-within) .placeholder, :host(.edited) .placeholder {
           display: none;
+        }
+        kbd {
+          border-radius: 5px;
+          background: #fffa;
+          border: 2px solid #0003;
+          padding: 3px 7px;
         }
       `)
     }
