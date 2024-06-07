@@ -17,9 +17,12 @@ This implements both sides of an OAuth login with PKCE.
 
 ```js
 export class ExampleClient {
+  constructor() {
+    this.pages = {}
+  }
+
   async request(request) {
-    const html = `<button>Sign In with FakeProvider</button>`
-    return new Response(html, {'content-type': 'text/html'})
+    return new Response(this.pages.index, {'content-type': 'text/html'})
   }
 }
 ```
@@ -33,6 +36,23 @@ export class FakeProvider {
     return new Response(html, {'content-type': 'text/html'})
   }
 }
+```
+
+`index.html`
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <title>Home</title>
+  </head>
+  <body>
+    <form>
+      <input type="hidden" value="{{csrf_token}}">
+      <input type="submit" value="Sign in to FakeProvider">
+    </form>
+  </body>
+</html>
 ```
 
 `ExampleView.js`
@@ -56,13 +76,13 @@ export class ExampleView extends HTMLElement {
       }
     }
     this.exampleClient = new ExampleClient()
+    this.exampleClient.pages['index'] = data['index.html']
     this.fakeProvider = new FakeProvider()
     this.simulatorView = document.createElement('simulator-view')
     this.simulatorView.server = {
       fetch: async request => {
         const url = new URL(request.url)
         if (url.host === 'client.localhost:3000') {
-          console.log(this.exampleClient)
           return this.exampleClient.request(request)
         } else if (url.host === 'provider.localhost:4000') {
           return this.fakeProvider.request(request)
