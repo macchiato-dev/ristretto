@@ -36,11 +36,39 @@ export class ColorPicker extends HTMLElement {
     this.hueSelectThumb = document.createElement('div')
     this.hueSelectThumb.classList.add('hue-select-thumb')
     this.hueSelect.append(this.hueSelectThumb)
+    this.hueSelectThumb.addEventListener('mousedown', e => {
+      this.hueDragOffset = e.clientY - this.hueSelectThumb.clientTop
+      e.stopPropagation()
+    })
+    this.hueSelect.addEventListener('mousedown', e => {
+      this.hueDragOffset = e.clientY - this.hueSelectThumb.clientTop
+      this.moveHueThumb(e)
+    })
+    this.hueSelectThumb.addEventListener('mouseup', () => {
+      this.hueDragOffset = undefined
+    })
+    this.hueSelect.addEventListener('mouseleave', () => {
+      this.hueDragOffset = undefined
+    })
+    this.hueSelect.addEventListener('mousemove', e => {
+      if (this.hueDragOffset !== undefined) {
+        this.moveHueThumb(e)
+      }
+    })
     this.shadowRoot.append(this.shadeSelect, this.hueSelect)
   }
 
   disconnectedCallback() {
     this.setStyles(false)
+  }
+
+  moveHueThumb(e) {
+    const y = e.pageY - this.hueSelect.offsetTop
+    const hueTop = `${Math.max(0, Math.min(y, this.hueSelect.clientHeight))}px`
+    const hue = Math.round(y * 360/this.hueSelect.clientHeight) % 360
+    const hueColor = `hsl(${hue} 100% 50%)`
+    this.style.setProperty('--hue-top', hueTop)
+    this.style.setProperty('--hue-color', hueColor)
   }
 
   setStyles(enabled) {
@@ -102,7 +130,7 @@ export class ColorPicker extends HTMLElement {
           width: 30px;
           border: 2px solid #cccccc;
           border-radius: 8px;
-          background-color: var(--hue-overlay, #0000ffaa);
+          background-color: var(--hue-color, #0000ff);
         }
       `)
     }
