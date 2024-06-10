@@ -66,7 +66,30 @@ export class ColorPicker extends HTMLElement {
     const y = e.pageY - this.hueSelect.offsetTop
     const hueTop = `${Math.max(0, Math.min(y, this.hueSelect.clientHeight))}px`
     const hue = Math.round(y * 360/this.hueSelect.clientHeight) % 360
-    const hueColor = `hsl(${hue} 100% 50%)`
+    let r = 255, g = 0, b = 0
+    if (hue > 60 && hue < 120) {
+      r = Math.floor((120 - hue) * 256/60)
+    } else if (hue >= 120 && hue <= 240) {
+      r = 0
+    } else if (hue > 240 && hue < 300) {
+      r = Math.floor((hue - 240) * 256/60)
+    }
+    if (hue > 0 && hue < 60) {
+      g = Math.floor(hue * 256/60)
+    } else if (hue >= 60 && hue <= 180) {
+      g = 255
+    } else if (hue > 180 && hue < 240) {
+      g = Math.floor((240 - hue) * 256/60)
+    }
+    if (hue > 120 && hue < 180) {
+      b = Math.floor((hue - 120) * 256/60)
+    } else if (hue >= 180 && hue <= 300) {
+      b = 255
+    } else if (hue > 300 && hue < 360) {
+      b = Math.floor((360 - hue) * 256/60)
+    }
+    const hueColor = `#` + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('')
+    console.log({hueColor})
     this.style.setProperty('--hue-top', hueTop)
     this.style.setProperty('--hue-color', hueColor)
   }
