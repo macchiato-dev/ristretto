@@ -31,6 +31,34 @@ export class ColorPicker extends HTMLElement {
     this.shadeSelectThumb = document.createElement('div')
     this.shadeSelectThumb.classList.add('shade-select-thumb')
     this.shadeSelect.append(this.shadeSelectThumb)
+    this.shadeSelectThumb.addEventListener('mousedown', e => {
+      this.shadeDragOffset = [
+        e.clientX - this.shadeSelectThumb.clientLeft,
+        e.clientY - this.shadeSelectThumb.clientTop,
+      ]
+      e.stopPropagation()
+    })
+    this.shadeSelect.addEventListener('mousedown', e => {
+      this.shadeDragOffset = [
+        e.clientX - this.shadeSelectThumb.clientLeft,
+        e.clientY - this.shadeSelectThumb.clientTop,
+      ]
+      this.moveShadeThumb(e)
+    })
+    this.shadeSelectThumb.addEventListener('mouseup', () => {
+      this.shadeDragOffset = undefined
+    })
+    this.shadeSelect.addEventListener('mouseup', () => {
+      this.shadeDragOffset = undefined
+    })
+    this.shadeSelect.addEventListener('mouseleave', () => {
+      this.shadeDragOffset = undefined
+    })
+    this.shadeSelect.addEventListener('mousemove', e => {
+      if (this.shadeDragOffset !== undefined) {
+        this.moveShadeThumb(e)
+      }
+    })
     this.hueSelect = document.createElement('div')
     this.hueSelect.classList.add('hue-select')
     this.hueSelectThumb = document.createElement('div')
@@ -47,6 +75,9 @@ export class ColorPicker extends HTMLElement {
     this.hueSelectThumb.addEventListener('mouseup', () => {
       this.hueDragOffset = undefined
     })
+    this.hueSelect.addEventListener('mouseup', () => {
+      this.hueDragOffset = undefined
+    })
     this.hueSelect.addEventListener('mouseleave', () => {
       this.hueDragOffset = undefined
     })
@@ -56,16 +87,38 @@ export class ColorPicker extends HTMLElement {
       }
     })
     this.shadowRoot.append(this.shadeSelect, this.hueSelect)
+    this.hue = 240
+    this.saturation = 1
+    this.lightness = 1
+    this.updateHueColor()
+    this.updateShadeColor()
   }
 
   disconnectedCallback() {
     this.setStyles(false)
   }
 
+  moveShadeThumb(e) {
+    const x = e.pageX - this.shadeSelect.offsetLeft
+    const y = e.pageY - this.shadeSelect.offsetTop
+    // const hue = Math.round(y * 360/this.shadeSelect.clientHeight) % 360
+    // this.updateShadeColor(hue)
+    const shadeLeft = Math.max(0, Math.min(x, this.shadeSelect.clientWidth))
+    const shadeTop = Math.max(0, Math.min(y, this.shadeSelect.clientHeight))
+    this.saturation = shadeLeft / this.shadeSelect.clientWidth
+    this.lightness = 1 - (shadeTop / this.shadeSelect.clientHeight)
+    this.updateShadeColor()
+  }
+
   moveHueThumb(e) {
-    const y = e.pageY - this.hueSelect.offsetTop
-    const hueTop = `${Math.max(0, Math.min(y, this.hueSelect.clientHeight))}px`
-    const hue = Math.round(y * 360/this.hueSelect.clientHeight) % 360
+    const y = Math.min(Math.max(e.pageY - this.hueSelect.offsetTop, 0), this.hueSelect.clientHeight)
+    this.hue = Math.floor(y * 360 / this.hueSelect.clientHeight)
+    this.updateHueColor()
+    this.updateShadeColor()
+  }
+
+  updateHueColor() {
+    const hue = this.hue
     let r = 255, g = 0, b = 0
     if (hue > 60 && hue < 120) {
       r = Math.floor((120 - hue) * 256/60)
@@ -88,10 +141,25 @@ export class ColorPicker extends HTMLElement {
     } else if (hue > 300 && hue < 360) {
       b = Math.floor((360 - hue) * 256/60)
     }
+    this.hueColorArray = [r, g, b]
     const hueColor = `#` + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join('')
-    console.log({hueColor})
-    this.style.setProperty('--hue-top', hueTop)
+    const invertColor = `#` + [r, g, b].map(n => (255 - n).toString(16).padStart(2, '0')).join('') + `ff`
+    const hueTop = hue * this.hueSelect.clientHeight / 360
     this.style.setProperty('--hue-color', hueColor)
+    this.style.setProperty('--invert-color', invertColor)
+    this.style.setProperty('--hue-top', `${hueTop}px`)
+  }
+
+  updateShadeColor() {
+    this.shadeColorArray = this.hueColorArray.map(n => (
+      (this.saturation * n) + ((1 - this.lightness) * (255 - n))
+    ))
+    const shadeColor = `#` + this.shadeColorArray.map(n => Math.floor(n).toString(16).padStart(2, '0')).join('')
+    this.style.setProperty('--shade-color', shadeColor)
+    const shadeLeft = this.saturation * this.shadeSelect.clientWidth
+    const shadeTop = (1 - this.lightness) * this.shadeSelect.clientWidth
+    this.style.setProperty('--shade-left', `${shadeLeft}px`)
+    this.style.setProperty('--shade-top', `${shadeTop}px`)
   }
 
   setStyles(enabled) {
@@ -115,12 +183,12 @@ export class ColorPicker extends HTMLElement {
           display: grid;
           grid-template-columns: 200px;
           grid-template-rows: 200px;
-          background: linear-gradient(to top, #000000, #0000ff);
+          background: linear-gradient(to top, #000000, var(--hue-color, #0000ff));
           mix-blend-mode: screen;
           position: relative;
         }
         .shade-select-overlay {
-          background: linear-gradient(to top, #00000000, #ffff00ff);
+          background: linear-gradient(to top, #00000000, var(--invert-color, #ffff00ff));
           mask-image: linear-gradient(to right, #ffffffff, #00000000);
           grid-row: 1;
           grid-column: 1;
@@ -131,12 +199,12 @@ export class ColorPicker extends HTMLElement {
           margin-top: -8px;
           margin-left: -8px;
           top: var(--shade-top, 0px);
-          left: var(--shade-right, 200px);
+          left: var(--shade-left, 200px);
           height: 16px;
           width: 16px;
           border: 2px solid #cccccc;
           border-radius: 8px;
-          background-color: var(--shade-select-overlay, #0000ffaa);
+          background-color: var(--shade-color, #0000ff);
         }
         .hue-select {
           background: linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
