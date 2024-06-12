@@ -16,6 +16,10 @@ Moving in the square in the left to the upper right, S and V in HSV get set to z
 
 On the left side, saturation and value can be identified. On the left side, it is white to black, indicating that from left to right the saturation goes from 0 to 100. The remaining is value. It goes 0 to 100 from bottom to top.
 
+The area on the left is called the shade selector. The saturation and lightness come from it, and a conversion to RGB is done to update the hex code.
+
+Below are a color input and a text input. The color input varies between browsers. It is sufficient in most desktop browsers but not all mobile browsers, where it is restricted to just selecting from a set of colors.
+
 `ColorPicker.js`
 
 ```js
@@ -86,7 +90,13 @@ export class ColorPicker extends HTMLElement {
         this.moveHueThumb(e)
       }
     })
-    this.shadowRoot.append(this.shadeSelect, this.hueSelect)
+    this.colorInput = document.createElement('input')
+    this.colorInput.setAttribute('type', 'color')
+    this.colorTextInput = document.createElement('input')
+    const inputArea = document.createElement('div')
+    inputArea.classList.add('input-area')
+    inputArea.append(this.colorInput, this.colorTextInput)
+    this.shadowRoot.append(this.shadeSelect, this.hueSelect, inputArea)
     this.hue = 240
     this.saturation = 1
     this.lightness = 1
@@ -151,13 +161,24 @@ export class ColorPicker extends HTMLElement {
   }
 
   updateShadeColor() {
+    console.log(this.lightness)
     this.shadeColorArray = this.hueColorArray.map(n => (
-      (this.saturation * n) + ((1 - this.lightness) * (255 - n))
+      (this.lightness * n) + ((255 - n) * this.lightness * (1 - this.saturation))
     ))
+    console.log(this.hueColorArray.map(n => (
+      [
+        this.lightness * n
+      ]
+    )))
+    // background: linear-gradient(to top, #000000, var(--hue-color, #0000ff));
+    // background: linear-gradient(to top, #00000000, var(--invert-color, #ffff00ff));
+    // mask-image: linear-gradient(to left, #00000000, #ffffffff);
     const shadeColor = `#` + this.shadeColorArray.map(n => Math.floor(n).toString(16).padStart(2, '0')).join('')
     this.style.setProperty('--shade-color', shadeColor)
+    this.colorInput.value = shadeColor
+    this.colorTextInput.value = shadeColor
     const shadeLeft = this.saturation * this.shadeSelect.clientWidth
-    const shadeTop = (1 - this.lightness) * this.shadeSelect.clientWidth
+    const shadeTop = (1 - this.lightness) * this.shadeSelect.clientHeight
     this.style.setProperty('--shade-left', `${shadeLeft}px`)
     this.style.setProperty('--shade-top', `${shadeTop}px`)
   }
@@ -189,7 +210,7 @@ export class ColorPicker extends HTMLElement {
         }
         .shade-select-overlay {
           background: linear-gradient(to top, #00000000, var(--invert-color, #ffff00ff));
-          mask-image: linear-gradient(to right, #ffffffff, #00000000);
+          mask-image: linear-gradient(to left, #00000000, #ffffffff);
           grid-row: 1;
           grid-column: 1;
           mix-blend-mode: screen;
@@ -222,6 +243,13 @@ export class ColorPicker extends HTMLElement {
           border: 2px solid #cccccc;
           border-radius: 8px;
           background-color: var(--hue-color, #0000ff);
+        }
+        .input-area {
+          grid-row: 2;
+          grid-column: 1 / span 2;
+          display: grid;
+          grid-template-columns: max-content 1fr;
+          gap: 5px;
         }
       `)
     }
