@@ -92,7 +92,22 @@ export class ColorPicker extends HTMLElement {
     })
     this.colorInput = document.createElement('input')
     this.colorInput.setAttribute('type', 'color')
+    this.colorInput.addEventListener('input', () => {
+      this.updateColorFromInput(this.colorInput.value)
+      this.colorTextInput.value = this.colorInput.value
+    })
     this.colorTextInput = document.createElement('input')
+    this.colorTextInput.addEventListener('input', () => {
+      if (this.colorTextInput.value.match(/^#[0-9a-f]{6}$/)) {
+        this.updateColorFromInput(this.colorTextInput.value)
+        this.colorInput.value = this.colorTextInput.value
+      }
+    })
+    this.colorTextInput.addEventListener('blur', () => {
+      if (!this.colorTextInput.value.match(/^#[0-9a-f]{6}$/)) {
+        this.colorTextInput.value = this.shadeColor
+      }
+    })
     const inputArea = document.createElement('div')
     inputArea.classList.add('input-area')
     inputArea.append(this.colorInput, this.colorTextInput)
@@ -102,6 +117,8 @@ export class ColorPicker extends HTMLElement {
     this.lightness = 1
     this.updateHueColor()
     this.updateShadeColor()
+    this.colorInput.value = this.shadeColor
+    this.colorTextInput.value = this.shadeColor
   }
 
   disconnectedCallback() {
@@ -111,13 +128,13 @@ export class ColorPicker extends HTMLElement {
   moveShadeThumb(e) {
     const x = e.pageX - this.shadeSelect.offsetLeft
     const y = e.pageY - this.shadeSelect.offsetTop
-    // const hue = Math.round(y * 360/this.shadeSelect.clientHeight) % 360
-    // this.updateShadeColor(hue)
     const shadeLeft = Math.max(0, Math.min(x, this.shadeSelect.clientWidth))
     const shadeTop = Math.max(0, Math.min(y, this.shadeSelect.clientHeight))
     this.saturation = shadeLeft / this.shadeSelect.clientWidth
     this.lightness = 1 - (shadeTop / this.shadeSelect.clientHeight)
     this.updateShadeColor()
+    this.colorInput.value = this.shadeColor
+    this.colorTextInput.value = this.shadeColor
   }
 
   moveHueThumb(e) {
@@ -125,6 +142,8 @@ export class ColorPicker extends HTMLElement {
     this.hue = Math.floor(y * 360 / this.hueSelect.clientHeight)
     this.updateHueColor()
     this.updateShadeColor()
+    this.colorInput.value = this.shadeColor
+    this.colorTextInput.value = this.shadeColor
   }
 
   updateHueColor() {
@@ -161,26 +180,49 @@ export class ColorPicker extends HTMLElement {
   }
 
   updateShadeColor() {
-    console.log(this.lightness)
     this.shadeColorArray = this.hueColorArray.map(n => (
       (this.lightness * n) + ((255 - n) * this.lightness * (1 - this.saturation))
     ))
-    console.log(this.hueColorArray.map(n => (
-      [
-        this.lightness * n
-      ]
-    )))
     // background: linear-gradient(to top, #000000, var(--hue-color, #0000ff));
     // background: linear-gradient(to top, #00000000, var(--invert-color, #ffff00ff));
     // mask-image: linear-gradient(to left, #00000000, #ffffffff);
-    const shadeColor = `#` + this.shadeColorArray.map(n => Math.floor(n).toString(16).padStart(2, '0')).join('')
-    this.style.setProperty('--shade-color', shadeColor)
-    this.colorInput.value = shadeColor
-    this.colorTextInput.value = shadeColor
+    this.shadeColor = `#` + this.shadeColorArray.map(n => Math.floor(n).toString(16).padStart(2, '0')).join('')
+    this.style.setProperty('--shade-color', this.shadeColor)
     const shadeLeft = this.saturation * this.shadeSelect.clientWidth
     const shadeTop = (1 - this.lightness) * this.shadeSelect.clientHeight
     this.style.setProperty('--shade-left', `${shadeLeft}px`)
     this.style.setProperty('--shade-top', `${shadeTop}px`)
+  }
+
+  updateColorFromInput() {
+    const [r, g, b] = [1, 3, 5].map(n => parseInt(this.colorInput.value.slice(n, n + 2), 16))
+    const max = Math.max(r, g, b)
+    this.lightness = max / 255
+    const min = Math.min(r, g, b)
+    this.saturation = (max - min === 0) ? 0 : ((max - min) / max)
+    if (this.saturation !== 0) {
+      if (max === r) {
+        if (g >= b) {
+          this.hue = Math.floor(60 - 60 * ((r - g) / (r - b)))
+        } else {
+          this.hue = Math.floor(300 + 60 * ((r - b) / (r - g)))
+        }
+      } else if (max === g) {
+        if (r >= b) {
+          this.hue = Math.floor(60 + 60 * ((g - r) / (g - b)))
+        } else {
+          this.hue = Math.floor(180 - 60 * ((g - b) / (g - r)))
+        }
+      } else if (max === b) {
+        if (g >= r) {
+          this.hue = Math.floor(180 + 60 * ((b - g) / (b - r)))
+        } else {
+          this.hue = Math.floor(300 - 60 * ((b - r) / (b - g)))
+        }
+      }
+    }
+    this.updateHueColor()
+    this.updateShadeColor()
   }
 
   setStyles(enabled) {
