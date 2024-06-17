@@ -16,29 +16,31 @@ This displays a tree of files.
 
 ```js
 export class FileTree extends HTMLElement {
-  constructor() {
-    super()
-    this.attachShadow({mode: 'open'})
-  }
-
   connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      ul {
-        list-style-type: none;
-        padding-inline-start: 15px;
-      }
-      li.active > .item {
-        background: var(--bg-selected, #fff5);
-      }
-    `
-    this.shadowRoot.append(style)
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.shadowRoot.addEventListener('click', e => {
       this.shadowRoot.querySelector('li.active').classList.remove('active')
       const el = e.target.closest('li')
       el.classList.add('active')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
     })
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        ul {
+          list-style-type: none;
+          padding-inline-start: 15px;
+        }
+        li.active > .item {
+          background: var(--bg-selected, #fff5);
+        }
+      `)
+    }
+    return this._styles
   }
 
   renderObject(ul, data, parents) {
@@ -95,35 +97,50 @@ export class FileTree extends HTMLElement {
 
 ```js
 export class AppView extends HTMLElement {
-  constructor() {
-    super()
+  connectedCallback() {
     this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (![...document.adoptedStyleSheets ?? []].includes(this.constructor.globalStyles)) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
+    }
     this.dataTable = document.createElement('file-tree')
     this.shadowRoot.append(this.dataTable)
     this.dataTable.data = this.data
   }
 
-  connectedCallback() {
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-        color: #ffffffbb;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-rows: fit-content;
+          padding: 5px;
+        }
+      `)
+    }
+    return this._styles
+  }
 
-    const style = document.createElement('style')
-    style.textContent = `
-    `
-    this.shadowRoot.append(style)
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(`
+        body {
+          margin: 0;
+          padding: 0;
+          color: #ffffffbb;
+        }
+        html {
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+      `)
+    }
+    return this._globalStyles
   }
 
   get data() {
