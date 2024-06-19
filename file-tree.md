@@ -16,14 +16,38 @@ This displays a tree of files.
 
 ```js
 export class FileTree extends HTMLElement {
+  icons = {
+    expand: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="6 2 12 14">
+        <path fill="currentColor" d="M10 17V7l5 5z"/>
+      </svg>
+    `,
+    collapse: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="6 2 12 14">
+        <path fill="currentColor" d="m12 15l-5-5h10z"/>
+      </svg>
+    `,
+  }
+
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.shadowRoot.addEventListener('click', e => {
       this.shadowRoot.querySelector('li.active').classList.remove('active')
-      const el = e.target.closest('li')
-      el.classList.add('active')
+      const li = e.target.closest('li')
+      li.classList.add('active')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
+      const btn = e.target.closest('button')
+      if (btn) {
+        if (li.classList.contains('has-children')) {
+          li.classList.toggle('collapsed')
+          if (li.classList.contains('collapsed')) {
+            btn.innerHTML = this.icons.expand
+          } else {
+            btn.innerHTML = this.icons.collapse
+          }
+        }
+      }
     })
   }
 
@@ -38,6 +62,16 @@ export class FileTree extends HTMLElement {
         li.active > .item {
           background: var(--bg-selected, #fff5);
         }
+        button {
+          all: unset;
+          opacity: 0;
+        }
+        li.has-children > .item > button {
+          opacity: 1.0;
+        }
+        li.collapsed > ul {
+          display: none;
+        }
       `)
     }
     return this._styles
@@ -47,16 +81,21 @@ export class FileTree extends HTMLElement {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
       const item = document.createElement('div')
+      const expand = document.createElement('button')
+      expand.innerHTML = this.icons.collapse
+      const name = document.createElement('span')
       item.classList.add('item')
+      item.append(expand, name)
       li.append(item)
       if (typeof value === 'object' && value !== null) {
-        item.innerText = key
+        name.innerText = key
+        li.classList.add('has-children')
         item.dataset.path = JSON.stringify([...parents, key])
         const child = document.createElement('ul')
         li.append(child)
         this.renderObject(child, value, [...parents, key])
       } else {
-        item.innerText = key
+        name.innerText = key
         item.dataset.path = JSON.stringify([...parents, key])
       }
       return li
