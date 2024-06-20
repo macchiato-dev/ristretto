@@ -16,6 +16,11 @@ This displays a tree of files.
 
 ```js
 export class FileTree extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+  }
+
   icons = {
     expand: `
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="6 2 12 14">
@@ -30,8 +35,48 @@ export class FileTree extends HTMLElement {
   }
 
   connectedCallback() {
-    this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    const style = document.createElement('style')
+    style.textContent = `
+      ul {
+        list-style-type: none;
+        padding-inline-start: 0;
+      }
+      li li .item {
+        padding-left: 20px;
+      }
+      li li li .item {
+        padding-left: 40px;
+      }
+      li li li li .item {
+        padding-left: 60px;
+      }
+      li li li li li .item {
+        padding-left: 80px;
+      }
+      li li li li li li .item {
+        padding-left: 100px;
+      }
+      li li li li li li li .item {
+        padding-left: 120px;
+      }
+      li li li li li li li li .item {
+        padding-left: 140px;
+      }
+      li.active > .item {
+        background: var(--bg-selected, #fff5);
+      }
+      button {
+        all: unset;
+        opacity: 0;
+      }
+      li.has-children > .item > button {
+        opacity: 1.0;
+      }
+      li.collapsed > ul {
+        display: none;
+      }
+    `
+    this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('click', e => {
       this.shadowRoot.querySelector('li.active').classList.remove('active')
       const li = e.target.closest('li')
@@ -49,32 +94,6 @@ export class FileTree extends HTMLElement {
         }
       }
     })
-  }
-
-  static get styles() {
-    if (!this._styles) {
-      this._styles = new CSSStyleSheet()
-      this._styles.replaceSync(`
-        ul {
-          list-style-type: none;
-          padding-inline-start: 15px;
-        }
-        li.active > .item {
-          background: var(--bg-selected, #fff5);
-        }
-        button {
-          all: unset;
-          opacity: 0;
-        }
-        li.has-children > .item > button {
-          opacity: 1.0;
-        }
-        li.collapsed > ul {
-          display: none;
-        }
-      `)
-    }
-    return this._styles
   }
 
   renderObject(ul, data, parents) {
@@ -136,50 +155,35 @@ export class FileTree extends HTMLElement {
 
 ```js
 export class AppView extends HTMLElement {
-  connectedCallback() {
+  constructor() {
+    super()
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    if (![...document.adoptedStyleSheets ?? []].includes(this.constructor.globalStyles)) {
-      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
-    }
     this.dataTable = document.createElement('file-tree')
     this.shadowRoot.append(this.dataTable)
     this.dataTable.data = this.data
   }
 
-  static get styles() {
-    if (!this._styles) {
-      this._styles = new CSSStyleSheet()
-      this._styles.replaceSync(`
-        :host {
-          display: grid;
-          grid-template-columns: 1fr;
-          grid-template-rows: fit-content;
-          padding: 5px;
-        }
-      `)
-    }
-    return this._styles
-  }
+  connectedCallback() {
+    const globalStyle = document.createElement('style')
+    globalStyle.textContent = `
+      body {
+        margin: 0;
+        padding: 0;
+        color: #ffffffbb;
+      }
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+    `
+    document.head.append(globalStyle)
 
-  static get globalStyles() {
-    if (!this._globalStyles) {
-      this._globalStyles = new CSSStyleSheet()
-      this._globalStyles.replaceSync(`
-        body {
-          margin: 0;
-          padding: 0;
-          color: #ffffffbb;
-        }
-        html {
-          box-sizing: border-box;
-        }
-        *, *:before, *:after {
-          box-sizing: inherit;
-        }
-      `)
-    }
-    return this._globalStyles
+    const style = document.createElement('style')
+    style.textContent = `
+    `
+    this.shadowRoot.append(style)
   }
 
   get data() {
