@@ -42,25 +42,25 @@ export class FileTree extends HTMLElement {
         padding-inline-start: 0;
       }
       li li .item {
-        padding-left: 20px;
+        padding-left: 15px;
       }
       li li li .item {
-        padding-left: 40px;
+        padding-left: 30px;
       }
       li li li li .item {
-        padding-left: 60px;
+        padding-left: 45px;
       }
       li li li li li .item {
-        padding-left: 80px;
+        padding-left: 60px;
       }
       li li li li li li .item {
-        padding-left: 100px;
+        padding-left: 75px;
       }
       li li li li li li li .item {
-        padding-left: 120px;
+        padding-left: 90px;
       }
       li li li li li li li li .item {
-        padding-left: 140px;
+        padding-left: 105px;
       }
       li.active > .item {
         background: var(--bg-selected, #fff5);
@@ -68,6 +68,7 @@ export class FileTree extends HTMLElement {
       button {
         all: unset;
         opacity: 0;
+        padding-right: 3px;
       }
       li.has-children > .item > button {
         opacity: 1.0;
@@ -78,22 +79,24 @@ export class FileTree extends HTMLElement {
     `
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('click', e => {
-      this.shadowRoot.querySelector('li.active').classList.remove('active')
       const li = e.target.closest('li')
+      this.shadowRoot.querySelector('li.active').classList.remove('active')
       li.classList.add('active')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
-      const btn = e.target.closest('button')
-      if (btn) {
-        if (li.classList.contains('has-children')) {
-          li.classList.toggle('collapsed')
-          if (li.classList.contains('collapsed')) {
-            btn.innerHTML = this.icons.expand
-          } else {
-            btn.innerHTML = this.icons.collapse
-          }
-        }
+      if (e.target.closest('button') && li.classList.contains('has-children')) {
+        this.toggleExpand(li)
       }
     })
+  }
+
+  toggleExpand(li) {
+    const btn = li.querySelector(':scope > .item > button')
+    li.classList.toggle('collapsed')
+    if (li.classList.contains('collapsed')) {
+      btn.innerHTML = this.icons.expand
+    } else {
+      btn.innerHTML = this.icons.collapse
+    }
   }
 
   renderObject(ul, data, parents) {
