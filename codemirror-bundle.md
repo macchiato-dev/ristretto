@@ -33202,7 +33202,8 @@ const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, t
     return true;
 });
 
-window.CodeMirrorModules = {
+Macchiato.externalModules = {
+  ...Macchiato.externalModules,
   '@codemirror/view': {
     keymap, highlightSpecialChars,
     drawSelection, highlightActiveLine, dropCursor,

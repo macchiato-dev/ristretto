@@ -15,6 +15,19 @@ This sets up CodeMirror. It supports getting and setting the text, and sends the
 `code-edit.js`
 
 ```js
+import { keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, EditorView } from '@codemirror/view'
+import { Compartment, Prec, EditorState } from '@codemirror/state'
+import { LanguageDescription, foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldKeymap } from '@codemirror/language'
+import { javascriptLanguage } from '@codemirror/lang-javascript'
+import { cssLanguage } from '@codemirror/lang-css'
+import { htmlLanguage } from '@codemirror/lang-html'
+import { jsonLanguage } from '@codemirror/lang-json'
+import { markdown, markdownKeymap } from '@codemirror/lang-markdown'
+import { history, defaultKeymap, historyKeymap } from '@codemirror/commands'
+import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { lintKeymap } from '@codemirror/lint'
+
 export class CodeEdit extends HTMLElement {
   constructor() {
     super()
@@ -81,56 +94,48 @@ export class CodeEdit extends HTMLElement {
   }
 
   get langPlugins() {
-    const cmView = window.CodeMirrorModules['@codemirror/view']
-    const cmState = window.CodeMirrorModules['@codemirror/state']
-    const cmLanguage = window.CodeMirrorModules['@codemirror/language']
-    const cmJavaScript = window.CodeMirrorModules['@codemirror/lang-javascript']
-    const cmCss = window.CodeMirrorModules['@codemirror/lang-css']
-    const cmHtml = window.CodeMirrorModules['@codemirror/lang-html']
-    const cmJson = window.CodeMirrorModules['@codemirror/lang-json']
-    const cmMarkdown = window.CodeMirrorModules['@codemirror/lang-markdown']
     const langPlugins = []
     if (['js', 'javascript'].includes(this.fileType)) {
-      langPlugins.push(cmJavaScript.javascriptLanguage)
+      langPlugins.push(javascriptLanguage)
     } else if (this.fileType === 'css') {
-      langPlugins.push(cmCss.cssLanguage)
+      langPlugins.push(cssLanguage)
     } else if (this.fileType === 'html') {
-      langPlugins.push(cmHtml.htmlLanguage)
+      langPlugins.push(htmlLanguage)
     } else if (this.fileType === 'json') {
-      langPlugins.push(cmJson.jsonLanguage)
+      langPlugins.push(jsonLanguage)
     } else if (this.fileType === 'md') {
       const codeLanguages = [
-        cmLanguage.LanguageDescription.of({
+        LanguageDescription.of({
           name: 'javascript',
           alias: ['js'],
           async load() {
-            return new cmLanguage.LanguageSupport(cmJavaScript.javascriptLanguage)
+            return new LanguageSupport(javascriptLanguage)
           },
         }),
-        cmLanguage.LanguageDescription.of({
+        LanguageDescription.of({
           name: 'css',
           async load() {
-            return new cmLanguage.LanguageSupport(cmCss.cssLanguage)
+            return new LanguageSupport(cssLanguage)
           },
         }),
-        cmLanguage.LanguageDescription.of({
+        LanguageDescription.of({
           name: 'json',
           async load() {
-            return new cmLanguage.LanguageSupport(cmJson.jsonLanguage)
+            return new LanguageSupport(jsonLanguage)
           },
         }),
-        cmLanguage.LanguageDescription.of({
+        LanguageDescription.of({
           name: 'html',
           async load() {
-            const javascript = new cmLanguage.LanguageSupport(cmJavaScript.javascriptLanguage)
-            const css = new cmLanguage.LanguageSupport(cmCss.cssLanguage)
-            return new cmLanguage.LanguageSupport(cmHtml.htmlLanguage, [css, javascript])
+            const javascript = new LanguageSupport(javascriptLanguage)
+            const css = new LanguageSupport(cssLanguage)
+            return new LanguageSupport(htmlLanguage, [css, javascript])
           },
         }),
       ]
-      const { language, support } = cmMarkdown.markdown({codeLanguages, addKeymap: false})
-      const markdownSupport = new cmLanguage.LanguageSupport(
-        language, [...support, cmState.Prec.high(cmView.keymap.of(cmMarkdown.markdownKeymap))]
+      const { language, support } = markdown({codeLanguages, addKeymap: false})
+      const markdownSupport = new LanguageSupport(
+        language, [...support, Prec.high(keymap.of(markdownKeymap))]
       )
       langPlugins.push(
         markdownSupport
@@ -140,56 +145,49 @@ export class CodeEdit extends HTMLElement {
   }
 
   initEditor() {
-    const cmView = window.CodeMirrorModules['@codemirror/view']
-    const cmState = window.CodeMirrorModules['@codemirror/state']
-    const cmLanguage = window.CodeMirrorModules['@codemirror/language']
-    const cmCommands = window.CodeMirrorModules['@codemirror/commands']
-    const cmAutocomplete = window.CodeMirrorModules['@codemirror/autocomplete']
-    const cmSearch = window.CodeMirrorModules['@codemirror/search']
-    const cmLint = window.CodeMirrorModules['@codemirror/lint']
-    this.languageCompartment = new cmState.Compartment()
+    this.languageCompartment = new Compartment()
     const langPlugins = this.langPlugins
     const basicSetup = [
-      cmView.lineNumbers(),
-      cmView.highlightActiveLineGutter(),
-      cmView.highlightSpecialChars(),
-      cmCommands.history(),
-      cmLanguage.foldGutter(),
-      cmView.drawSelection(),
-      cmView.dropCursor(),
-      cmState.EditorState.allowMultipleSelections.of(true),
-      cmLanguage.indentOnInput(),
-      cmLanguage.syntaxHighlighting(
-        cmLanguage.defaultHighlightStyle, {fallback: true}
+      lineNumbers(),
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      syntaxHighlighting(
+        defaultHighlightStyle, {fallback: true}
       ),
-      cmLanguage.bracketMatching(),
-      cmAutocomplete.closeBrackets(),
-      cmAutocomplete.autocompletion(),
-      cmView.rectangularSelection(),
-      cmView.crosshairCursor(),
-      cmView.highlightActiveLine(),
-      cmSearch.highlightSelectionMatches(),
-      cmView.keymap.of([
-        ...cmAutocomplete.closeBracketsKeymap,
-        ...cmCommands.defaultKeymap,
-        ...cmSearch.searchKeymap,
-        ...cmCommands.historyKeymap,
-        ...cmLanguage.foldKeymap,
-        ...cmAutocomplete.completionKeymap,
-        ...cmLint.lintKeymap,
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      keymap.of([
+        ...closeBracketsKeymap,
+        ...defaultKeymap,
+        ...searchKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...completionKeymap,
+        ...lintKeymap,
       ]),
     ]
-    const viewTheme = cmView.EditorView.theme({
+    const viewTheme = EditorView.theme({
       '&': {flexGrow: '1', height: '100%'},
       '.cm-scroller': {overflow: 'auto'}
     })
-    this.view = new cmView.EditorView({
+    this.view = new EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
         viewTheme,
-        cmView.EditorView.updateListener.of(e => {
+        EditorView.updateListener.of(e => {
           if (e.docChanged) {
             this.dispatchEvent(new CustomEvent(
               'code-input', {bubbles: true, composed: true}

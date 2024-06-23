@@ -45,7 +45,8 @@ import { rust, rustLanguage } from '@codemirror/lang-rust'
 import { wast, wastLanguage } from '@codemirror/lang-wast'
 import { xml, xmlLanguage, completeFromSchema } from '@codemirror/lang-xml'
 
-window.CodeMirrorModules = {
+Macchiato.externalModules = {
+  ...Macchiato.externalModules,
   '@codemirror/view': {
     keymap, highlightSpecialChars,
     drawSelection, highlightActiveLine, dropCursor,
