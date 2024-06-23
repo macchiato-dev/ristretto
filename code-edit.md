@@ -17,7 +17,7 @@ This sets up CodeMirror. It supports getting and setting the text, and sends the
 ```js
 import { keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, highlightSpecialChars, drawSelection, dropCursor, rectangularSelection, crosshairCursor, EditorView } from '@codemirror/view'
 import { Compartment, Prec, EditorState } from '@codemirror/state'
-import { LanguageDescription, foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldKeymap } from '@codemirror/language'
+import { LanguageSupport, LanguageDescription, foldGutter, indentOnInput, syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldKeymap } from '@codemirror/language'
 import { javascriptLanguage } from '@codemirror/lang-javascript'
 import { cssLanguage } from '@codemirror/lang-css'
 import { htmlLanguage } from '@codemirror/lang-html'
