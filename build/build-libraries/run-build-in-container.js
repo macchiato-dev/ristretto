@@ -37,6 +37,12 @@ const packages = [
   '@codemirror/lang-sql',
   '@codemirror/lang-wast',
   '@lezer/highlight',
+  'prosemirror-state',
+  'prosemirror-view',
+  'prosemirror-model',
+  'prosemirror-schema-basic',
+  'prosemirror-schema-list',
+  'prosemirror-example-setup',
 ]
 
 async function* getFiles(path) {

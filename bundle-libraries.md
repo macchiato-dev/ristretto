@@ -2,7 +2,7 @@
 
 This takes the downloaded libraries in `library-source.md` and bundles them using rollup.
 
-`bundle-source.js`
+`codemirror-bundle-source.js`
 
 ```js
 import {
@@ -123,18 +123,60 @@ Macchiato.externalModules = {
 }
 ```
 
+`prosemirror-bundle-source.js`
+
+```js
+import {EditorState} from "prosemirror-state"
+import {EditorView} from "prosemirror-view"
+import {Schema, DOMParser} from "prosemirror-model"
+import {schema} from "prosemirror-schema-basic"
+import {addListNodes} from "prosemirror-schema-list"
+import {exampleSetup} from "prosemirror-example-setup"
+
+Macchiato.externalModules = {
+  ...Macchiato.externalModules,
+  'prosemirror-state': {
+    EditorState,
+  },
+  'prosemirror-view': {
+    EditorView,
+  },
+  'prosemirror-model': {
+    Schema,
+    DOMParser,
+  },
+  'prosemirror-schema-basic': {
+    schema,
+  },
+  'prosemirror-schema-list': {
+    addListNodes,
+  },
+  'prosemirror-example-setup': {
+    exampleSetup,
+  },
+}
+```
+
 `run-bundle-libraries.js`
 
 ```js
+const files = ['codemirror-bundle.md', 'prosemirror-bundle.md']
+
 const commands = {
   async getLibrarySource() {
     return await Deno.readTextFile('./build/build-libraries/library-source.md')
   },
-  async loadBundle() {
-    return await Deno.readTextFile('./codemirror-bundle.md')
+  async loadBundle(filename) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    return await Deno.readTextFile(filename)
   },
-  async saveBundle(text) {
-    await Deno.writeTextFile('./codemirror-bundle.md', text)
+  async saveBundle(filename, text) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    await Deno.writeTextFile(filename, text)
   },
 }
 
@@ -202,7 +244,7 @@ async function toBase64(bytes) {
   })
 }
 
-async function bundle(librarySource) {
+async function bundle(librarySource, bundleSourceFilename) {
   const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
   const localBlocks = await Array.fromAsync(readBlocksWithNames(__source))
   const nodeModules = Object.fromEntries(
@@ -218,7 +260,7 @@ async function bundle(librarySource) {
   const pkgLock = JSON.parse(librarySource.slice(...otherBlocks['package-lock.json'].contentRange))
   const rollupBlock = nodeModules['@rollup/browser/dist/es/rollup.browser.js']
   const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
-  const bundleSourceBlock = localBlocks.find(({name}) => name === 'bundle-source.js')
+  const bundleSourceBlock = localBlocks.find(({name}) => name === bundleSourceFilename)
   const bundleSourceContent = __source.slice(...bundleSourceBlock.contentRange)
   const scripts = {'bundle-source.js': bundleSourceContent}
   for (const key of Object.keys(pkgLock.packages).filter(name => name.startsWith('node_modules'))) {
@@ -259,19 +301,24 @@ async function bundle(librarySource) {
   return output[0].code
 }
 
-async function updateBundle(bundleNotebook, bundleSource) {
+async function updateBundle(bundleNotebook, filename, bundleSource) {
   const blocks = await Array.fromAsync(readBlocksWithNames(bundleNotebook))
-  const range = blocks.find(({name}) => name === 'codemirror-bundle.js').contentRange
+  const range = blocks.find(({name}) => name === filename).contentRange
   return bundleNotebook.slice(0, range[0]) + bundleSource.replace(/\n$/, '') + bundleNotebook.slice(range[1])
 }
 
 async function build() {
   try {
     const librarySource = await parentRequest('getLibrarySource')
-    const output = await bundle(librarySource)
-    const bundleNotebookInput = await parentRequest('loadBundle')
-    const bundleNotebookOutput = await updateBundle(bundleNotebookInput, output)
-    await parentRequest('saveBundle', bundleNotebookOutput)
+    for (const library of ['codemirror', 'prosemirror']) {
+      const mdFilename = `${library}-bundle.md`
+      const jsFilename = `${library}-bundle.js`
+      const bundleSourceFilename = `${library}-bundle-source.js`
+      const output = await bundle(librarySource, bundleSourceFilename)
+      const bundleNotebookInput = await parentRequest('loadBundle', mdFilename)
+      const bundleNotebookOutput = await updateBundle(bundleNotebookInput, jsFilename, output)
+      await parentRequest('saveBundle', mdFilename, bundleNotebookOutput)
+    }
     close()
   } catch (err) {
     console.error(err)
