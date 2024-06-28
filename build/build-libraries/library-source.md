@@ -19,9 +19,9 @@ Wrote to /app/package.json:
 }
 
 
--- npm install @rollup/browser@3.29.1 @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/search @codemirror/state @codemirror/view @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @codemirror/lang-javascript @codemirror/lang-markdown @codemirror/lang-python @codemirror/lang-rust @codemirror/lang-xml @codemirror/lang-sql @codemirror/lang-wast @lezer/highlight prosemirror-state prosemirror-view prosemirror-model prosemirror-schema-basic prosemirror-schema-list prosemirror-example-setup
+-- npm install @rollup/browser@3.29.1 @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/search @codemirror/state @codemirror/view @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @codemirror/lang-javascript @codemirror/lang-markdown @codemirror/lang-python @codemirror/lang-rust @codemirror/lang-xml @codemirror/lang-sql @codemirror/lang-wast @lezer/highlight prosemirror-state prosemirror-view prosemirror-model prosemirror-schema-basic prosemirror-schema-list prosemirror-example-setup prosemirror-history prosemirror-keymap prosemirror-commands
 
-added 48 packages, and audited 49 packages in 9s
+added 48 packages, and audited 49 packages in 12s
 
 found 0 vulnerabilities
 
@@ -25288,7 +25288,7 @@ class Fragment {
     /**
     Find the index and inner offset corresponding to a given relative
     position in this fragment. The result object will be reused
-    (overwritten) the next time the function is called. (Not public.)
+    (overwritten) the next time the function is called. @internal
     */
     findIndex(pos, round = -1) {
         if (pos == 0)
@@ -26079,17 +26079,29 @@ class ResolvedPos {
     @internal
     */
     static resolveCached(doc, pos) {
-        for (let i = 0; i < resolveCache.length; i++) {
-            let cached = resolveCache[i];
-            if (cached.pos == pos && cached.doc == doc)
-                return cached;
+        let cache = resolveCache.get(doc);
+        if (cache) {
+            for (let i = 0; i < cache.elts.length; i++) {
+                let elt = cache.elts[i];
+                if (elt.pos == pos)
+                    return elt;
+            }
         }
-        let result = resolveCache[resolveCachePos] = ResolvedPos.resolve(doc, pos);
-        resolveCachePos = (resolveCachePos + 1) % resolveCacheSize;
+        else {
+            resolveCache.set(doc, cache = new ResolveCache);
+        }
+        let result = cache.elts[cache.i] = ResolvedPos.resolve(doc, pos);
+        cache.i = (cache.i + 1) % resolveCacheSize;
         return result;
     }
 }
-let resolveCache = [], resolveCachePos = 0, resolveCacheSize = 12;
+class ResolveCache {
+    constructor() {
+        this.elts = [];
+        this.i = 0;
+    }
+}
+const resolveCacheSize = 12, resolveCache = new WeakMap();
 /**
 Represents a flat range of content, i.e. one that starts and
 ends in the same node.
@@ -26521,7 +26533,7 @@ class Node {
     static fromJSON(schema, json) {
         if (!json)
             throw new RangeError("Invalid input for Node.fromJSON");
-        let marks = null;
+        let marks = undefined;
         if (json.marks) {
             if (!Array.isArray(json.marks))
                 throw new RangeError("Invalid mark data for Node.fromJSON");
@@ -27525,11 +27537,17 @@ class DOMParser {
         @internal
         */
         this.styles = [];
+        let matchedStyles = this.matchedStyles = [];
         rules.forEach(rule => {
-            if (isTagRule(rule))
+            if (isTagRule(rule)) {
                 this.tags.push(rule);
-            else if (isStyleRule(rule))
+            }
+            else if (isStyleRule(rule)) {
+                let prop = /[^=]*/.exec(rule.style)[0];
+                if (matchedStyles.indexOf(prop) < 0)
+                    matchedStyles.push(prop);
                 this.styles.push(rule);
+            }
         });
         // Only normalize list elements when lists in the schema can't directly contain themselves
         this.normalizeLists = !this.tags.some(r => {
@@ -27891,29 +27909,36 @@ class ParseContext {
     // had a rule with `ignore` set.
     readStyles(styles) {
         let add = Mark.none, remove = Mark.none;
-        for (let i = 0, l = styles.length; i < l; i++) {
-            let name = styles.item(i);
-            for (let after = undefined;;) {
-                let rule = this.parser.matchStyle(name, styles.getPropertyValue(name), this, after);
-                if (!rule)
-                    break;
-                if (rule.ignore)
-                    return null;
-                if (rule.clearMark) {
-                    this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
-                        if (rule.clearMark(m))
-                            remove = m.addToSet(remove);
-                    });
-                }
-                else {
-                    add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
-                }
-                if (rule.consuming === false)
-                    after = rule;
-                else
-                    break;
+        // Because many properties will only show up in 'normalized' form
+        // in `style.item` (i.e. text-decoration becomes
+        // text-decoration-line, text-decoration-color, etc), we directly
+        // query the styles mentioned in our rules instead of iterating
+        // over the items.
+        if (styles.length)
+            for (let i = 0; i < this.parser.matchedStyles.length; i++) {
+                let name = this.parser.matchedStyles[i], value = styles.getPropertyValue(name);
+                if (value)
+                    for (let after = undefined;;) {
+                        let rule = this.parser.matchStyle(name, value, this, after);
+                        if (!rule)
+                            break;
+                        if (rule.ignore)
+                            return null;
+                        if (rule.clearMark) {
+                            this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
+                                if (rule.clearMark(m))
+                                    remove = m.addToSet(remove);
+                            });
+                        }
+                        else {
+                            add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
+                        }
+                        if (rule.consuming === false)
+                            after = rule;
+                        else
+                            break;
+                    }
             }
-        }
         return [add, remove];
     }
     // Look up a handler for the given node. If none are found, return
@@ -28434,7 +28459,7 @@ export { ContentMatch, DOMParser, DOMSerializer, Fragment, Mark, MarkType, Node,
 `````
 {
   "name": "prosemirror-model",
-  "version": "1.21.1",
+  "version": "1.21.3",
   "description": "ProseMirror's document model",
   "type": "module",
   "main": "dist/index.cjs",
@@ -28934,9 +28959,9 @@ class StyleSet {
       }
     },
     "node_modules/@codemirror/lang-sql": {
-      "version": "6.6.5",
-      "resolved": "https://registry.npmjs.org/@codemirror/lang-sql/-/lang-sql-6.6.5.tgz",
-      "integrity": "sha512-noy8Hp+4rng6HM0647hvN5hXVefd9o6tar+9p/vV7pj14zsRBaVQvtl6w7cLs1dGPllSsDmnN8R+gAsjnEs6mA==",
+      "version": "6.7.0",
+      "resolved": "https://registry.npmjs.org/@codemirror/lang-sql/-/lang-sql-6.7.0.tgz",
+      "integrity": "sha512-KMXp6rtyPYz6RaElvkh/77ClEAoQoHRPZo0zutRRialeFs/B/X8YaUJBCnAV2zqyeJPLZ4hgo48mG8TKoNXfZA==",
       "dependencies": {
         "@codemirror/autocomplete": "^6.0.0",
         "@codemirror/language": "^6.0.0",
@@ -29221,9 +29246,9 @@ class StyleSet {
       }
     },
     "node_modules/prosemirror-model": {
-      "version": "1.21.1",
-      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.1.tgz",
-      "integrity": "sha512-IVBAuMqOfltTr7yPypwpfdGT+6rGAteVOw2FO6GEvCGGa1ZwxLseqC1Eax/EChDvG/xGquB2d/hLdgh3THpsYg==",
+      "version": "1.21.3",
+      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.3.tgz",
+      "integrity": "sha512-nt2Xs/RNGepD9hrrkzXvtCm1mpGJoQfFSPktGa0BF/aav6XsnmVGZ9sTXNWRLupAz5SCLa3EyKlFeK7zJWROKg==",
       "dependencies": {
         "orderedmap": "^2.0.0"
       }
@@ -54647,6 +54672,7 @@ const defaults = {
     operatorChars: "*+\-%<>!=&|~^/",
     specialVar: "?",
     identifierQuotes: '"',
+    caseInsensitiveIdentifiers: false,
     words: /*@__PURE__*/keywords(SQLKeywords, SQLTypes)
 };
 function dialect(spec, kws, types, builtin) {
@@ -54941,8 +54967,9 @@ function isSelfTag(namespace) {
     return namespace.self && typeof namespace.self.label == "string";
 }
 class CompletionLevel {
-    constructor(idQuote) {
+    constructor(idQuote, idCaseInsensitive) {
         this.idQuote = idQuote;
+        this.idCaseInsensitive = idCaseInsensitive;
         this.list = [];
         this.children = undefined;
     }
@@ -54952,8 +54979,8 @@ class CompletionLevel {
         if (found)
             return found;
         if (name && !this.list.some(c => c.label == name))
-            this.list.push(nameCompletion(name, "type", this.idQuote));
-        return (children[name] = new CompletionLevel(this.idQuote));
+            this.list.push(nameCompletion(name, "type", this.idQuote, this.idCaseInsensitive));
+        return (children[name] = new CompletionLevel(this.idQuote, this.idCaseInsensitive));
     }
     maybeChild(name) {
         return this.children ? this.children[name] : null;
@@ -54967,7 +54994,7 @@ class CompletionLevel {
     }
     addCompletions(completions) {
         for (let option of completions)
-            this.addCompletion(typeof option == "string" ? nameCompletion(option, "property", this.idQuote) : option);
+            this.addCompletion(typeof option == "string" ? nameCompletion(option, "property", this.idQuote, this.idCaseInsensitive) : option);
     }
     addNamespace(namespace) {
         if (Array.isArray(namespace)) {
@@ -54998,8 +55025,8 @@ class CompletionLevel {
         }
     }
 }
-function nameCompletion(label, type, idQuote) {
-    if (/^[a-z_][a-z_\d]*$/.test(label))
+function nameCompletion(label, type, idQuote, idCaseInsensitive) {
+    if ((new RegExp("^[a-z_][a-z_\\d]*$", idCaseInsensitive ? "i" : "")).test(label))
         return { label, type };
     return { label, type, apply: idQuote + label + idQuote };
 }
@@ -55010,7 +55037,7 @@ function nameCompletion(label, type, idQuote) {
 function completeFromSchema(schema, tables, schemas, defaultTableName, defaultSchemaName, dialect) {
     var _a;
     let idQuote = ((_a = dialect === null || dialect === void 0 ? void 0 : dialect.spec.identifierQuotes) === null || _a === void 0 ? void 0 : _a[0]) || '"';
-    let top = new CompletionLevel(idQuote);
+    let top = new CompletionLevel(idQuote, !!(dialect === null || dialect === void 0 ? void 0 : dialect.spec.caseInsensitiveIdentifiers));
     let defaultSchema = defaultSchemaName ? top.child(defaultSchemaName) : null;
     top.addNamespace(schema);
     if (tables)
@@ -55282,7 +55309,7 @@ export { Cassandra, MSSQL, MariaSQL, MySQL, PLSQL, PostgreSQL, SQLDialect, SQLit
 `````
 {
   "name": "@codemirror/lang-sql",
-  "version": "6.6.5",
+  "version": "6.7.0",
   "description": "SQL language support for the CodeMirror code editor",
   "scripts": {
     "test": "cm-runtests",
@@ -57366,7 +57393,7 @@ function add(elt, child) {
     "@codemirror/lang-markdown": "^6.2.5",
     "@codemirror/lang-python": "^6.1.6",
     "@codemirror/lang-rust": "^6.0.1",
-    "@codemirror/lang-sql": "^6.6.5",
+    "@codemirror/lang-sql": "^6.7.0",
     "@codemirror/lang-wast": "^6.0.2",
     "@codemirror/lang-xml": "^6.1.0",
     "@codemirror/language": "^6.10.2",
@@ -57376,8 +57403,11 @@ function add(elt, child) {
     "@codemirror/view": "^6.28.2",
     "@lezer/highlight": "^1.2.0",
     "@rollup/browser": "^3.29.1",
+    "prosemirror-commands": "^1.5.2",
     "prosemirror-example-setup": "^1.2.2",
-    "prosemirror-model": "^1.21.1",
+    "prosemirror-history": "^1.4.0",
+    "prosemirror-keymap": "^1.2.2",
+    "prosemirror-model": "^1.21.3",
     "prosemirror-schema-basic": "^1.2.2",
     "prosemirror-schema-list": "^1.4.0",
     "prosemirror-state": "^1.4.3",
@@ -57411,7 +57441,7 @@ function add(elt, child) {
         "@codemirror/lang-markdown": "^6.2.5",
         "@codemirror/lang-python": "^6.1.6",
         "@codemirror/lang-rust": "^6.0.1",
-        "@codemirror/lang-sql": "^6.6.5",
+        "@codemirror/lang-sql": "^6.7.0",
         "@codemirror/lang-wast": "^6.0.2",
         "@codemirror/lang-xml": "^6.1.0",
         "@codemirror/language": "^6.10.2",
@@ -57421,8 +57451,11 @@ function add(elt, child) {
         "@codemirror/view": "^6.28.2",
         "@lezer/highlight": "^1.2.0",
         "@rollup/browser": "^3.29.1",
+        "prosemirror-commands": "^1.5.2",
         "prosemirror-example-setup": "^1.2.2",
-        "prosemirror-model": "^1.21.1",
+        "prosemirror-history": "^1.4.0",
+        "prosemirror-keymap": "^1.2.2",
+        "prosemirror-model": "^1.21.3",
         "prosemirror-schema-basic": "^1.2.2",
         "prosemirror-schema-list": "^1.4.0",
         "prosemirror-state": "^1.4.3",
@@ -57544,9 +57577,9 @@ function add(elt, child) {
       }
     },
     "node_modules/@codemirror/lang-sql": {
-      "version": "6.6.5",
-      "resolved": "https://registry.npmjs.org/@codemirror/lang-sql/-/lang-sql-6.6.5.tgz",
-      "integrity": "sha512-noy8Hp+4rng6HM0647hvN5hXVefd9o6tar+9p/vV7pj14zsRBaVQvtl6w7cLs1dGPllSsDmnN8R+gAsjnEs6mA==",
+      "version": "6.7.0",
+      "resolved": "https://registry.npmjs.org/@codemirror/lang-sql/-/lang-sql-6.7.0.tgz",
+      "integrity": "sha512-KMXp6rtyPYz6RaElvkh/77ClEAoQoHRPZo0zutRRialeFs/B/X8YaUJBCnAV2zqyeJPLZ4hgo48mG8TKoNXfZA==",
       "dependencies": {
         "@codemirror/autocomplete": "^6.0.0",
         "@codemirror/language": "^6.0.0",
@@ -57831,9 +57864,9 @@ function add(elt, child) {
       }
     },
     "node_modules/prosemirror-model": {
-      "version": "1.21.1",
-      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.1.tgz",
-      "integrity": "sha512-IVBAuMqOfltTr7yPypwpfdGT+6rGAteVOw2FO6GEvCGGa1ZwxLseqC1Eax/EChDvG/xGquB2d/hLdgh3THpsYg==",
+      "version": "1.21.3",
+      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.3.tgz",
+      "integrity": "sha512-nt2Xs/RNGepD9hrrkzXvtCm1mpGJoQfFSPktGa0BF/aav6XsnmVGZ9sTXNWRLupAz5SCLa3EyKlFeK7zJWROKg==",
       "dependencies": {
         "orderedmap": "^2.0.0"
       }
@@ -57953,6 +57986,9 @@ const packages = [
   'prosemirror-schema-basic',
   'prosemirror-schema-list',
   'prosemirror-example-setup',
+  'prosemirror-history',
+  'prosemirror-keymap',
+  'prosemirror-commands',
 ]
 
 async function* getFiles(path) {

@@ -76,6 +76,9 @@ const packages = [
   'prosemirror-schema-basic',
   'prosemirror-schema-list',
   'prosemirror-example-setup',
+  'prosemirror-history',
+  'prosemirror-keymap',
+  'prosemirror-commands',
 ]
 
 async function* getFiles(path) {

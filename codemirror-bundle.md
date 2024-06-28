@@ -32105,6 +32105,7 @@ const defaults = {
     operatorChars: "*+\-%<>!=&|~^/",
     specialVar: "?",
     identifierQuotes: '"',
+    caseInsensitiveIdentifiers: false,
     words: /*@__PURE__*/keywords(SQLKeywords, SQLTypes)
 };
 function dialect(spec, kws, types, builtin) {
@@ -32399,8 +32400,9 @@ function isSelfTag(namespace) {
     return namespace.self && typeof namespace.self.label == "string";
 }
 class CompletionLevel {
-    constructor(idQuote) {
+    constructor(idQuote, idCaseInsensitive) {
         this.idQuote = idQuote;
+        this.idCaseInsensitive = idCaseInsensitive;
         this.list = [];
         this.children = undefined;
     }
@@ -32410,8 +32412,8 @@ class CompletionLevel {
         if (found)
             return found;
         if (name && !this.list.some(c => c.label == name))
-            this.list.push(nameCompletion(name, "type", this.idQuote));
-        return (children[name] = new CompletionLevel(this.idQuote));
+            this.list.push(nameCompletion(name, "type", this.idQuote, this.idCaseInsensitive));
+        return (children[name] = new CompletionLevel(this.idQuote, this.idCaseInsensitive));
     }
     maybeChild(name) {
         return this.children ? this.children[name] : null;
@@ -32425,7 +32427,7 @@ class CompletionLevel {
     }
     addCompletions(completions) {
         for (let option of completions)
-            this.addCompletion(typeof option == "string" ? nameCompletion(option, "property", this.idQuote) : option);
+            this.addCompletion(typeof option == "string" ? nameCompletion(option, "property", this.idQuote, this.idCaseInsensitive) : option);
     }
     addNamespace(namespace) {
         if (Array.isArray(namespace)) {
@@ -32456,8 +32458,8 @@ class CompletionLevel {
         }
     }
 }
-function nameCompletion(label, type, idQuote) {
-    if (/^[a-z_][a-z_\d]*$/.test(label))
+function nameCompletion(label, type, idQuote, idCaseInsensitive) {
+    if ((new RegExp("^[a-z_][a-z_\\d]*$", idCaseInsensitive ? "i" : "")).test(label))
         return { label, type };
     return { label, type, apply: idQuote + label + idQuote };
 }
@@ -32468,7 +32470,7 @@ function nameCompletion(label, type, idQuote) {
 function completeFromSchema$1(schema, tables, schemas, defaultTableName, defaultSchemaName, dialect) {
     var _a;
     let idQuote = ((_a = dialect === null || dialect === void 0 ? void 0 : dialect.spec.identifierQuotes) === null || _a === void 0 ? void 0 : _a[0]) || '"';
-    let top = new CompletionLevel(idQuote);
+    let top = new CompletionLevel(idQuote, !!(dialect === null || dialect === void 0 ? void 0 : dialect.spec.caseInsensitiveIdentifiers));
     let defaultSchema = defaultSchemaName ? top.child(defaultSchemaName) : null;
     top.addNamespace(schema);
     if (tables)

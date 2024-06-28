@@ -126,34 +126,173 @@ Macchiato.externalModules = {
 `prosemirror-bundle-source.js`
 
 ```js
-import {EditorState} from "prosemirror-state"
-import {EditorView} from "prosemirror-view"
-import {Schema, DOMParser} from "prosemirror-model"
-import {schema} from "prosemirror-schema-basic"
-import {addListNodes} from "prosemirror-schema-list"
-import {exampleSetup} from "prosemirror-example-setup"
+import {
+  EditorState,
+  Selection,
+  SelectionRange,
+  TextSelection,
+  NodeSelection,
+  AllSelection,
+  Transaction,
+  Plugin,
+  PluginKey
+} from 'prosemirror-state'
+import {
+  EditorView,
+  Decoration,
+  DecorationSet
+} from 'prosemirror-view'
+import {
+  Node,
+  ResolvedPos,
+  NodeRange,
+  Fragment,
+  Slice,
+  ReplaceError,
+  Mark,
+  Schema,
+  NodeType,
+  MarkType,
+  ContentMatch,
+  DOMParser,
+  DOMSerializer
+} from 'prosemirror-model'
+import {schema} from 'prosemirror-schema-basic'
+import {addListNodes} from 'prosemirror-schema-list'
+import {exampleSetup} from 'prosemirror-example-setup'
+import {
+  history,
+  undo,
+  redo,
+  undoNoScroll,
+  redoNoScroll,
+  undoDepth,
+  redoDepth,
+  closeHistory
+} from 'prosemirror-history'
+import {
+  keymap,
+  keydownHandler
+} from 'prosemirror-keymap'
+import {
+  deleteSelection,
+  joinBackward,
+  joinTextblockBackward,
+  joinTextblockForward,
+  selectNodeBackward,
+  joinForward,
+  selectNodeForward,
+  joinUp,
+  joinDown,
+  lift,
+  newlineInCode,
+  exitCode,
+  createParagraphNear,
+  liftEmptyBlock,
+  splitBlockAs,
+  splitBlock,
+  splitBlockKeepMarks,
+  selectParentNode,
+  selectAll,
+  selectTextblockStart,
+  selectTextblockEnd,
+  wrapIn,
+  setBlockType,
+  toggleMark,
+  autoJoin,
+  chainCommands,
+  pcBaseKeymap,
+  macBaseKeymap,
+  baseKeymap
+} from 'prosemirror-commands'
 
 Macchiato.externalModules = {
   ...Macchiato.externalModules,
   'prosemirror-state': {
     EditorState,
+    Selection,
+    SelectionRange,
+    TextSelection,
+    NodeSelection,
+    AllSelection,
+    Transaction,
+    Plugin,
+    PluginKey
   },
   'prosemirror-view': {
     EditorView,
+    Decoration,
+    DecorationSet
   },
   'prosemirror-model': {
+    Node,
+    ResolvedPos,
+    NodeRange,
+    Fragment,
+    Slice,
+    ReplaceError,
+    Mark,
     Schema,
+    NodeType,
+    MarkType,
+    ContentMatch,
     DOMParser,
+    DOMSerializer
   },
   'prosemirror-schema-basic': {
-    schema,
+    schema
   },
   'prosemirror-schema-list': {
-    addListNodes,
+    addListNodes
   },
   'prosemirror-example-setup': {
-    exampleSetup,
+    exampleSetup
   },
+  'prosemirror-history': {
+    history,
+    undo,
+    redo,
+    undoNoScroll,
+    redoNoScroll,
+    undoDepth,
+    redoDepth,
+    closeHistory
+  },
+  'prosemirror-keymap': {
+    keymap,
+    keydownHandler
+  },
+  'prosemirror-commands': {
+    deleteSelection,
+    joinBackward,
+    joinTextblockBackward,
+    joinTextblockForward,
+    selectNodeBackward,
+    joinForward,
+    selectNodeForward,
+    joinUp,
+    joinDown,
+    lift,
+    newlineInCode,
+    exitCode,
+    createParagraphNear,
+    liftEmptyBlock,
+    splitBlockAs,
+    splitBlock,
+    splitBlockKeepMarks,
+    selectParentNode,
+    selectAll,
+    selectTextblockStart,
+    selectTextblockEnd,
+    wrapIn,
+    setBlockType,
+    toggleMark,
+    autoJoin,
+    chainCommands,
+    pcBaseKeymap,
+    macBaseKeymap,
+    baseKeymap
+  }
 }
 ```
 

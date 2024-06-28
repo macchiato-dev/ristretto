@@ -412,7 +412,7 @@ class Fragment {
     /**
     Find the index and inner offset corresponding to a given relative
     position in this fragment. The result object will be reused
-    (overwritten) the next time the function is called. (Not public.)
+    (overwritten) the next time the function is called. @internal
     */
     findIndex(pos, round = -1) {
         if (pos == 0)
@@ -1203,17 +1203,29 @@ class ResolvedPos {
     @internal
     */
     static resolveCached(doc, pos) {
-        for (let i = 0; i < resolveCache.length; i++) {
-            let cached = resolveCache[i];
-            if (cached.pos == pos && cached.doc == doc)
-                return cached;
+        let cache = resolveCache.get(doc);
+        if (cache) {
+            for (let i = 0; i < cache.elts.length; i++) {
+                let elt = cache.elts[i];
+                if (elt.pos == pos)
+                    return elt;
+            }
         }
-        let result = resolveCache[resolveCachePos] = ResolvedPos.resolve(doc, pos);
-        resolveCachePos = (resolveCachePos + 1) % resolveCacheSize;
+        else {
+            resolveCache.set(doc, cache = new ResolveCache);
+        }
+        let result = cache.elts[cache.i] = ResolvedPos.resolve(doc, pos);
+        cache.i = (cache.i + 1) % resolveCacheSize;
         return result;
     }
 }
-let resolveCache = [], resolveCachePos = 0, resolveCacheSize = 12;
+class ResolveCache {
+    constructor() {
+        this.elts = [];
+        this.i = 0;
+    }
+}
+const resolveCacheSize = 12, resolveCache = new WeakMap();
 /**
 Represents a flat range of content, i.e. one that starts and
 ends in the same node.
@@ -1645,7 +1657,7 @@ let Node$1 = class Node {
     static fromJSON(schema, json) {
         if (!json)
             throw new RangeError("Invalid input for Node.fromJSON");
-        let marks = null;
+        let marks = undefined;
         if (json.marks) {
             if (!Array.isArray(json.marks))
                 throw new RangeError("Invalid mark data for Node.fromJSON");
@@ -2649,11 +2661,17 @@ class DOMParser {
         @internal
         */
         this.styles = [];
+        let matchedStyles = this.matchedStyles = [];
         rules.forEach(rule => {
-            if (isTagRule(rule))
+            if (isTagRule(rule)) {
                 this.tags.push(rule);
-            else if (isStyleRule(rule))
+            }
+            else if (isStyleRule(rule)) {
+                let prop = /[^=]*/.exec(rule.style)[0];
+                if (matchedStyles.indexOf(prop) < 0)
+                    matchedStyles.push(prop);
                 this.styles.push(rule);
+            }
         });
         // Only normalize list elements when lists in the schema can't directly contain themselves
         this.normalizeLists = !this.tags.some(r => {
@@ -3015,29 +3033,36 @@ class ParseContext {
     // had a rule with `ignore` set.
     readStyles(styles) {
         let add = Mark.none, remove = Mark.none;
-        for (let i = 0, l = styles.length; i < l; i++) {
-            let name = styles.item(i);
-            for (let after = undefined;;) {
-                let rule = this.parser.matchStyle(name, styles.getPropertyValue(name), this, after);
-                if (!rule)
-                    break;
-                if (rule.ignore)
-                    return null;
-                if (rule.clearMark) {
-                    this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
-                        if (rule.clearMark(m))
-                            remove = m.addToSet(remove);
-                    });
-                }
-                else {
-                    add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
-                }
-                if (rule.consuming === false)
-                    after = rule;
-                else
-                    break;
+        // Because many properties will only show up in 'normalized' form
+        // in `style.item` (i.e. text-decoration becomes
+        // text-decoration-line, text-decoration-color, etc), we directly
+        // query the styles mentioned in our rules instead of iterating
+        // over the items.
+        if (styles.length)
+            for (let i = 0; i < this.parser.matchedStyles.length; i++) {
+                let name = this.parser.matchedStyles[i], value = styles.getPropertyValue(name);
+                if (value)
+                    for (let after = undefined;;) {
+                        let rule = this.parser.matchStyle(name, value, this, after);
+                        if (!rule)
+                            break;
+                        if (rule.ignore)
+                            return null;
+                        if (rule.clearMark) {
+                            this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
+                                if (rule.clearMark(m))
+                                    remove = m.addToSet(remove);
+                            });
+                        }
+                        else {
+                            add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
+                        }
+                        if (rule.consuming === false)
+                            after = rule;
+                        else
+                            break;
+                    }
             }
-        }
         return [add, remove];
     }
     // Look up a handler for the given node. If none are found, return
@@ -13582,6 +13607,14 @@ function mustPreserveItems(state) {
     }
     return cachedPreserveItems;
 }
+/**
+Set a flag on the given transaction that will prevent further steps
+from being appended to an existing history event (so that they
+require a separate undo command to undo).
+*/
+function closeHistory(tr) {
+    return tr.setMeta(closeHistoryKey, true);
+}
 const historyKey = new PluginKey("history");
 const closeHistoryKey = new PluginKey("closeHistory");
 /**
@@ -13642,6 +13675,30 @@ const undo = buildCommand(false, true);
 A command function that redoes the last undone change, if any.
 */
 const redo = buildCommand(true, true);
+/**
+A command function that undoes the last change. Don't scroll the
+selection into view.
+*/
+const undoNoScroll = buildCommand(false, false);
+/**
+A command function that redoes the last undone change. Don't
+scroll the selection into view.
+*/
+const redoNoScroll = buildCommand(true, false);
+/**
+The amount of undoable events available in a given state.
+*/
+function undoDepth(state) {
+    let hist = historyKey.getState(state);
+    return hist ? hist.done.eventCount : 0;
+}
+/**
+The amount of redoable events available in a given editor state.
+*/
+function redoDepth(state) {
+    let hist = historyKey.getState(state);
+    return hist ? hist.undone.eventCount : 0;
+}
 
 /**
 Delete the selection, if there is one.
@@ -13710,6 +13767,60 @@ const joinBackward = (state, dispatch, view) => {
     }
     return false;
 };
+/**
+A more limited form of [`joinBackward`]($commands.joinBackward)
+that only tries to join the current textblock to the one before
+it, if the cursor is at the start of a textblock.
+*/
+const joinTextblockBackward = (state, dispatch, view) => {
+    let $cursor = atBlockStart(state, view);
+    if (!$cursor)
+        return false;
+    let $cut = findCutBefore($cursor);
+    return $cut ? joinTextblocksAround(state, $cut, dispatch) : false;
+};
+/**
+A more limited form of [`joinForward`]($commands.joinForward)
+that only tries to join the current textblock to the one after
+it, if the cursor is at the end of a textblock.
+*/
+const joinTextblockForward = (state, dispatch, view) => {
+    let $cursor = atBlockEnd(state, view);
+    if (!$cursor)
+        return false;
+    let $cut = findCutAfter($cursor);
+    return $cut ? joinTextblocksAround(state, $cut, dispatch) : false;
+};
+function joinTextblocksAround(state, $cut, dispatch) {
+    let before = $cut.nodeBefore, beforeText = before, beforePos = $cut.pos - 1;
+    for (; !beforeText.isTextblock; beforePos--) {
+        if (beforeText.type.spec.isolating)
+            return false;
+        let child = beforeText.lastChild;
+        if (!child)
+            return false;
+        beforeText = child;
+    }
+    let after = $cut.nodeAfter, afterText = after, afterPos = $cut.pos + 1;
+    for (; !afterText.isTextblock; afterPos++) {
+        if (afterText.type.spec.isolating)
+            return false;
+        let child = afterText.firstChild;
+        if (!child)
+            return false;
+        afterText = child;
+    }
+    let step = replaceStep(state.doc, beforePos, afterPos, Slice.empty);
+    if (!step || step.from != beforePos ||
+        step instanceof ReplaceStep && step.slice.size >= afterPos - beforePos)
+        return false;
+    if (dispatch) {
+        let tr = state.tr.step(step);
+        tr.setSelection(TextSelection.create(tr.doc, beforePos));
+        dispatch(tr.scrollIntoView());
+    }
+    return true;
+}
 function textblockAt(node, side, only = false) {
     for (let scan = node; scan; scan = (side == "start" ? scan.firstChild : scan.lastChild)) {
         if (scan.isTextblock)
@@ -14026,6 +14137,18 @@ selection, also delete its content.
 */
 const splitBlock = splitBlockAs();
 /**
+Acts like [`splitBlock`](https://prosemirror.net/docs/ref/#commands.splitBlock), but without
+resetting the set of active marks at the cursor.
+*/
+const splitBlockKeepMarks = (state, dispatch) => {
+    return splitBlock(state, dispatch && (tr => {
+        let marks = state.storedMarks || (state.selection.$to.parentOffset && state.selection.$from.marks());
+        if (marks)
+            tr.ensureMarks(marks);
+        dispatch(tr);
+    }));
+};
+/**
 Move the selection to the node wrapping the current selection, if
 any. (Will not select the document node.)
 */
@@ -14257,6 +14380,57 @@ function toggleMark(markType, attrs = null) {
         }
         return true;
     };
+}
+function wrapDispatchForJoin(dispatch, isJoinable) {
+    return (tr) => {
+        if (!tr.isGeneric)
+            return dispatch(tr);
+        let ranges = [];
+        for (let i = 0; i < tr.mapping.maps.length; i++) {
+            let map = tr.mapping.maps[i];
+            for (let j = 0; j < ranges.length; j++)
+                ranges[j] = map.map(ranges[j]);
+            map.forEach((_s, _e, from, to) => ranges.push(from, to));
+        }
+        // Figure out which joinable points exist inside those ranges,
+        // by checking all node boundaries in their parent nodes.
+        let joinable = [];
+        for (let i = 0; i < ranges.length; i += 2) {
+            let from = ranges[i], to = ranges[i + 1];
+            let $from = tr.doc.resolve(from), depth = $from.sharedDepth(to), parent = $from.node(depth);
+            for (let index = $from.indexAfter(depth), pos = $from.after(depth + 1); pos <= to; ++index) {
+                let after = parent.maybeChild(index);
+                if (!after)
+                    break;
+                if (index && joinable.indexOf(pos) == -1) {
+                    let before = parent.child(index - 1);
+                    if (before.type == after.type && isJoinable(before, after))
+                        joinable.push(pos);
+                }
+                pos += after.nodeSize;
+            }
+        }
+        // Join the joinable points
+        joinable.sort((a, b) => a - b);
+        for (let i = joinable.length - 1; i >= 0; i--) {
+            if (canJoin(tr.doc, joinable[i]))
+                tr.join(joinable[i]);
+        }
+        dispatch(tr);
+    };
+}
+/**
+Wrap a command so that, when it produces a transform that causes
+two joinable nodes to end up next to each other, those are joined.
+Nodes are considered joinable when they are of the same type and
+when the `isJoinable` predicate returns true for them or, if an
+array of strings was passed, if their node type name is in that
+array.
+*/
+function autoJoin(command, isJoinable) {
+    let canJoin = Array.isArray(isJoinable) ? (node) => isJoinable.indexOf(node.type.name) > -1
+        : isJoinable;
+    return (state, dispatch, view) => command(state, dispatch && wrapDispatchForJoin(dispatch, canJoin), view);
 }
 /**
 Combine a number of command functions into a single function (which
@@ -16041,22 +16215,88 @@ Macchiato.externalModules = {
   ...Macchiato.externalModules,
   'prosemirror-state': {
     EditorState,
+    Selection,
+    SelectionRange,
+    TextSelection,
+    NodeSelection,
+    AllSelection,
+    Transaction,
+    Plugin,
+    PluginKey
   },
   'prosemirror-view': {
     EditorView,
+    Decoration,
+    DecorationSet
   },
   'prosemirror-model': {
+    Node: Node$1,
+    ResolvedPos,
+    NodeRange,
+    Fragment,
+    Slice,
+    ReplaceError,
+    Mark,
     Schema,
+    NodeType: NodeType$1,
+    MarkType,
+    ContentMatch,
     DOMParser,
+    DOMSerializer
   },
   'prosemirror-schema-basic': {
-    schema,
+    schema
   },
   'prosemirror-schema-list': {
-    addListNodes,
+    addListNodes
   },
   'prosemirror-example-setup': {
-    exampleSetup,
+    exampleSetup
   },
+  'prosemirror-history': {
+    history,
+    undo,
+    redo,
+    undoNoScroll,
+    redoNoScroll,
+    undoDepth,
+    redoDepth,
+    closeHistory
+  },
+  'prosemirror-keymap': {
+    keymap,
+    keydownHandler
+  },
+  'prosemirror-commands': {
+    deleteSelection,
+    joinBackward,
+    joinTextblockBackward,
+    joinTextblockForward,
+    selectNodeBackward,
+    joinForward,
+    selectNodeForward,
+    joinUp,
+    joinDown,
+    lift,
+    newlineInCode,
+    exitCode,
+    createParagraphNear,
+    liftEmptyBlock,
+    splitBlockAs,
+    splitBlock,
+    splitBlockKeepMarks,
+    selectParentNode,
+    selectAll,
+    selectTextblockStart,
+    selectTextblockEnd,
+    wrapIn,
+    setBlockType,
+    toggleMark,
+    autoJoin,
+    chainCommands,
+    pcBaseKeymap,
+    macBaseKeymap,
+    baseKeymap
+  }
 };
 ````
