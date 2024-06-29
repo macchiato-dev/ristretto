@@ -32,31 +32,37 @@ export class OutlineTextEdit extends HTMLElement {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     const editorDiv = document.createElement('div')
     const contentDiv = document.createElement('div')
-    contentDiv.innerHTML = `<obj-pair><obj-key>Pedro</obj-key><obj-sep>:</obj-sep><str-val>Pedro</str-val></obj-pair><obj-pair><obj-key>Pedro</obj-key><obj-sep>:</obj-sep><obj-val>Pedro</obj-val></obj-pair>`
+    contentDiv.innerHTML = `<obj-pair><obj-key><obj-place></obj-place>Pedro</obj-key><obj-val><obj-place></obj-place>Pedro</obj-val></obj-pair><obj-pair><obj-key><obj-place></obj-place>Pedro</obj-key><obj-val><obj-place></obj-place>Pedro</obj-val></obj-pair>`
     this.shadowRoot.append(editorDiv)
 
     const dataSchema = new Schema({
       nodes: {
         text: {},
+        objPlace: {
+          content: "",
+          toDOM() { return ["obj-place"] },
+          parseDOM: [{tag: "obj-place"}],
+          inline: true,
+          selectable: false
+        },
         objKey: {
-          content: "text*",
+          content: "objPlace text*",
           toDOM() { return ["obj-key", 0] },
           parseDOM: [{tag: "obj-key"}],
-        },
-        objSep: {
-          content: "text*",
-          toDOM() { return ["obj-sep", 0] },
-          parseDOM: [{tag: "obj-sep"}],
+          inline: true
         },
         objVal: {
-          content: "text*",
+          content: "objPlace text*",
           toDOM() { return ["obj-val", 0] },
           parseDOM: [{tag: "obj-val"}],
+          inline: true,
+          isolating: true
         },
         objPair: {
-          content: "objKey objSep objVal",
+          content: "objKey objVal",
           toDOM() { return ["obj-pair", 0] },
-          parseDOM: [{tag: "obj-pair"}]
+          parseDOM: [{tag: "obj-pair"}],
+          inline: false
         },
         doc: {content: "(objPair)+"},
       },
@@ -64,17 +70,31 @@ export class OutlineTextEdit extends HTMLElement {
     const dataKeymap = keymap({
       "Backspace": (state, dispatch, view) => {
         const {$from} = state.selection
-        console.log($from.parent, $from.parentOffset)
-        if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
-          console.log($from)
-          dispatch(
-            state.tr
-            .delete($from.pos - 1, $from.pos)
-            .setSelection(TextSelection.create(state.doc, 1))
-          )
+        const name = $from.parent.type.name
+        if (['objKey', 'objVal'].includes(name) && $from.parentOffset <= 1) {
+          return true
+        } else if (['objPair', 'objPlace'].includes(name)) {
           return true
         }
-      }
+      },
+      "ArrowLeft": (state, dispatch, view) => {
+        const {$from} = state.selection
+        const name = $from.parent.type.name
+        if (['objKey', 'objVal'].includes(name) && $from.parentOffset <= 1) {
+          const tr = state.tr
+          tr.setSelection(new TextSelection(tr.doc.resolve($from.pos - 2)))
+          dispatch(tr)
+          return true
+        }
+      },
+      "ArrowRight": (state, dispatch, view) => {
+        const {$from} = state.selection
+        if (['objKey', 'objVal'].includes($from.parent.type.name) && $from.parentOffset === $from.parent.nodeSize - 2) {
+          const tr = state.tr
+          tr.setSelection(new TextSelection(tr.doc.resolve($from.pos + 2)))
+          dispatch(tr)
+        }
+      },
     })
 
     const histKeymap = keymap({
@@ -112,18 +132,15 @@ export class OutlineTextEdit extends HTMLElement {
           font-size: 16px;
         }
         .ProseMirror-menubar { display: none; }
-        obj-pair {
-          display: block;
-        }
-        obj-sep {
-          opacity: 0;
-        }
         obj-key {
           background-color: #6f6f6f;
           padding: 3px 7px;
           border-radius: 9999px;
+          display: inline;
+          margin-right: 5px;
         }
         obj-val {
+          display: inline;
         }
         obj-pair {
           display: block;
