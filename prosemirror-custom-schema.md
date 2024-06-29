@@ -17,7 +17,7 @@
 
 ```js
 import {RichTextEdit} from "/rich-text-edit/rich-text-edit.js"
-import {EditorState} from "prosemirror-state"
+import {EditorState, TextSelection, Selection} from "prosemirror-state"
 import {EditorView} from "prosemirror-view"
 import {undo, redo, history} from "prosemirror-history"
 import {keymap} from "prosemirror-keymap"
@@ -32,29 +32,59 @@ export class OutlineTextEdit extends HTMLElement {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     const editorDiv = document.createElement('div')
     const contentDiv = document.createElement('div')
-    contentDiv.innerHTML = `<note>Pedro</note><note>Pedro</note><note>Pedro</note>`
+    contentDiv.innerHTML = `<obj-pair><obj-key>Pedro</obj-key><obj-sep>:</obj-sep><str-val>Pedro</str-val></obj-pair><obj-pair><obj-key>Pedro</obj-key><obj-sep>:</obj-sep><obj-val>Pedro</obj-val></obj-pair>`
     this.shadowRoot.append(editorDiv)
 
-    const mySchema = new Schema({
+    const dataSchema = new Schema({
       nodes: {
         text: {},
-        note: {
+        objKey: {
           content: "text*",
-          toDOM() { return ["note", 0] },
-          parseDOM: [{tag: "note"}]
+          toDOM() { return ["obj-key", 0] },
+          parseDOM: [{tag: "obj-key"}],
         },
-        doc: {content: "(note)+"},
+        objSep: {
+          content: "text*",
+          toDOM() { return ["obj-sep", 0] },
+          parseDOM: [{tag: "obj-sep"}],
+        },
+        objVal: {
+          content: "text*",
+          toDOM() { return ["obj-val", 0] },
+          parseDOM: [{tag: "obj-val"}],
+        },
+        objPair: {
+          content: "objKey objSep objVal",
+          toDOM() { return ["obj-pair", 0] },
+          parseDOM: [{tag: "obj-pair"}]
+        },
+        doc: {content: "(objPair)+"},
       },
+    })
+    const dataKeymap = keymap({
+      "Backspace": (state, dispatch, view) => {
+        const {$from} = state.selection
+        console.log($from.parent, $from.parentOffset)
+        if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
+          console.log($from)
+          dispatch(
+            state.tr
+            .delete($from.pos - 1, $from.pos)
+            .setSelection(TextSelection.create(state.doc, 1))
+          )
+          return true
+        }
+      }
     })
 
     const histKeymap = keymap({
       "Mod-z": undo,
-      "Mod-y": redo
+      "Mod-y": redo,
     })
     this.view = new EditorView(editorDiv, {
       state: EditorState.create({
-        doc: DOMParser.fromSchema(mySchema).parse(contentDiv),
-        plugins: [histKeymap, keymap(baseKeymap), history()],
+        doc: DOMParser.fromSchema(dataSchema).parse(contentDiv),
+        plugins: [dataKeymap, histKeymap, history()],
       }),
       root: this.shadowRoot,
     })
@@ -64,11 +94,40 @@ export class OutlineTextEdit extends HTMLElement {
     if (!this._styles) {
       this._styles = new CSSStyleSheet()
       this._styles.replaceSync(`
-        * {
-          color: white;
+        .ProseMirror {
+          word-wrap: break-word;
+          white-space: pre-wrap;
+          white-space: break-spaces;
+          -webkit-font-variant-ligatures: none;
+          font-variant-ligatures: none;
+          font-feature-settings: "liga" 0; /* the above doesn't seem to work in Edge */
         }
-        note {
+        ul {
+          list-style-type: none;
+        }
+        div {
+          background: #14191e;
+          color: #eee;
+          font-family: -apple-system, BlinkMacSystemFont, Avenir Next, Avenir, Helvetica, sans-serif;
+          font-size: 16px;
+        }
+        .ProseMirror-menubar { display: none; }
+        obj-pair {
           display: block;
+        }
+        obj-sep {
+          opacity: 0;
+        }
+        obj-key {
+          background-color: #6f6f6f;
+          padding: 3px 7px;
+          border-radius: 9999px;
+        }
+        obj-val {
+        }
+        obj-pair {
+          display: block;
+          padding: 5px;
         }
       `)
     }
