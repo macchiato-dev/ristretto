@@ -84,7 +84,9 @@ export class OutlineTextEdit extends HTMLElement {
       "Backspace": (state, dispatch, view) => {
         const {$from} = state.selection
         const textToDelete = state.doc.textBetween($from.pos - 1, $from.pos)
-        if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
+        if ($from.pos !== state.selection.$to.pos) {
+          return true
+        } else if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
           return true
         } else if ($from.parent.type.name === 'objKey' && $from.parentOffset === 1) {
           const tr = state.tr
@@ -114,7 +116,9 @@ export class OutlineTextEdit extends HTMLElement {
                 if (text === ' ') {
                   if (newState.doc.resolve(start).marks().some(mark => mark.type.name === 'placeholder')) {
                     const tr = newState.tr
+                    tr.removeMark(start - 2, end + 2, newState.schema.marks.placeholder)
                     tr.delete(start, end)
+                    tr.removeStoredMark(newState.schema.marks.placeholder)
                     return tr
                   }
                 }
