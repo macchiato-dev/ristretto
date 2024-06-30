@@ -22,7 +22,7 @@ import {EditorView} from "prosemirror-view"
 import {undo, redo, history} from "prosemirror-history"
 import {keymap} from "prosemirror-keymap"
 import {baseKeymap} from "prosemirror-commands"
-import {Schema, DOMParser, Slice, Fragment} from "prosemirror-model"
+import {Schema, Node, Slice, Fragment} from "prosemirror-model"
 import {addListNodes} from "prosemirror-schema-list"
 import {exampleSetup} from "prosemirror-example-setup"
 
@@ -31,17 +31,16 @@ export class OutlineTextEdit extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     const editorDiv = document.createElement('div')
-    const contentDiv = document.createElement('div')
-    contentDiv.innerHTML = (
-      '<obj-pair>' +
-      '<obj-key>Pedro</obj-key>' +
-      '<obj-val> Pedro</obj-val>' +
-      '</obj-pair>' +
-      '<obj-pair>' +
-      '<obj-key>Pedro</obj-key>' +
-      '<obj-val> Pedro</obj-val>' +
-      '</obj-pair>'
-    )
+    const content = {
+      type: 'doc',
+      content: [
+        this.buildPair('Pedro', 'Pedro'),
+        this.buildPair('Pedro', 'Pedro'),
+        this.buildPair('Pedro', 'Pedro'),
+        this.buildPair('Pedro', 'Pedro'),
+        this.buildPair('Pedro', 'Pedro'),
+      ],
+    }
     this.shadowRoot.append(editorDiv)
 
     const dataSchema = new Schema({
@@ -87,6 +86,7 @@ export class OutlineTextEdit extends HTMLElement {
         if ($from.pos !== state.selection.$to.pos) {
           return true
         } else if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
+          // TODO: if both key and value are empty, delete the entire node
           return true
         } else if ($from.parent.type.name === 'objKey' && $from.parentOffset === 1) {
           const tr = state.tr
@@ -98,6 +98,9 @@ export class OutlineTextEdit extends HTMLElement {
           dispatch(tr)
           return true
         }
+      },
+      "Enter": (state, dispatch, view) => {
+        return true
       }
     })
 
@@ -130,11 +133,27 @@ export class OutlineTextEdit extends HTMLElement {
     })
     this.view = new EditorView(editorDiv, {
       state: EditorState.create({
-        doc: DOMParser.fromSchema(dataSchema).parse(contentDiv),
+        doc: Node.fromJSON(dataSchema, content),
         plugins: [dataKeymap, dataPlugin, histKeymap, history()],
       }),
       root: this.shadowRoot,
     })
+  }
+
+  buildPair(key, value) {
+    return {
+      type: 'objPair',
+      content: [
+        {
+          type: 'objKey',
+          content: [ { type: 'text', text: key } ],
+        },
+        {
+          type: 'objVal',
+          content: [ { type: 'text', text: ` ${value}` } ],
+        },
+      ],
+    }
   }
 
   static get styles() {
@@ -185,29 +204,6 @@ export class OutlineTextEdit extends HTMLElement {
       `)
     }
     return this._styles
-  }
-
-  get exampleContent() {
-    const ul = document.createElement('ul')
-    const li = document.createElement('li')
-    const root = document.createElement('b')
-    root.innerText = 'root'
-    const nested = document.createElement('ul')
-    nested.append(...([
-      ['$schema', 'https://vega.github.io/schema/vega/v5.json'],
-      ['description', 'A basic stacked area chart example.'],
-      ['width', '500'],
-      ['height', '200'],
-    ]).map(item => {
-      const li = document.createElement('li')
-      const b = document.createElement('b')
-      b.innerText = item[0]
-      li.append(b, ' ' + item[1])
-      return li
-    }))
-    li.append(root, nested)
-    ul.append(li)
-    return ul
   }
 }
 ```
