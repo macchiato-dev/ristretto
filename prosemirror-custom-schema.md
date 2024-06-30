@@ -100,6 +100,8 @@ export class OutlineTextEdit extends HTMLElement {
         }
       },
       "Enter": (state, dispatch, view) => {
+        const from = state.selection.$from
+        console.log(from.pos, from.posAtIndex(from.index(1), 1), from.posAtIndex(from.indexAfter(1), 1))
         return true
       }
     })
