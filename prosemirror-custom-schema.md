@@ -83,7 +83,20 @@ export class OutlineTextEdit extends HTMLElement {
       "Backspace": (state, dispatch, view) => {
         const {$from} = state.selection
         const textToDelete = state.doc.textBetween($from.pos - 1, $from.pos)
-        if ($from.pos !== state.selection.$to.pos) {
+        const fullText = state.doc.textBetween(
+          $from.posAtIndex($from.index(1), 1),
+          $from.posAtIndex($from.indexAfter(1), 1)
+        )
+        console.log([fullText.slice(0)])
+        if (fullText === ' ') {
+          const tr = state.tr
+          tr.delete(
+            $from.posAtIndex($from.index(1), 1) - 2,
+            $from.posAtIndex($from.indexAfter(1), 1) + 2
+          )
+          dispatch(tr)
+          return true
+        } else if ($from.pos !== state.selection.$to.pos) {
           return true
         } else if ($from.parent.type.name === 'objVal' && $from.parentOffset === 1) {
           // TODO: if both key and value are empty, delete the entire node
