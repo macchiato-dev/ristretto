@@ -87,7 +87,6 @@ export class OutlineTextEdit extends HTMLElement {
           $from.posAtIndex($from.index(1), 1),
           $from.posAtIndex($from.indexAfter(1), 1)
         )
-        console.log([fullText.slice(0)])
         if (fullText === ' ') {
           const tr = state.tr
           tr.delete(
@@ -114,8 +113,21 @@ export class OutlineTextEdit extends HTMLElement {
       },
       "Enter": (state, dispatch, view) => {
         const from = state.selection.$from
-        console.log(from.pos, from.posAtIndex(from.index(1), 1), from.posAtIndex(from.indexAfter(1), 1))
-        return true
+        const rowStart = from.posAtIndex(from.index(1), 1)
+        const rowEnd = from.posAtIndex(from.indexAfter(1), 1)
+        if (from.pos - 1 === rowStart) {
+          const tr = state.tr
+          const newNode = Node.fromJSON(dataSchema, this.buildPair('Pedro', 'Pedro'))
+          tr.insert(rowStart - 1, newNode)
+          dispatch(tr)
+          return true
+        } else if (from.pos + 1 === rowEnd) {
+          const tr = state.tr
+          const newNode = Node.fromJSON(dataSchema, this.buildPair('Pedro', 'Pedro'))
+          tr.insert(rowEnd + 1, newNode)
+          dispatch(tr)
+          return true
+        }
       }
     })
 
