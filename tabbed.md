@@ -262,6 +262,7 @@ export class NotebookCode extends HTMLElement {
     editorContainer.classList.add('editor-container')
     this.editor = document.createElement('m-editor-code-edit')
     this.editor.fileType = 'md'
+    this.editor.lineWrapping = true
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }
