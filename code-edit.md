@@ -31,10 +31,11 @@ import { lintKeymap } from '@codemirror/lint'
 export class CodeEdit extends HTMLElement {
   constructor() {
     super()
-    this.attachShadow({mode: 'open'})
+    this.lineWrapping = false
   }
 
   connectedCallback() {
+    this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styleSheet]
     this.initEditor()
   }
@@ -80,17 +81,28 @@ export class CodeEdit extends HTMLElement {
 
   set fileType(value) {
     this._fileType = value
-    if (this.view) {
-      const langPlugins = this.langPlugins
-      this.view.dispatch({
-        effects: 
-        this.languageCompartment.reconfigure(langPlugins)
-      })
-    }
+    this.reconfigure()
   }
 
   get fileType() {
     return this._fileType
+  }
+
+  set lineWrapping(value) {
+    this._lineWrapping = value
+  }
+
+  get lineWrapping() {
+    return this._lineWrapping
+  }
+
+  reconfigure() {
+    if (this.view) {
+      const {langPlugins} = this
+      this.view.dispatch({
+        effects: this.languageCompartment.reconfigure(langPlugins)
+      })
+    }
   }
 
   get langPlugins() {
@@ -140,6 +152,9 @@ export class CodeEdit extends HTMLElement {
       langPlugins.push(
         markdownSupport
       )
+    }
+    if (this.lineWrapping) {
+      langPlugins.push(EditorView.lineWrapping)
     }
     return langPlugins
   }
@@ -239,6 +254,7 @@ export class AppView extends HTMLElement {
     const codeEdit = document.createElement('code-edit')
     codeEdit.fileType = 'js'
     codeEdit.value = `const x = 9`
+    codeEdit.lineWrapping = true
     this.shadowRoot.append(codeEdit)
   }
 }
