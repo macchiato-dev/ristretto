@@ -34,11 +34,7 @@ export class OutlineTextEdit extends HTMLElement {
     const content = {
       type: 'doc',
       content: [
-        this.buildPair('Pedro', 'Pedro'),
-        this.buildPair('Pedro', 'Pedro'),
-        this.buildPair('Pedro', 'Pedro'),
-        this.buildPair('Pedro', 'Pedro'),
-        this.buildPair('Pedro', 'Pedro'),
+        this.buildPair('', ''),
       ],
     }
     this.shadowRoot.append(editorDiv)
@@ -117,13 +113,13 @@ export class OutlineTextEdit extends HTMLElement {
         const rowEnd = from.posAtIndex(from.indexAfter(1), 1)
         if (from.pos - 1 === rowStart) {
           const tr = state.tr
-          const newNode = Node.fromJSON(dataSchema, this.buildPair('Pedro', 'Pedro'))
+          const newNode = Node.fromJSON(dataSchema, this.buildPair('', ''))
           tr.insert(rowStart - 1, newNode)
           dispatch(tr)
           return true
         } else if (from.pos + 1 === rowEnd) {
           const tr = state.tr
-          const newNode = Node.fromJSON(dataSchema, this.buildPair('Pedro', 'Pedro'))
+          const newNode = Node.fromJSON(dataSchema, this.buildPair('', ''))
           tr.insert(rowEnd + 1, newNode)
           dispatch(tr)
           return true
@@ -136,7 +132,9 @@ export class OutlineTextEdit extends HTMLElement {
       "Mod-y": redo,
     })
     const dataPlugin = new Plugin({
-      appendTransaction: (transactions, oldState, newState) => {
+      appendTransaction(transactions, oldState, newState) {
+        console.log(this)
+        console.log(oldState.doc.toJSON())
         for (const transaction of transactions) {
           for (const step of transaction.steps) {
             const stepText = step.slice?.content?.content?.[0]?.text
@@ -168,12 +166,17 @@ export class OutlineTextEdit extends HTMLElement {
   }
 
   buildPair(key, value) {
+    const keyContent = key === '' ? [{
+      type: 'text',
+      marks: [{type: 'placeholder'}],
+      text: ' '
+    }] : [{ type: 'text', text: key }]
     return {
       type: 'objPair',
       content: [
         {
           type: 'objKey',
-          content: [ { type: 'text', text: key } ],
+          content: keyContent,
         },
         {
           type: 'objVal',
