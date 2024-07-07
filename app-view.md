@@ -1,6 +1,6 @@
-# Explore
+# App View
 
-This is an interface to explore different notebooks for different types of content.
+This is the main view of the app. It has a sidebar and a content view.
 
 `notebook.json`
 
@@ -17,18 +17,16 @@ This is an interface to explore different notebooks for different types of conte
 }
 ```
 
-TODO: to the right of where it says Data, add a pill switcher ( My Files | Examples ), also a filter icon to filter them. When creating a new one, upon editing, add it to the end of My Files, switch to My Files, and smooth scroll to select it.
+TODO: Add a page for the content of the notebook, perhaps called Project or Home.
 
-The page by default will have Examples selected, but if you resume an instance by dragging the Markdown to the file drop zone, it will go back to having whatever was selected, selected.
+TODO: Save the markdown for an instance in SessionStorage, and upon reloading, such as after a crash, give an option to download it, try running it again, or discard it (with confirmation).
 
-The Markdown for an instance will be saved in SessionStorage, and upon reloading, such as after a crash, an option will be given to download it, try running it again, or discard it (with confirmation).
-
-`ExploreApp.js`
+`AppView.js`
 
 ```js
 import {Builder} from '/loader/builder.js'
 
-export class ExploreApp extends HTMLElement {
+export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -443,19 +441,19 @@ import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
 import {FileTree} from '/file-tree/file-tree.js'
 import {Storage} from '/storage/storage.js'
-import {ExploreApp} from '/ExploreApp.js'
+import {AppView} from '/AppView.js'
 
 customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
 customElements.define('file-tree', FileTree)
-customElements.define('explore-app', ExploreApp)
+customElements.define('app-view', AppView)
 
 async function setup() {
-  const exploreApp = document.createElement('explore-app')
-  exploreApp.storage = new Storage()
-  exploreApp.setAttribute('draggable', 'false')
-  document.body.append(exploreApp)
+  const appView = document.createElement('app-view')
+  appView.storage = new Storage()
+  appView.setAttribute('draggable', 'false')
+  document.body.append(appView)
 }
 
 setup()
