@@ -268,9 +268,17 @@ iframe {
   flex-grow: 1;
   border: 0;
 }
+access-view {
+  position: absolute;
+  left: -100px;
+  top: 0px;
+  width: 5px;
+  height: 5px;
+}
 </style>
   </head>
   <body>
+    <access-view></access-view>
     <iframe id="frame" src="/frame.html"></iframe>
 <script type="module">
 class AccessView extends HTMLElement {
@@ -420,6 +428,15 @@ frame.addEventListener('load', async () => {
   frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
 })
 addEventListener('message', e => {
+  if (e.source === frame.contentWindow) {
+    const [command, ...args] = e.data
+    if (command === 'download') {
+      const [download] = args
+      const blob = new Blob([download.data], {type: download.type})
+      const accessView = document.querySelector('access-view')
+      accessView.download(download.name, blob)
+    }
+  }
 })
 </script>
   </body>
@@ -457,8 +474,8 @@ iframe {
 <script type="module">
 let iframe = undefined
 addEventListener('message', e => {
-  if (e.origin === iframe?.contentWindow) {
-    parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...message.ports])
+  if (e.origin === 'null') {
+    parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
   } else {
     if (e.data[0] === 'notebook') {
       iframe = document.createElement('iframe')
