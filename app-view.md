@@ -259,6 +259,8 @@ export class AppView extends HTMLElement {
           const builder = new Builder({src: notebookSrc, parentSrc: __source})
           const deps = builder.getDeps()
           port.postMessage(deps)
+        } else if (cmd === 'download') {
+          parent.postMessage(e.data, '*')
         }
       }
     })
