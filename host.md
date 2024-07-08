@@ -10,6 +10,19 @@ The interface for showing *upload*, *download*, and *follow link* is developed h
 
 ```js
 export class AccessView extends HTMLElement {
+  closeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <path fill="currentColor" d="m12 13.4l-2.9 2.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l2.9-2.9l-2.9-2.875q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l2.9 2.9l2.875-2.9q.275-.275.7-.275t.7.275q.3.3.3.713t-.3.687L13.375 12l2.9 2.9q.275.275.275.7t-.275.7q-.3.3-.712.3t-.688-.3z"/>
+  </svg>`
+
+  warnings = {
+    download: (
+      'This download was triggered from inside the Ristretto sandbox. ' +
+      'The sandbox protects content from leaving the sandbox, even with untrusted code, but ' +
+      'downloading, along with copying to the clipboard and following links, is a way content ' +
+      'can leave the sandbox. Be careful when downloading, opening, and sending files.'
+    ),
+  }
+
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
@@ -28,6 +41,20 @@ export class AccessView extends HTMLElement {
         this.close()
       }
     })
+    const header = document.createElement('div')
+    header.classList.add('header')
+    this.heading = document.createElement('h1')
+    const closeButton = document.createElement('button')
+    closeButton.innerHTML = this.closeIcon
+    closeButton.addEventListener('click', () => {
+      this.close()
+    })
+    header.append(this.heading, closeButton)
+    this.content = document.createElement('div')
+    this.content.classList.add('content')
+    this.footer = document.createElement('div')
+    this.footer.classList.add('footer')
+    this.dialogEl.append(header, this.content, this.footer)
     this.shadowRoot.append(this.dialogEl)
   }
 
@@ -45,7 +72,21 @@ export class AccessView extends HTMLElement {
     }, 350)
   }
 
-  download() {
+  download(name, blob) {
+    const url = URL.createObjectURL(blob)
+    this.heading.innerText = 'Download'
+    this.footer.innerText = this.warnings.download
+    const a = document.createElement('a')
+    a.addEventListener('click', () => {
+      this.close()
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+      }, 100)
+    })
+    a.innerText = `${name} (${blob.size} bytes)`
+    a.href = url
+    a.download = name
+    this.content.replaceChildren(a)
     this.open()
   }
 
@@ -57,9 +98,11 @@ export class AccessView extends HTMLElement {
           margin-top: 20px;
           margin-right: 20px;
           min-width: 300px;
-          border: 1px solid rgba(0, 0, 0, 0.3);
+          max-width: 400px;
+          border: 2px solid rgba(50, 50, 50);
           border-radius: 6px;
-          box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+          font-family: sans-serif;
+          background: rgb(206 212 220);
         }
         dialog::backdrop {
           opacity: 0;
@@ -74,6 +117,22 @@ export class AccessView extends HTMLElement {
         }
         dialog.closing::backdrop {
           visibility: visible;
+        }
+        .header {
+          display: flex;
+        }
+        .header h1 {
+          padding: 0;
+          margin: 0;
+          flex-grow: 1;
+          font-size: 24px;
+        }
+        .header button {
+          all: unset;
+          cursor: pointer;
+        }
+        .content, .footer {
+          margin-top: 10px;
         }
       `)
     }
@@ -115,15 +174,15 @@ export class ExampleView extends HTMLElement {
   }
 
   upload() {
-
+    
   }
 
   download() {
-    this.accessView.download()
+    this.accessView.download('test.txt', new Blob(['test'], {type: 'text/plain'}))
   }
 
   link() {
-
+    
   }
 
   static get styles() {
@@ -214,10 +273,153 @@ iframe {
   <body>
     <iframe id="frame" src="/frame.html"></iframe>
 <script type="module">
+class AccessView extends HTMLElement {
+  closeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+    <path fill="currentColor" d="m12 13.4l-2.9 2.9q-.275.275-.7.275t-.7-.275t-.275-.7t.275-.7l2.9-2.9l-2.9-2.875q-.275-.275-.275-.7t.275-.7t.7-.275t.7.275l2.9 2.9l2.875-2.9q.275-.275.7-.275t.7.275q.3.3.3.713t-.3.687L13.375 12l2.9 2.9q.275.275.275.7t-.275.7q-.3.3-.712.3t-.688-.3z"/>
+  </svg>`
+
+  warnings = {
+    download: (
+      'This download was triggered from inside the Ristretto sandbox. ' +
+      'The sandbox protects content from leaving the sandbox, even with untrusted code, but ' +
+      'downloading, along with copying to the clipboard and following links, is a way content ' +
+      'can leave the sandbox. Be careful when downloading, opening, and sending files.'
+    ),
+  }
+
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
+    document.adoptedStyleSheets = [...sheets, this.constructor.globalStyles]
+    this.dialogEl = document.createElement('dialog')
+    this.dialogEl.addEventListener('click', e => {
+      const rect = this.dialogEl.getBoundingClientRect()
+      const clickedInside = (
+        rect.top <= e.clientY &&
+        e.clientY <= rect.top + rect.height &&
+        rect.left <= e.clientX &&
+        e.clientX <= rect.left + rect.width
+      )
+      if (e.target === this.dialogEl && !clickedInside) {
+        this.close()
+      }
+    })
+    const header = document.createElement('div')
+    header.classList.add('header')
+    this.heading = document.createElement('h1')
+    const closeButton = document.createElement('button')
+    closeButton.innerHTML = this.closeIcon
+    closeButton.addEventListener('click', () => {
+      this.close()
+    })
+    header.append(this.heading, closeButton)
+    this.content = document.createElement('div')
+    this.content.classList.add('content')
+    this.footer = document.createElement('div')
+    this.footer.classList.add('footer')
+    this.dialogEl.append(header, this.content, this.footer)
+    this.shadowRoot.append(this.dialogEl)
+  }
+
+  open() {
+    this.dialogEl.classList.add('opened')
+    this.dialogEl.showModal()
+  }
+
+  close() {
+    this.dialogEl.classList.remove('opened')
+    this.dialogEl.classList.add('closing')
+    setTimeout(() => {
+      this.dialogEl.close()
+      this.dialogEl.classList.remove('closing')
+    }, 350)
+  }
+
+  download(name, blob) {
+    const url = URL.createObjectURL(blob)
+    this.heading.innerText = 'Download'
+    this.footer.innerText = this.warnings.download
+    const a = document.createElement('a')
+    a.addEventListener('click', () => {
+      this.close()
+      setTimeout(() => {
+        URL.revokeObjectURL(url)
+      }, 100)
+    })
+    a.innerText = `${name} (${blob.size} bytes)`
+    a.href = url
+    a.download = name
+    this.content.replaceChildren(a)
+    this.open()
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        dialog {
+          margin-top: 20px;
+          margin-right: 20px;
+          min-width: 300px;
+          max-width: 400px;
+          border: 2px solid rgba(50, 50, 50);
+          border-radius: 6px;
+          font-family: sans-serif;
+          background: rgb(206 212 220);
+        }
+        dialog::backdrop {
+          opacity: 0;
+          transition: opacity 0.3s ease-in;
+          background-color: rgba(127, 127, 127, .20);
+        }
+        dialog.opened::backdrop {
+          opacity: 1;
+        }
+        dialog.closing {
+          visibility: hidden;
+        }
+        dialog.closing::backdrop {
+          visibility: visible;
+        }
+        .header {
+          display: flex;
+        }
+        .header h1 {
+          padding: 0;
+          margin: 0;
+          flex-grow: 1;
+          font-size: 24px;
+        }
+        .header button {
+          all: unset;
+          cursor: pointer;
+        }
+        .content, .footer {
+          margin-top: 10px;
+        }
+      `)
+    }
+    return this._styles
+  }
+
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(``)
+    }
+    return this._globalStyles
+  }
+}
+
+customElements.define('access-view', AccessView)
+
 const frame = document.getElementById('frame')
 frame.addEventListener('load', async () => {
   const data = new Uint8Array(await (await fetch('/notebook.md')).arrayBuffer())
   frame.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
+})
+addEventListener('message', e => {
 })
 </script>
   </body>
