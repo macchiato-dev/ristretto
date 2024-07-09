@@ -16,7 +16,7 @@ export class AccessView extends HTMLElement {
 
   warnings = {
     download: (
-      'This download was triggered from inside the Ristretto sandbox. ' +
+      'This download dialog was triggered from inside the Ristretto sandbox. ' +
       'The sandbox protects content from leaving the sandbox, even with untrusted code, but ' +
       'downloading, along with copying to the clipboard and following links, is a way content ' +
       'can leave the sandbox. Be careful when downloading, opening, and sending files.'
@@ -69,24 +69,40 @@ export class AccessView extends HTMLElement {
     setTimeout(() => {
       this.dialogEl.close()
       this.dialogEl.classList.remove('closing')
+      for (const url of this.urls ?? []) {
+        URL.revokeObjectURL(url)
+      }
     }, 350)
   }
 
   download(name, blob) {
-    const url = URL.createObjectURL(blob)
+    const files = [{name, blob}].map(({name, blob}) => {
+      const url = URL.createObjectURL(blob)
+      return {name, url}
+    })
+    this.urls = files.map(({url}) => url)
     this.heading.innerText = 'Download'
     this.footer.innerText = this.warnings.download
-    const a = document.createElement('a')
-    a.addEventListener('click', () => {
-      this.close()
-      setTimeout(() => {
-        URL.revokeObjectURL(url)
-      }, 100)
+    const fileDivs = files.map(({name, url}) => {
+      const div = document.createElement('div')
+      div.classList.add('download-file')
+      const nameEl = document.createElement('input')
+      nameEl.type = 'text'
+      nameEl.value = name
+      const a = document.createElement('a')
+      a.innerText = 'Download'
+      a.href = url
+      a.download = name
+      nameEl.addEventListener('input', () => {
+        a.download = nameEl.value
+      })
+      const sizeEl = document.createElement('div')
+      sizeEl.innerText = `${blob.size} bytes`
+      sizeEl.classList.add('size')
+      div.append(nameEl, a, sizeEl)
+      return div
     })
-    a.innerText = `${name} (${blob.size} bytes)`
-    a.href = url
-    a.download = name
-    this.content.replaceChildren(a)
+    this.content.replaceChildren(...fileDivs)
     this.open()
   }
 
@@ -120,6 +136,8 @@ export class AccessView extends HTMLElement {
         }
         .header {
           display: flex;
+          flex-direction: row;
+          align-items: flex-start;
         }
         .header h1 {
           padding: 0;
@@ -133,6 +151,32 @@ export class AccessView extends HTMLElement {
         }
         .content, .footer {
           margin-top: 10px;
+        }
+        .download-file {
+          display: flex;
+          flex-direction: row;
+          gap: 10px;
+          align-items: center;
+        }
+        .download-file input {
+          flex-grow: 1;
+          outline: none;
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(0, 0, 0, 0.4);
+          padding: 5px;
+          border-radius: 4px;
+          font-size: 16px;
+        }
+        .download-file .size {
+          font-size: 12px;
+          min-width: 80px;
+          text-align: right;
+          padding-right: 10px;
+        }
+        .footer {
+          padding-right: 10px;
+          font-size: 14px;
+          margin-top: 20px;
         }
       `)
     }
@@ -288,7 +332,7 @@ class AccessView extends HTMLElement {
 
   warnings = {
     download: (
-      'This download was triggered from inside the Ristretto sandbox. ' +
+      'This download dialog was triggered from inside the Ristretto sandbox. ' +
       'The sandbox protects content from leaving the sandbox, even with untrusted code, but ' +
       'downloading, along with copying to the clipboard and following links, is a way content ' +
       'can leave the sandbox. Be careful when downloading, opening, and sending files.'
@@ -341,24 +385,40 @@ class AccessView extends HTMLElement {
     setTimeout(() => {
       this.dialogEl.close()
       this.dialogEl.classList.remove('closing')
+      for (const url of this.urls ?? []) {
+        URL.revokeObjectURL(url)
+      }
     }, 350)
   }
 
   download(name, blob) {
-    const url = URL.createObjectURL(blob)
+    const files = [{name, blob}].map(({name, blob}) => {
+      const url = URL.createObjectURL(blob)
+      return {name, url}
+    })
+    this.urls = files.map(({url}) => url)
     this.heading.innerText = 'Download'
     this.footer.innerText = this.warnings.download
-    const a = document.createElement('a')
-    a.addEventListener('click', () => {
-      this.close()
-      setTimeout(() => {
-        URL.revokeObjectURL(url)
-      }, 100)
+    const fileDivs = files.map(({name, url}) => {
+      const div = document.createElement('div')
+      div.classList.add('download-file')
+      const nameEl = document.createElement('input')
+      nameEl.type = 'text'
+      nameEl.value = name
+      const a = document.createElement('a')
+      a.innerText = 'Download'
+      a.href = url
+      a.download = name
+      nameEl.addEventListener('input', () => {
+        a.download = nameEl.value
+      })
+      const sizeEl = document.createElement('div')
+      sizeEl.innerText = `${blob.size} bytes`
+      sizeEl.classList.add('size')
+      div.append(nameEl, a, sizeEl)
+      return div
     })
-    a.innerText = `${name} (${blob.size} bytes)`
-    a.href = url
-    a.download = name
-    this.content.replaceChildren(a)
+    this.content.replaceChildren(...fileDivs)
     this.open()
   }
 
@@ -392,6 +452,8 @@ class AccessView extends HTMLElement {
         }
         .header {
           display: flex;
+          flex-direction: row;
+          align-items: flex-start;
         }
         .header h1 {
           padding: 0;
@@ -405,6 +467,32 @@ class AccessView extends HTMLElement {
         }
         .content, .footer {
           margin-top: 10px;
+        }
+        .download-file {
+          display: flex;
+          flex-direction: row;
+          gap: 10px;
+          align-items: center;
+        }
+        .download-file input {
+          flex-grow: 1;
+          outline: none;
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(0, 0, 0, 0.4);
+          padding: 5px;
+          border-radius: 4px;
+          font-size: 16px;
+        }
+        .download-file .size {
+          font-size: 12px;
+          min-width: 80px;
+          text-align: right;
+          padding-right: 10px;
+        }
+        .footer {
+          padding-right: 10px;
+          font-size: 14px;
+          margin-top: 20px;
         }
       `)
     }
