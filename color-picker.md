@@ -26,7 +26,7 @@ Below are a color input and a text input. The color input varies between browser
 export class ColorPicker extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
-    this.setStyles(true)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.shadeSelect = document.createElement('div')
     this.shadeSelect.classList.add('shade-select')
     this.shadeSelectOverlay = document.createElement('div')
@@ -36,29 +36,25 @@ export class ColorPicker extends HTMLElement {
     this.shadeSelectThumb.classList.add('shade-select-thumb')
     this.shadeSelect.append(this.shadeSelectThumb)
     this.shadeSelectThumb.addEventListener('mousedown', e => {
+      this.shadeSelectThumb.setPointerCapture(e.pointerId)
       this.shadeDragOffset = [
         e.clientX - this.shadeSelectThumb.clientLeft,
         e.clientY - this.shadeSelectThumb.clientTop,
       ]
       e.stopPropagation()
     })
-    this.shadeSelect.addEventListener('mousedown', e => {
+    this.shadeSelect.addEventListener('pointerdown', e => {
       this.shadeDragOffset = [
         e.clientX - this.shadeSelectThumb.clientLeft,
         e.clientY - this.shadeSelectThumb.clientTop,
       ]
       this.moveShadeThumb(e)
+      this.shadeSelectThumb.setPointerCapture(e.pointerId)
     })
-    this.shadeSelectThumb.addEventListener('mouseup', () => {
+    this.shadeSelectThumb.addEventListener('pointerup', () => {
       this.shadeDragOffset = undefined
     })
-    this.shadeSelect.addEventListener('mouseup', () => {
-      this.shadeDragOffset = undefined
-    })
-    this.shadeSelect.addEventListener('mouseleave', () => {
-      this.shadeDragOffset = undefined
-    })
-    this.shadeSelect.addEventListener('mousemove', e => {
+    this.shadeSelectThumb.addEventListener('pointermove', e => {
       if (this.shadeDragOffset !== undefined) {
         this.moveShadeThumb(e)
       }
@@ -68,24 +64,23 @@ export class ColorPicker extends HTMLElement {
     this.hueSelectThumb = document.createElement('div')
     this.hueSelectThumb.classList.add('hue-select-thumb')
     this.hueSelect.append(this.hueSelectThumb)
-    this.hueSelectThumb.addEventListener('mousedown', e => {
+    this.hueSelectThumb.addEventListener('pointerdown', e => {
+      this.hueSelectThumb.setPointerCapture(e.pointerId)
       this.hueDragOffset = e.clientY - this.hueSelectThumb.clientTop
       e.stopPropagation()
     })
-    this.hueSelect.addEventListener('mousedown', e => {
+    this.hueSelect.addEventListener('pointerdown', e => {
       this.hueDragOffset = e.clientY - this.hueSelectThumb.clientTop
       this.moveHueThumb(e)
+      this.hueSelectThumb.setPointerCapture(e.pointerId)
     })
-    this.hueSelectThumb.addEventListener('mouseup', () => {
+    this.hueSelectThumb.addEventListener('pointerup', () => {
       this.hueDragOffset = undefined
     })
-    this.hueSelect.addEventListener('mouseup', () => {
+    this.hueSelect.addEventListener('pointerup', () => {
       this.hueDragOffset = undefined
     })
-    this.hueSelect.addEventListener('mouseleave', () => {
-      this.hueDragOffset = undefined
-    })
-    this.hueSelect.addEventListener('mousemove', e => {
+    this.hueSelectThumb.addEventListener('pointermove', e => {
       if (this.hueDragOffset !== undefined) {
         this.moveHueThumb(e)
       }
@@ -119,10 +114,6 @@ export class ColorPicker extends HTMLElement {
     this.updateShadeColor()
     this.colorInput.value = this.shadeColor
     this.colorTextInput.value = this.shadeColor
-  }
-
-  disconnectedCallback() {
-    this.setStyles(false)
   }
 
   moveShadeThumb(e) {
@@ -223,10 +214,6 @@ export class ColorPicker extends HTMLElement {
     }
     this.updateHueColor()
     this.updateShadeColor()
-  }
-
-  setStyles(enabled) {
-    this.shadowRoot.adoptedStyleSheets = enabled ? [this.constructor.styles] : []
   }
 
   static get styles() {
