@@ -133,8 +133,6 @@ export class OutlineTextEdit extends HTMLElement {
     })
     const dataPlugin = new Plugin({
       appendTransaction(transactions, oldState, newState) {
-        console.log(this)
-        console.log(oldState.doc.toJSON())
         for (const transaction of transactions) {
           for (const step of transaction.steps) {
             const stepText = step.slice?.content?.content?.[0]?.text

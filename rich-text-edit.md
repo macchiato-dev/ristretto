@@ -64,7 +64,6 @@ export class RichTextEdit extends HTMLElement {
       }),
       root: this.shadowRoot
     })
-    console.log(this.view)
   }
 
   static get styles() {
