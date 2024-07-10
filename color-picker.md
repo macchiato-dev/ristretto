@@ -94,8 +94,8 @@ export class ColorPicker extends HTMLElement {
     this.colorTextInput = document.createElement('input')
     this.colorTextInput.addEventListener('input', () => {
       if (this.colorTextInput.value.match(/^#[0-9a-f]{6}$/)) {
-        this.updateColorFromInput(this.colorTextInput.value)
         this.colorInput.value = this.colorTextInput.value
+        this.updateColorFromInput()
       }
     })
     this.colorTextInput.addEventListener('blur', () => {
