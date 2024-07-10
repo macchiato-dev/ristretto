@@ -10,6 +10,7 @@ This is a collection of tab styles.
     ["colors.json.md", "thumbnail.svg"]
   ],
   "importFiles": [
+    ["color-picker.md", "ColorPicker.js"],
     ["menu.md", "dropdown.js"],
     ["tabs.md", "TabItem.js"],
     ["tabs.md", "TabList.js"]
@@ -32,20 +33,17 @@ export class ExampleView extends HTMLElement {
       body {
         margin: 0;
         padding: 0;
-        background-color: #55391b;
       }
     `
     document.head.append(globalStyle)
     const style = document.createElement('style')
     style.textContent = `
       :host {
-        display: grid;
-        grid-template-columns: 1fr;
-        grid-template-rows: 1fr;
         margin: 0;
         padding: 10px;
         color: #bfcfcd;
-        background: #fff;
+        display: flex;
+        flex-direction: column;
       }
       tab-list.e1 {
         --bg: #339;
@@ -59,8 +57,10 @@ export class ExampleView extends HTMLElement {
     `
     this.shadowRoot.append(style)
 
+    this.colorPicker = document.createElement('color-picker')
     this.initExample1()
     this.initExample2()
+    this.shadowRoot.append(this.colorPicker)
   }
 
   initExample1() {
@@ -156,12 +156,14 @@ export class ExampleItem extends HTMLElement {
 `app.js`
 
 ```js
+import {ColorPicker} from '/color-picker/ColorPicker.js'
 import {Dropdown} from "/menu/dropdown.js"
 import {TabItem} from '/tabs/TabItem.js'
 import {TabList} from '/tabs/TabList.js'
 import {ExampleItem} from '/ExampleItem.js'
 import {ExampleView} from '/ExampleView.js'
 
+customElements.define('color-picker', ColorPicker)
 customElements.define('m-menu-dropdown', Dropdown)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
