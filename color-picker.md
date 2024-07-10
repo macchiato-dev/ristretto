@@ -35,7 +35,7 @@ export class ColorPicker extends HTMLElement {
     this.shadeSelectThumb = document.createElement('div')
     this.shadeSelectThumb.classList.add('shade-select-thumb')
     this.shadeSelect.append(this.shadeSelectThumb)
-    this.shadeSelectThumb.addEventListener('mousedown', e => {
+    this.shadeSelectThumb.addEventListener('pointerdown', e => {
       this.shadeSelectThumb.setPointerCapture(e.pointerId)
       this.shadeDragOffset = [
         e.clientX - this.shadeSelectThumb.clientLeft,
@@ -234,7 +234,6 @@ export class ColorPicker extends HTMLElement {
           grid-template-columns: 200px;
           grid-template-rows: 200px;
           background: linear-gradient(to top, #000000, var(--hue-color, #0000ff));
-          mix-blend-mode: screen;
           position: relative;
         }
         .shade-select-overlay {
