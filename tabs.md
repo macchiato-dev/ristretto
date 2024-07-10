@@ -19,32 +19,6 @@ This is a component for tabs.
 
 ```js
 export class TabItem extends HTMLElement {
-  icons = {
-    menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
-      </svg>
-    `,
-  }
-
-  textEn = {
-    addLeft: 'Add left',
-    addRight: 'Add right',
-    moveLeft: 'Move left',
-    moveRight: 'Move right',
-    rename: 'Rename',
-    delete: 'Delete',
-  }
-
-  textEs = {
-    addLeft: 'Añadir izquierda',
-    addRight: 'Añadir derecha',
-    moveLeft: 'Mover izquierda',
-    moveRight: 'Mover derecha',
-    rename: 'Cambiar nombre',
-    delete: 'Borrar',
-  }
-
   constructor() {
     super()
     this.language = navigator.language
@@ -108,66 +82,7 @@ export class TabItem extends HTMLElement {
   }
 
   connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-      }
-      div.header {
-        display: flex;
-        flex-direction: row;
-        align-items: stretch;
-        padding-left: 3px 0;
-        border-radius: var(--radius, 5px);
-        color: var(--fg, #070707);
-        background-color: var(--bg, rgb(212,212,216));
-        align-items: center;
-      }
-      :host(.selected) div.header {
-        background-color: var(--bg-selected, rgb(15,118,110));
-        color: var(--fg-selected, #e7e7e7);
-      }
-      div.header > * {
-        background: inherit;
-        color: inherit;
-        border: none;
-      }
-      .name {
-        flex-grow: 1;
-        padding: 0 5px;
-        font: inherit;
-        font-family: monospace;
-        outline: none;
-        white-space: nowrap;
-      }
-      div.header button svg {
-        margin-bottom: -3px;
-      }
-      div.content {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        min-height: 5px;
-      }
-      div.content.collapsed > * {
-        display: none;
-      }
-      label {
-        padding: 0;
-        margin: 0;
-      }
-      button {
-        padding: 0 4px;
-        border-radius: 5px;
-      }
-      svg {
-        height: 24px;
-        width: 20px;
-      }
-    `
-    this.shadowRoot.appendChild(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
   }
 
   openMenu() {
@@ -248,6 +163,32 @@ export class TabItem extends HTMLElement {
     }
   }
 
+  icons = {
+    menu: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
+        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+      </svg>
+    `,
+  }
+
+  textEn = {
+    addLeft: 'Add left',
+    addRight: 'Add right',
+    moveLeft: 'Move left',
+    moveRight: 'Move right',
+    rename: 'Rename',
+    delete: 'Delete',
+  }
+
+  textEs = {
+    addLeft: 'Añadir izquierda',
+    addRight: 'Añadir derecha',
+    moveLeft: 'Mover izquierda',
+    moveRight: 'Mover derecha',
+    rename: 'Cambiar nombre',
+    delete: 'Borrar',
+  }
+
   get language() {
     return this._language
   }
@@ -259,6 +200,71 @@ export class TabItem extends HTMLElement {
 
   get langEs() {
     return /^es\b/.test(this.language)
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        div.header {
+          display: flex;
+          flex-direction: row;
+          align-items: stretch;
+          padding-left: 3px 0;
+          border-radius: var(--radius, 5px);
+          color: var(--fg, #070707);
+          background-color: var(--bg, rgb(212,212,216));
+          align-items: center;
+        }
+        :host(.selected) div.header {
+          background-color: var(--bg-selected, rgb(15,118,110));
+          color: var(--fg-selected, #e7e7e7);
+        }
+        div.header > * {
+          background: inherit;
+          color: inherit;
+          border: none;
+        }
+        .name {
+          flex-grow: 1;
+          padding: 0 5px;
+          font: inherit;
+          font-family: monospace;
+          outline: none;
+          white-space: nowrap;
+        }
+        div.header button svg {
+          margin-bottom: -3px;
+        }
+        div.content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          min-height: 5px;
+        }
+        div.content.collapsed > * {
+          display: none;
+        }
+        label {
+          padding: 0;
+          margin: 0;
+        }
+        button {
+          padding: 0 4px;
+          border-radius: 5px;
+        }
+        svg {
+          height: 24px;
+          width: 20px;
+        }
+      `)
+    }
+    return this._styles
   }
 }
 ```
