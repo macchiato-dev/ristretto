@@ -30,82 +30,82 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
-    this.nameEl.addEventListener('input', e => {
-      this.contentEl.name = this.nameEl.innerText
-    })
-    this.nameEl.addEventListener('blur', () => {
-      this.nameEl.removeAttribute('contenteditable')
-      if (this.isNew) {
-        this.selected = true
-        this.isNew = false
-      }
-    })
-    this.nameEl.addEventListener('keydown', e => {
-      if (e.which === 13) {
-        e.preventDefault()
-        const isNew = this.isNew
-        this.nameEl.blur()
-        if (isNew) {
-          this.dispatchEvent(new CustomEvent(
-            'ready-to-edit', {bubbles: true}
-          ))
-        }
-        return false
-      }
-    })
-
-    this.nameEl.addEventListener('pointerdown', e => {
-      if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
-        this.nameEl.setPointerCapture(e.pointerId)
-        e.preventDefault()
-        this.pointerDown = true
-        this.moved = false
-        const rect = this.getBoundingClientRect()
-        this.offsetX = e.clientX - rect.left
-        this.offsetY = e.clientY - rect.top
-      }
-    })
-    this.nameEl.addEventListener('pointermove', e => {
-      if (!this.moved) {
-        this.moved = true
-        if (this.pointerDown) {
-          this.tabList.dragItem.nameEl.innerText = this.nameEl.innerText
-          this.tabList.dragItem.classList.add('dragging')
-        }
-      }
-      if (this.pointerDown) {
-        this.tabList.dragItem.setDragPosition(
-          e.clientX - this.offsetX, e.clientY - this.offsetY
-        )
-      }
-    })
-    this.nameEl.addEventListener('pointerup', e => {
-      if (!this.moved) {
-        this.selected = true
-      }
-      this.moved = false
-      this.pointerDown = false
-      this.tabList.dragItem.classList.remove('dragging')
-    })
-    this.nameEl.addEventListener('dblclick', e => {
-      this.rename()
-      e.preventDefault()
-    })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
     this.menuBtn.innerHTML = this.icons.menu
-    this.menuBtn.addEventListener('click', e => {
-      this.openMenu()
-    })
     this.headerEl.appendChild(this.menuBtn)
-    this.menu = document.createElement(
-      'm-menu-dropdown'
-    )
+    this.menu = document.createElement('m-menu-dropdown')
     this.shadowRoot.appendChild(this.menu)
   }
 
   connectedCallback() {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+
+    if (!this.classList.contains('drag')) {
+      this.nameEl.addEventListener('input', e => {
+        this.contentEl.name = this.name
+      })
+      this.nameEl.addEventListener('blur', () => {
+        this.nameEl.removeAttribute('contenteditable')
+        if (this.isNew) {
+          this.selected = true
+          this.isNew = false
+        }
+      })
+      this.nameEl.addEventListener('keydown', e => {
+        if (e.which === 13) {
+          e.preventDefault()
+          const isNew = this.isNew
+          this.nameEl.blur()
+          if (isNew) {
+            this.dispatchEvent(new CustomEvent(
+              'ready-to-edit', {bubbles: true}
+            ))
+          }
+          return false
+        }
+      })
+      this.nameEl.addEventListener('pointerdown', e => {
+        if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
+          this.nameEl.setPointerCapture(e.pointerId)
+          e.preventDefault()
+          this.pointerDown = true
+          this.moved = false
+          const rect = this.getBoundingClientRect()
+          this.offsetX = e.clientX - rect.left
+          this.offsetY = e.clientY - rect.top
+        }
+      })
+      this.nameEl.addEventListener('pointermove', e => {
+        if (!this.moved) {
+          this.moved = true
+          if (this.pointerDown) {
+            this.tabList.dragItem.name = this.name
+            this.tabList.dragItem.selected = this.selected
+            this.tabList.dragItem.classList.add('dragging')
+          }
+        }
+        if (this.pointerDown) {
+          this.tabList.dragItem.setDragPosition(
+            e.clientX - this.offsetX, e.clientY - this.offsetY
+          )
+        }
+      })
+      this.nameEl.addEventListener('pointerup', e => {
+        this.tabList.dragItem.classList.remove('dragging')
+        if (!this.moved) {
+          this.selected = true
+        }
+        this.moved = false
+        this.pointerDown = false
+      })
+      this.nameEl.addEventListener('lostpointercapture', e => {
+        this.tabList.dragItem.classList.remove('dragging')
+      })
+      this.menuBtn.addEventListener('click', e => {
+        this.openMenu()
+      })
+    }
   }
 
   openMenu() {
@@ -174,14 +174,15 @@ export class TabItem extends HTMLElement {
   set selected(value) {
     if (value) {      
       this.classList.add('selected')
-      this.contentEl.selected = true
     } else {
       this.classList.remove('selected')
-      this.contentEl.selected = false
     }
-    if (value === true) {
-      for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
-        el.selected = false
+    if (!this.classList.contains('drag')) {
+      this.contentEl.selected = value
+      if (value) {
+        for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
+          el.selected = false
+        }
       }
     }
   }
@@ -244,8 +245,6 @@ export class TabItem extends HTMLElement {
           top: var(--drag-top, 0px);
           left: var(--drag-left, 0px);
           display: none;
-          pointer-events: none;
-          opacity: 70%;
         }
         :host(.drag.dragging) {
           display: block;
