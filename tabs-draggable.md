@@ -65,21 +65,19 @@ export class TabItem extends HTMLElement {
           return false
         }
       })
-      this.nameEl.addEventListener('pointerdown', e => {
-        if (e.isPrimary && !(
-          this.menuBtn.contains(e.target) || this.menu.contains(e.target) ||
-          this.nameEl.contentEditable === 'true'
-        )) {
-          this.nameEl.setPointerCapture(e.pointerId)
+      this.headerEl.addEventListener('pointerdown', e => {
+        if (e.isPrimary && this.nameEl.contentEditable !== 'true' && !this.menu.contains(e.target)) {
+          this.headerEl.setPointerCapture(e.pointerId)
           e.preventDefault()
           this.pointerDown = true
+          this.pointerOnMenu = this.menuBtn.contains(e.target)
           this.moved = false
           const rect = this.getBoundingClientRect()
           this.offsetX = e.clientX - rect.left
           this.offsetY = e.clientY - rect.top
         }
       })
-      this.nameEl.addEventListener('pointermove', e => {
+      this.headerEl.addEventListener('pointermove', e => {
         if (!this.moved) {
           this.moved = true
           if (this.pointerDown) {
@@ -108,23 +106,24 @@ export class TabItem extends HTMLElement {
           }
         }
       })
-      this.nameEl.addEventListener('pointerup', e => {
+      this.headerEl.addEventListener('pointerup', e => {
         this.tabList.dragItem.classList.remove('dragging')
         if (!this.moved) {
-          this.selected = true
+          if (this.pointerOnMenu) {
+            this.openMenu()
+          } else {
+            this.selected = true            
+          }
         }
         this.moved = false
         this.pointerDown = false
       })
-      this.nameEl.addEventListener('lostpointercapture', e => {
+      this.headerEl.addEventListener('lostpointercapture', e => {
         this.tabList.dragItem.classList.remove('dragging')
         if (this.hoverTab) {
           this.hoverTab.classList.remove('drop-hover')
           this.hoverTab = undefined
         }
-      })
-      this.menuBtn.addEventListener('click', e => {
-        this.openMenu()
       })
     }
   }
