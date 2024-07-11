@@ -187,6 +187,15 @@ export class AppView extends HTMLElement {
         padding: 10px;
         padding-right: 0px;
         overflow-y: auto;
+        scrollbar-color: #0000004d #0000;
+      }
+      div.select::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      div.select::-webkit-scrollbar-thumb {
+        background-color: #0000004d;
+        border-radius: 4px;
       }
       div.explore {
         display: flex;
