@@ -46,7 +46,7 @@ export class TabItem extends HTMLElement {
         this.contentEl.name = this.name
       })
       this.nameEl.addEventListener('blur', () => {
-        this.nameEl.removeAttribute('contenteditable')
+        this.nameEl.contentEditable = 'false'
         if (this.isNew) {
           this.selected = true
           this.isNew = false
@@ -66,7 +66,10 @@ export class TabItem extends HTMLElement {
         }
       })
       this.nameEl.addEventListener('pointerdown', e => {
-        if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
+        if (e.isPrimary && !(
+          this.menuBtn.contains(e.target) || this.menu.contains(e.target) ||
+          this.nameEl.contentEditable === 'true'
+        )) {
           this.nameEl.setPointerCapture(e.pointerId)
           e.preventDefault()
           this.pointerDown = true
@@ -166,7 +169,7 @@ export class TabItem extends HTMLElement {
   }
 
   rename() {
-    this.nameEl.setAttribute('contenteditable', '')
+    this.nameEl.contentEditable = 'true'
     const range = document.createRange()
     const sel = window.getSelection()
     range.setStart(this.nameEl, this.nameEl.childNodes.length)
@@ -276,6 +279,7 @@ export class TabItem extends HTMLElement {
           color: var(--fg, #070707);
           background-color: var(--bg, rgb(212,212,216));
           align-items: center;
+          user-select: none;
         }
         :host(.selected) div.header {
           background-color: var(--bg-selected, rgb(15,118,110));
