@@ -89,6 +89,20 @@ export class TabItem extends HTMLElement {
           this.tabList.dragItem.setDragPosition(
             e.clientX - this.offsetX, e.clientY - this.offsetY
           )
+          const hoverTab = [
+            ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+          ].find(el => (
+            el !== this.tabList.dragItem && el.tagName === 'TAB-ITEM'
+          ))
+          if (this.hoverTab !== hoverTab) {
+            if (this.hoverTab) {
+              this.hoverTab.classList.remove('drop-hover')
+            }
+            if (hoverTab) {
+              hoverTab.classList.add('drop-hover')
+            }
+            this.hoverTab = hoverTab
+          }
         }
       })
       this.nameEl.addEventListener('pointerup', e => {
@@ -101,6 +115,10 @@ export class TabItem extends HTMLElement {
       })
       this.nameEl.addEventListener('lostpointercapture', e => {
         this.tabList.dragItem.classList.remove('dragging')
+        if (this.hoverTab) {
+          this.hoverTab.classList.remove('drop-hover')
+          this.hoverTab = undefined
+        }
       })
       this.menuBtn.addEventListener('click', e => {
         this.openMenu()
@@ -194,8 +212,8 @@ export class TabItem extends HTMLElement {
 
   icons = {
     menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 14 24">
+        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
       </svg>
     `,
   }
@@ -263,6 +281,10 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg-selected, rgb(15,118,110));
           color: var(--fg-selected, #e7e7e7);
         }
+        :host(.drop-hover) div.header, :host(.selected.drop-hover) div.header {
+          background-color: var(--bg-drop-hover, rgb(122, 122, 126));
+          color: var(--fg, #070707);
+        }
         div.header > * {
           background: inherit;
           color: inherit;
@@ -298,7 +320,12 @@ export class TabItem extends HTMLElement {
         }
         svg {
           height: 24px;
-          width: 20px;
+          width: 10px;
+          margin-right: -3px;
+          opacity: 33%;
+        }
+        :host(.selected) svg {
+          opacity: 75%;
         }
       `)
     }
@@ -327,12 +354,16 @@ export class TabList extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      :host {
+        overflow-x: auto;
+      }
       .list {
         display: flex;
         flex-direction: row;
         gap: 3px;
         color: #111;
         overflow-x: auto;
+        scrollbar-width: thin;
       }
     `
     this.shadowRoot.append(style)
