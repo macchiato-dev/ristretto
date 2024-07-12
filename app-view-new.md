@@ -18,6 +18,11 @@ TODO:
 - [ ] Add hamburger icon to top bar when sidebar is unpinned
 - [ ] Make hamburger icon show sidebar
 - [ ] Support pinning sidebar
+- [ ] Add menu
+- [ ] Make menu drop down like a tab, changing on top bar when open, with border, so it's clear what's part of menu
+- [ ] Add settings to menu
+- [ ] Add option to configure height to avoid hidden content on mobile
+- [ ] Add download/link/upload icon that shows menu
 
 `AppView.js`
 
