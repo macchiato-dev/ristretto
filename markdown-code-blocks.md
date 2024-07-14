@@ -42,10 +42,7 @@ function* readMarkdownCodeBlocks(input) {
     }
     const contentRange = [contentStart, contentStart + close.index]
     const blockRange = [index + open.index, contentRange.at(-1) + close[0].length]
-    // TODO: error if there are not exactly two newlines
-    // TODO: parse multiple backquotes
-    // TODO: read and apply, and fail if it doesn't match
-    const nameLineMatch = input.slice(0, block.blockRange[0]).match(/(^|\n[^\n*]\n)([^\n]*`)(\s*)$/)
+    const nameLineMatch = input.slice(index, block.blockRange[0]).match(/(^|\n[^\n*]\n)([^\n]*`)(\s*)$/)
     if (nameLineMatch) {
       if (
         !nameLineMatch[1].match(/^\s*$/) ||
@@ -56,10 +53,16 @@ function* readMarkdownCodeBlocks(input) {
           'line before it and exactly one empty line after it'
         )
       }
-      const line = nameLineMatch[2]
+      let line = nameLineMatch[2]
+      const modifierPattern = /\s* `(-|b64|str)`/
+      let modifier
+      const modifierMatch = line.match(modifierPattern)
+      if (modifierMatch) {
+        line = line.replace(modifierPattern, '')
+        modifier = modifierMatch[1]
+      }
       const quotes = `^(\`+)`.match(line)
-      // TODO: fix '`s1` `s2`'.match(new RegExp(`^${quotes}(.*)${quotes}( \`(-|b64|str)\`)?\s*$`))
-      const nameMatch = line.match(new RegExp(`^${quotes}(.*)${quotes}( \`(-|b64|str)\`)?\s*$`))
+      const nameMatch = line.match(new RegExp(`^${quotes}(.*)${quotes}$`))
       if (!nameMatch || line.matchAll(quotes) !== 2) {
         throw new Error('Invalid name line')
       }
@@ -73,11 +76,13 @@ function* readMarkdownCodeBlocks(input) {
         blockRange: [blockRange[0] - match[0].length, blockRange[1]],
         contentRange,
         info: open[3].trim(),
-        format: 
+        modifier
       }
     }
-    yield { blockRange, contentRange, info: open[3].trim() }
     index = blockRange.at(-1)
+  }
+  if (input.substring(index).match(disallowed)) {
+    throw new Error('<details>, <summary>, and non-fenced code blocks are not allowed')
   }
 }
 ```
