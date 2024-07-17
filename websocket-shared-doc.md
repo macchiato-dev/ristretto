@@ -49,6 +49,64 @@ export class DevView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.tabListView = document.createElement('div')
+    this.tabListView.setAttribute('role', 'tablist')
+    this.client1View = document.createElement('div')
+    this.client2View = document.createElement('div')
+    this.logView = document.createElement('div')
+    this.client1Tab = this.addTab('Client 1', this.client1View)
+    this.client2Tab = this.addTab('Client 2', this.client2View)
+    this.logsTab = this.addTab('Logs', this.logView)
+    this.selectedTab = this.client1Tab
+    this.setTabIndex(this.selectedTab)
+    this.shadowRoot.append(this.tabListView)
+
+    this.tabListView.addEventListener('click', e => {
+      const tab = e.target.closest('button:not([aria-selected=true])')
+      if (tab) {
+        this.selectedTab = tab
+      }
+    })
+    this.tabListView.addEventListener('keydown', ({code, target}) => {
+      const tab = target.closest('button')
+      const dir = {ArrowLeft: -1, ArrowRight: 1}[code]
+      if (tab && dir !== undefined) {
+        const tabs = [...tab.parentElement.children]
+        tabs[tabs.indexOf(tab) + dir]?.focus()
+      }
+    })
+    this.tabListView.addEventListener('focusin', ({target}) => {
+      const tab = target.closest('button')
+      if (tab) {
+        this.setTabIndex(tab)
+      }
+    })
+  }
+
+  addTab(name, view) {
+    const tab = document.createElement('button')
+    tab.innerText = name
+    tab.tabIndex = -1
+    this.tabListView.append(tab)
+    return tab
+  }
+
+  get selectedTab() {
+    return [...this.tabListView.children].find(el => el.ariaSelected === 'true')
+  }
+
+  set selectedTab(tab) {
+    if (this.selectedTab) {
+      this.selectedTab.ariaSelected = 'false'
+    }
+    tab.ariaSelected = 'true'
+  }
+
+  setTabIndex(tab) {
+    for (const otherTab of [...this.tabListView.children].filter(el => el !== tab)) {
+      otherTab.tabIndex = -1
+    }
+    tab.tabIndex = 0
   }
 
   static get styles() {
@@ -57,19 +115,32 @@ export class DevView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-columns: max-content max-content;
-          padding: 10px;
-          gap: 10px;
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr minmax(20px, max-content);
+          background: #000;
+          color: #eee;
         }
-        * {
-          box-sizing: border-box;
-        }
-        .shade-select {
+        div[role=tablist] {
+          background-color: darkblue;
+          grid-row: 2;
           display: grid;
-          grid-template-columns: 200px;
-          grid-template-rows: 200px;
-          background: linear-gradient(to top, #000000, var(--hue-color, #0000ff));
-          position: relative;
+          grid-template-columns: repeat(auto-fill, minmax(100px, max-content));
+          padding: 3px;
+          gap: 3px;
+        }
+        div[role=tablist] button {
+          all: unset;
+          user-select: none;
+          padding: 3px 5px;
+          text-align: center;
+          font-family: sans-serif;
+        }
+        div[role=tablist] button[aria-selected=true] {
+          background-color: #aff7;
+          font-weight: bold;
+        }
+        div[role=tablist] button:focus-visible {
+          outline: 2px solid #fff9;
         }
       `)
     }
@@ -104,10 +175,9 @@ export class ExampleView extends HTMLElement {
       this._styles = new CSSStyleSheet()
       this._styles.replaceSync(`
         :host {
-          display: flex;
-          flex-direction: column;
-          padding: 10px;
-          align-items: center;
+          display: grid;
+          grid-template-rows: 1fr;
+          grid-template-columns: 1fr;
         }
       `)
     }
@@ -118,9 +188,19 @@ export class ExampleView extends HTMLElement {
     if (!this._globalStyles) {
       this._globalStyles = new CSSStyleSheet()
       this._globalStyles.replaceSync(`
+        html {
+          height: 100%;
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
         body {
           display: grid;
           grid-template-columns: 1fr;
+          margin: 0;
+          padding: 0;
+          height: 100%;
         }
       `)
     }
