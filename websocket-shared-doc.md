@@ -151,14 +151,15 @@ export class DevView extends HTMLElement {
           background-color: darkblue;
           grid-row: 2;
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(100px, max-content));
+          grid-template-columns: repeat(3, minmax(100px, max-content));
+          overflow-x: auto;
           padding: 3px;
           gap: 3px;
         }
         div[role=tablist] button {
           all: unset;
           user-select: none;
-          padding: 3px 5px;
+          padding: 3px 10px;
           text-align: center;
           font-family: sans-serif;
         }
