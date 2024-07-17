@@ -8,6 +8,8 @@ This is intended to be small and simple but work reasonably well, and serve as a
 
 ## Shared Components
 
+This is a tab bar used for testing. It can be used in other places.
+
 `SharedComponents.js`
 
 ```js
@@ -29,12 +31,13 @@ export class SharedComponents {
       },
       set selectedTab(tab) {
         const previousEl = this.selectedTab
+        let previous
         if (previousEl) {
           previousEl.ariaSelected = 'false'
+          previous = {
+            el: previousEl, name: Object.entries(items).find(([name, el]) => el === previousEl)[0]
+          }
         }
-        const previous = previousEl ? {
-          el: previousEl, name: Object.entries(items).find(([name, el]) => el === previousEl)[0]
-        } : undefined
         const current = {
           el: tab, name: Object.entries(items).find(([name, el]) => el === tab)[0]
         }
@@ -68,9 +71,7 @@ export class SharedComponents {
         tabList.setTabIndex(tab)
       }
     })
-    if (!tabList.selectedTab) {
-      tabList.selectedTab = items[tabs[0].name]
-    }
+    tabList.selectedTab = items[tabs[0].name]
     tabList.setTabIndex(tabList.selectedTab)
     return tabList
   }
@@ -81,9 +82,57 @@ export class SharedComponents {
 
 This runs inside of a worker. It communicates with the server wrapper through postMessage.
 
+`AppServer.js`
+
+```js
+export class AppServer {
+  constructor({log}) {
+    this.log = log
+    this.log?.({source: 'AppServer', message: 'Created AppServer'})
+    globalThis.addEventListener('message', e => {
+    })
+  }
+}
+```
+
 ## Server Wrapper
 
 This takes real server resources, or simulated ones, and runs the server inside the worker.
+
+`ServerWrapper.js`
+
+```js
+import {AppServer} from '/AppServer.js'
+
+export class ServerWrapper {
+  constructor({source, createWorker}) {
+    this.eventHandlers = {log: []}
+    this.source = source
+    this.createWorker = createWorker
+  }
+
+  addEventListener(name, handler) {
+    this.eventHandlers[name].push(handler)
+  }
+
+  dispatchEvent(name, event) {
+    for (const fn of this.eventHandlers[name]) {
+      fn(event)
+    }
+  }
+
+  start() {
+    this.worker = this.createWorker(this.source)
+    globalThis.addEventListener('message', e => {
+      if (e.source === this.worker.source) {
+        if (e.data[0] === 'log') {
+          this.dispatchEvent('log', e.data[1])
+        }
+      }
+    })
+  }
+}
+```
 
 ## Server Runner
 
@@ -92,6 +141,76 @@ This runs the server inside of Deno.
 ## Simulated Server Runner
 
 This runs the server inside of an iFrame, using simulated resources.
+
+`SimulatedServerRunner.js`
+
+```js
+import {ServerWrapper} from '/ServerWrapper.js'
+
+const runSource = `<!doctype html>
+<html charset="utf-8">
+<head></head>
+<body>
+<script type="module">
+addEventListener('message', async e => {
+  if (e.data[0] === 'source') {
+    await import('data:text/javascript;base64,' + btoa(e.data[1]))
+  }
+})
+</script>
+</body>
+</html>`
+
+const initAppServer = `const appServer = new AppServer({
+  log(data) {
+    parent.postMessage(['log', data], '*')
+  }
+})`
+
+export class SimulatedServerRunner {
+  constructor({el}) {
+    this.el = el
+    this.eventHandlers = {log: []}
+  }
+
+  createWorker(source) {
+    const frame = document.createElement('iframe')
+    frame.addEventListener('load', () => {
+      frame.contentWindow.postMessage(['source', source], '*')
+    })
+    frame.src = 'data:text/html;base64,' + btoa(runSource)
+    this.el.append(frame)
+    return {
+      frame,
+      get source() { return frame.contentWindow },
+    }
+  }
+
+  addEventListener(name, handler) {
+    this.eventHandlers[name].push(handler)
+  }
+
+  dispatchEvent(name, event) {
+    for (const fn of this.eventHandlers[name]) {
+      fn(event)
+    }
+  }
+
+  start() {
+    const source = __source.slice(
+      ...Array.from(readBlocksWithNames(__source)).find(({name}) => name === 'AppServer.js').contentRange
+    ) + '\n' + initAppServer
+    this.serverWrapper = new ServerWrapper({
+      createWorker: this.createWorker.bind(this),
+      source,
+    })
+    this.serverWrapper.addEventListener('log', e => {
+      this.dispatchEvent('log', e)
+    })
+    this.serverWrapper.start()
+  }
+}
+```
 
 ## Client
 
@@ -116,24 +235,61 @@ This adds an extra instance of the client and some controls to the client.
 `DevView.js`
 
 ```js
-import { SharedComponents } from '/SharedComponents.js'
+import {SharedComponents} from '/SharedComponents.js'
+import {SimulatedServerRunner} from '/SimulatedServerRunner.js'
 
 export class DevView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.client1View = document.createElement('div')
-    this.client2View = document.createElement('div')
-    this.logView = document.createElement('div')
+    this.logs = this.createLogs()
+    this.views = {
+      client1: document.createElement('div'),
+      client2: document.createElement('div'),
+      logs: this.logs.el,
+    }
+    for (const [key, view] of Object.entries(this.views)) {
+      view.classList.add(key, 'tab-content', 'hidden')
+    }
+    this.views.client1.classList.remove('hidden')
     this.tabs = SharedComponents.createTabs(
       {name: 'client1', label: 'Client 1'},
       {name: 'client2', label: 'Client 2'},
       {name: 'logs', label: 'Logs'},
     )
     this.tabs.el.addEventListener('tab-select', e => {
-      console.log(e)
+      this.views[e.detail.previous.name]?.classList.add('hidden')
+      this.views[e.detail.current.name]?.classList.remove('hidden')
     })
-    this.shadowRoot.append(this.tabs.el)
+    this.shadowRoot.append(this.tabs.el, ...(Object.values(this.views)))
+    this.start()
+  }
+
+  createLogs() {
+    const el = document.createElement('div')
+    return {
+      el,
+      append({source, message}) {
+        const el = document.createElement('div')
+        const sourceEl = document.createElement('strong')
+        const messageEl = document.createElement('span')
+        el.classList.add('log-message')
+        sourceEl.innerText = source
+        messageEl.innerText = message
+        el.append(sourceEl, messageEl)
+        this.el.append(el)
+      }
+    }
+  }
+
+  start() {
+    const el = document.createElement('el')
+    this.logs.el.append(el)
+    this.simulatedServerRunner = new SimulatedServerRunner({el})
+    this.simulatedServerRunner.addEventListener('log', e => {
+      this.logs.append(e)
+    })
+    this.simulatedServerRunner.start()
   }
 
   static get styles() {
@@ -169,6 +325,28 @@ export class DevView extends HTMLElement {
         }
         div[role=tablist] button:focus-visible {
           outline: 2px solid #fff9;
+        }
+        .tab-content.hidden {
+          display: none;
+        }
+        .logs {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 3px;
+          padding: 3px;
+        }
+        .logs iframe {
+          border: none;
+          height: 5px;
+          width: 5px;
+        }
+        .log-message {
+          border: 1px solid #fff5;
+          border-radius: 3px;
+          padding: 3px;
+          display: flex;
+          gap: 5px;
         }
       `)
     }
