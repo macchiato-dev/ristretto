@@ -6,6 +6,70 @@ Also, the client logic happens inside of an iFrame and the server logic happens 
 
 This is intended to be small and simple but work reasonably well, and serve as an intro. Concepts here will be expanded upon in other docs.
 
+## Shared Components
+
+`SharedComponents.js`
+
+```js
+export class SharedComponents {
+  static createTabs(...tabs) {
+    const el = document.createElement('div')
+    const items = Object.fromEntries(tabs.map(({name, label}) => {
+      const el = document.createElement('button')
+      el.innerText = name
+      el.tabIndex = -1
+      return [name, el]
+    }))
+    el.setAttribute('role', 'tablist')
+    el.append(...tabs.map(({name}) => items[name]))
+    const tabList = {
+      el,
+      get selectedTab() {
+        return [...el.children].find(el => el.ariaSelected === 'true')
+      },
+      set selectedTab(tab) {
+        if (this.selectedTab) {
+          this.selectedTab.ariaSelected = 'false'
+        }
+        tab.ariaSelected = 'true'
+      },
+      setTabIndex(tab) {
+        for (const otherTab of [...el.children].filter(el => el !== tab)) {
+          otherTab.tabIndex = -1
+        }
+        tab.tabIndex = 0
+      }
+    }
+    el.addEventListener('click', e => {
+      const tab = e.target.closest('button:not([aria-selected=true])')
+      if (tab) {
+        tabList.selectedTab = tab
+        // emit event, with newly selected tab and previously selected tab (target/relatedTarget)
+      }
+    })
+    el.addEventListener('keydown', ({code, target}) => {
+      const tab = target.closest('button')
+      const dir = {ArrowLeft: -1, ArrowRight: 1}[code]
+      if (tab && dir !== undefined) {
+        const tabs = [...tab.parentElement.children]
+        tabs[tabs.indexOf(tab) + dir]?.focus()
+      }
+    })
+    el.addEventListener('focusin', ({target}) => {
+      const tab = target.closest('button')
+      if (tab) {
+        tabList.setTabIndex(tab)
+      }
+    })
+    if (!tabList.selectedTab) {
+      tabList.selectedTab = items[tabs[0].name]
+    }
+    tabList.setTabIndex(tabList.selectedTab)
+    return tabList
+  }
+}
+```
+
 ## Server
 
 This runs inside of a worker. It communicates with the server wrapper through postMessage.
@@ -45,68 +109,21 @@ This adds an extra instance of the client and some controls to the client.
 `DevView.js`
 
 ```js
+import { SharedComponents } from '/SharedComponents.js'
+
 export class DevView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.tabListView = document.createElement('div')
-    this.tabListView.setAttribute('role', 'tablist')
     this.client1View = document.createElement('div')
     this.client2View = document.createElement('div')
     this.logView = document.createElement('div')
-    this.client1Tab = this.addTab('Client 1', this.client1View)
-    this.client2Tab = this.addTab('Client 2', this.client2View)
-    this.logsTab = this.addTab('Logs', this.logView)
-    this.selectedTab = this.client1Tab
-    this.setTabIndex(this.selectedTab)
-    this.shadowRoot.append(this.tabListView)
-
-    this.tabListView.addEventListener('click', e => {
-      const tab = e.target.closest('button:not([aria-selected=true])')
-      if (tab) {
-        this.selectedTab = tab
-      }
-    })
-    this.tabListView.addEventListener('keydown', ({code, target}) => {
-      const tab = target.closest('button')
-      const dir = {ArrowLeft: -1, ArrowRight: 1}[code]
-      if (tab && dir !== undefined) {
-        const tabs = [...tab.parentElement.children]
-        tabs[tabs.indexOf(tab) + dir]?.focus()
-      }
-    })
-    this.tabListView.addEventListener('focusin', ({target}) => {
-      const tab = target.closest('button')
-      if (tab) {
-        this.setTabIndex(tab)
-      }
-    })
-  }
-
-  addTab(name, view) {
-    const tab = document.createElement('button')
-    tab.innerText = name
-    tab.tabIndex = -1
-    this.tabListView.append(tab)
-    return tab
-  }
-
-  get selectedTab() {
-    return [...this.tabListView.children].find(el => el.ariaSelected === 'true')
-  }
-
-  set selectedTab(tab) {
-    if (this.selectedTab) {
-      this.selectedTab.ariaSelected = 'false'
-    }
-    tab.ariaSelected = 'true'
-  }
-
-  setTabIndex(tab) {
-    for (const otherTab of [...this.tabListView.children].filter(el => el !== tab)) {
-      otherTab.tabIndex = -1
-    }
-    tab.tabIndex = 0
+    this.tabs = SharedComponents.createTabs(
+      {name: 'client1', label: 'Client 1'},
+      {name: 'client2', label: 'Client 2'},
+      {name: 'logs', label: 'Logs'},
+    )
+    this.shadowRoot.append(this.tabs.el)
   }
 
   static get styles() {
