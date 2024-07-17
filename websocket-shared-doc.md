@@ -28,10 +28,18 @@ export class SharedComponents {
         return [...el.children].find(el => el.ariaSelected === 'true')
       },
       set selectedTab(tab) {
-        if (this.selectedTab) {
-          this.selectedTab.ariaSelected = 'false'
+        const previousEl = this.selectedTab
+        if (previousEl) {
+          previousEl.ariaSelected = 'false'
+        }
+        const previous = previousEl ? {
+          el: previousEl, name: Object.entries(items).find(([name, el]) => el === previousEl)[0]
+        } : undefined
+        const current = {
+          el: tab, name: Object.entries(items).find(([name, el]) => el === tab)[0]
         }
         tab.ariaSelected = 'true'
+        tab.dispatchEvent(new CustomEvent('tab-select', {bubbles: true, detail: {current, previous}}))
       },
       setTabIndex(tab) {
         for (const otherTab of [...el.children].filter(el => el !== tab)) {
@@ -44,7 +52,6 @@ export class SharedComponents {
       const tab = e.target.closest('button:not([aria-selected=true])')
       if (tab) {
         tabList.selectedTab = tab
-        // emit event, with newly selected tab and previously selected tab (target/relatedTarget)
       }
     })
     el.addEventListener('keydown', ({code, target}) => {
@@ -123,6 +130,9 @@ export class DevView extends HTMLElement {
       {name: 'client2', label: 'Client 2'},
       {name: 'logs', label: 'Logs'},
     )
+    this.tabs.el.addEventListener('tab-select', e => {
+      console.log(e)
+    })
     this.shadowRoot.append(this.tabs.el)
   }
 
