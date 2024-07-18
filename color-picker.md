@@ -292,19 +292,12 @@ export class ColorPicker extends HTMLElement {
 export class ExampleView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
-    this.setStyles(true)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
+    }
     this.colorPicker = document.createElement('color-picker')
-    document.body.append(this.colorPicker)
-  }
-
-  disconnectedCallback() {
-    this.setStyles(false)
-  }
-
-  setStyles(enabled) {
-    this.shadowRoot.adoptedStyleSheets = enabled ? [this.constructor.styles] : []
-    const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
-    document.adoptedStyleSheets = [...sheets, ...(enabled ? [this.constructor.globalStyles] : [])]
+    this.shadowRoot.append(this.colorPicker)
   }
 
   static get styles() {
