@@ -31,13 +31,8 @@ export class AppView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.notebookTemplates = {
-      'colors.json': [
-        'palette.md',
-        'shapes.md',
-      ],
-      'image.png': [
-        'image-filters.md',
-        'histogram.md',
+      'intro.md': [
+        'app-content.md',
       ],
       'example-notebook.md': [
         'list.md',
@@ -48,6 +43,14 @@ export class AppView extends HTMLElement {
         'table.md',
         'data-cards.md',
         'editable-data-table.md',
+      ],
+      'colors.json': [
+        'palette.md',
+        'shapes.md',
+      ],
+      'image.png': [
+        'image-filters.md',
+        'histogram.md',
       ],
       'font.woff2': [
         'heading.md',
@@ -268,7 +271,7 @@ export class AppView extends HTMLElement {
           const builder = new Builder({src: notebookSrc, parentSrc: __source})
           const deps = builder.getDeps()
           port.postMessage(deps)
-        } else if (cmd === 'download') {
+        } else if (['download', 'link'].includes(command)) {
           parent.postMessage(e.data, '*')
         }
       }

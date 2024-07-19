@@ -1,6 +1,6 @@
 # App Content
 
-This renders a subset of Markdown with special treatment of sections related to the application.
+This renders a subset of Markdown with the ability to render components related to the app.
 
 `AppContent.js`
 
@@ -9,12 +9,86 @@ export class AppContent extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.shadowRoot.append(...this.content.split("\n\n").map(s => {
-      let header = s.trim().match(/^#{0,6} /)?.[0]
+    this.shadowRoot.append(...this.renderContent(this.content))
+    this.shadowRoot.addEventListener('click', e => {
+      if (e.target.tagName === 'A') {
+        console.log('clicked link', e.target.href)
+        e.preventDefault()
+        return false
+      }
+    })
+  }
+
+  renderInline(content) {
+    const result = []
+    let remaining = content
+    for (let i=0; i < 10; i++) {
+      const linkMatch = remaining.match(/\[(.*)\]\((.*)\)/)
+      if (linkMatch) {
+        result.push(remaining.slice(0, linkMatch.index))
+        const a = document.createElement('a')
+        a.innerText = linkMatch[1]
+        a.href = linkMatch[2]
+        result.push(a)
+        remaining = remaining.slice(linkMatch.index + linkMatch[0].length)
+      } else {
+        result.push(remaining)
+        break;
+      }
+    }
+    return result
+  }
+
+  renderBlock(content) {
+    if (content.trim() === '`[new-content]`') {
+      return document.createElement('new-content')
+    } else {
+      const header = content.trim().match(/^#{0,6} /)?.[0]
       const el = document.createElement(header ? `h${header.length}` : `p`)
-      el.innerText = s.slice(header?.length ?? 0)
+      el.append(...this.renderInline(content.slice(header?.length ?? 0)))
       return el
-    }))
+    }
+  }
+
+  renderContent(content) {
+    return content.split("\n\n").map(s => this.renderBlock(s))
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        a, a:visited {
+          color: #9bf;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+This is for adding new content - first, upload, then type, paste or upload.
+
+`NewContent.js`
+
+```js
+export class NewContent extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.outputEl = document.createElement('div')
+    this.shadowRoot.append(this.createFileInput(), this.outputEl)
+  }
+
+  createFileInput() {
+    const el = document.createElement('input')
+    el.type = 'file'
+    el.multiple = true
+    el.addEventListener('change', e => {
+      this.outputEl.innerText = `${el.files.length} file(s) selected`
+    })
+    return el
   }
 
   static get styles() {
@@ -32,9 +106,13 @@ export class AppContent extends HTMLElement {
 `content.md`
 
 ```md
-# Hello
+# App Content
 
-This is a test.
+This is for adding new content (currently just an upload link to test uploading):
+
+`[new-content]`
+
+[Test link to Mars wikipedia page](https://en.wikipedia.org/Mars)
 ```
 
 `ExampleView.js`
@@ -98,9 +176,11 @@ export class ExampleView extends HTMLElement {
 
 ```js
 import {AppContent} from '/AppContent.js'
+import {NewContent} from '/NewContent.js'
 import {ExampleView} from '/ExampleView.js'
 
 customElements.define('app-content', AppContent)
+customElements.define('new-content', NewContent)
 customElements.define('example-view', ExampleView)
 
 async function setup() {
@@ -110,3 +190,25 @@ async function setup() {
 
 await setup()
 ```
+
+
+`thumbnail.svg`
+
+```svg
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    svg {
+      background-color: #111;
+    }
+    text {
+      font: 18px sans-serif;
+      fill: #efe;
+    }
+  </style>
+
+  <g transform="translate(2 4)">
+    <text x="10" y="35">app-content</text>
+  </g>
+</svg>
+```
+
