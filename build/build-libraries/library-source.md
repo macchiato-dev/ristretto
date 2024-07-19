@@ -19,9 +19,9 @@ Wrote to /app/package.json:
 }
 
 
--- npm install @rollup/browser@3.29.1 @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/search @codemirror/state @codemirror/view @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @codemirror/lang-javascript @codemirror/lang-markdown @codemirror/lang-python @codemirror/lang-rust @codemirror/lang-xml @codemirror/lang-sql @codemirror/lang-wast @lezer/highlight prosemirror-state prosemirror-view prosemirror-model prosemirror-schema-basic prosemirror-schema-list prosemirror-example-setup prosemirror-history prosemirror-keymap prosemirror-commands
+-- npm install @rollup/browser@3.29.1 @codemirror/autocomplete @codemirror/commands @codemirror/language @codemirror/lint @codemirror/search @codemirror/state @codemirror/view @codemirror/lang-html @codemirror/lang-css @codemirror/lang-json @codemirror/lang-javascript @codemirror/lang-markdown @codemirror/lang-python @codemirror/lang-rust @codemirror/lang-xml @codemirror/lang-sql @codemirror/lang-wast @codemirror/theme-one-dark @lezer/highlight prosemirror-state prosemirror-view prosemirror-model prosemirror-schema-basic prosemirror-schema-list prosemirror-example-setup prosemirror-history prosemirror-keymap prosemirror-commands
 
-added 48 packages, and audited 49 packages in 12s
+added 49 packages, and audited 50 packages in 16s
 
 found 0 vulnerabilities
 
@@ -1261,7 +1261,7 @@ const nodes = {
     `<h6>` elements.
     */
     heading: {
-        attrs: { level: { default: 1 } },
+        attrs: { level: { default: 1, validate: "number" } },
         content: "inline*",
         group: "block",
         defining: true,
@@ -1301,9 +1301,9 @@ const nodes = {
     image: {
         inline: true,
         attrs: {
-            src: {},
-            alt: { default: null },
-            title: { default: null }
+            src: { validate: "string" },
+            alt: { default: null, validate: "string|null" },
+            title: { default: null, validate: "string|null" }
         },
         group: "inline",
         draggable: true,
@@ -1339,8 +1339,8 @@ const marks = {
     */
     link: {
         attrs: {
-            href: {},
-            title: { default: null }
+            href: { validate: "string" },
+            title: { default: null, validate: "string|null" }
         },
         inclusive: false,
         parseDOM: [{ tag: "a[href]", getAttrs(dom) {
@@ -1405,7 +1405,7 @@ export { marks, nodes, schema };
 `````
 {
   "name": "prosemirror-schema-basic",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Basic schema elements for ProseMirror",
   "type": "module",
   "main": "dist/index.cjs",
@@ -3874,7 +3874,7 @@ function applyTransaction(history, state, tr, options) {
     }
     else if (appended && appended.getMeta(historyKey)) {
         if (appended.getMeta(historyKey).redo)
-            return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps[tr.steps.length - 1]), history.prevTime, history.prevComposition);
+            return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps), history.prevTime, history.prevComposition);
         else
             return new HistoryState(history.done, history.undone.addTransform(tr, undefined, options, mustPreserveItems(state)), null, history.prevTime, history.prevComposition);
     }
@@ -3884,7 +3884,7 @@ function applyTransaction(history, state, tr, options) {
         let newGroup = history.prevTime == 0 ||
             (!appended && history.prevComposition != composition &&
                 (history.prevTime < (tr.time || 0) - options.newGroupDelay || !isAdjacentTo(tr, history.prevRanges)));
-        let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps[tr.steps.length - 1]);
+        let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps);
         return new HistoryState(history.done.addTransform(tr, newGroup ? state.selection.getBookmark() : undefined, options, mustPreserveItems(state)), Branch.empty, prevRanges, tr.time, composition == null ? history.prevComposition : composition);
     }
     else if (rebased = tr.getMeta("rebased")) {
@@ -3909,9 +3909,10 @@ function isAdjacentTo(transform, prevRanges) {
     });
     return adjacent;
 }
-function rangesFor(map) {
+function rangesFor(maps) {
     let result = [];
-    map.forEach((_from, _to, from, to) => result.push(from, to));
+    for (let i = maps.length - 1; i >= 0 && result.length == 0; i--)
+        maps[i].forEach((_from, _to, from, to) => result.push(from, to));
     return result;
 }
 function mapRanges(ranges, mapping) {
@@ -4059,7 +4060,7 @@ export { closeHistory, history, redo, redoDepth, redoNoScroll, undo, undoDepth, 
 `````
 {
   "name": "prosemirror-history",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Undo history for ProseMirror",
   "type": "module",
   "main": "dist/index.cjs",
@@ -17940,7 +17941,7 @@ class MarkViewDesc extends ViewDesc {
         let custom = view.nodeViews[mark.type.name];
         let spec = custom && custom(mark, view, inline);
         if (!spec || !spec.dom)
-            spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline));
+            spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline), null, mark.attrs);
         return new MarkViewDesc(parent, mark, spec.dom, spec.contentDOM || spec.dom);
     }
     parseRule() {
@@ -18012,7 +18013,8 @@ class NodeViewDesc extends ViewDesc {
                 throw new RangeError("Text must be rendered as a DOM text node");
         }
         else if (!dom) {
-            ({ dom, contentDOM } = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node)));
+            let spec = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node), null, node.attrs);
+            ({ dom, contentDOM } = spec);
         }
         if (!contentDOM && !node.isText && dom.nodeName != "BR") { // Chrome gets confused by <br contenteditable=false>
             if (!dom.hasAttribute("contenteditable"))
@@ -20376,7 +20378,9 @@ handlers.dragstart = (view, _event) => {
     }
     let draggedSlice = (node || view.state.selection).content();
     let { dom, text, slice } = serializeForClipboard(view, draggedSlice);
-    event.dataTransfer.clearData();
+    // Pre-120 Chrome versions clear files when calling `clearData` (#1472)
+    if (!event.dataTransfer.files.length || !chrome || chrome_version > 120)
+        event.dataTransfer.clearData();
     event.dataTransfer.setData(brokenClipboardAPI ? "Text" : "text/html", dom.innerHTML);
     // See https://github.com/ProseMirror/prosemirror/issues/1156
     event.dataTransfer.effectAllowed = "copyMove";
@@ -22475,7 +22479,7 @@ export { Decoration, DecorationSet, EditorView, __endComposition, __parseFromCli
 `````
 {
   "name": "prosemirror-view",
-  "version": "1.33.8",
+  "version": "1.33.9",
   "description": "ProseMirror's view component",
   "type": "module",
   "main": "dist/index.cjs",
@@ -23591,7 +23595,7 @@ starts counting, and defaults to 1. Represented as an `<ol>`
 element.
 */
 const orderedList = {
-    attrs: { order: { default: 1 } },
+    attrs: { order: { default: 1, validate: "number" } },
     parseDOM: [{ tag: "ol", getAttrs(dom) {
                 return { order: dom.hasAttribute("start") ? +dom.getAttribute("start") : 1 };
             } }],
@@ -23861,7 +23865,7 @@ export { addListNodes, bulletList, liftListItem, listItem, orderedList, sinkList
 `````
 {
   "name": "prosemirror-schema-list",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "List-related schema elements and commands for ProseMirror",
   "type": "module",
   "main": "dist/index.cjs",
@@ -25521,7 +25525,9 @@ class Mark {
         let type = schema.marks[json.type];
         if (!type)
             throw new RangeError(`There is no mark type ${json.type} in this schema`);
-        return type.create(json.attrs);
+        let mark = type.create(json.attrs);
+        type.checkAttrs(mark.attrs);
+        return mark;
     }
     /**
     Test whether two sets of marks are identical.
@@ -26501,13 +26507,17 @@ class Node {
     }
     /**
     Check whether this node and its descendants conform to the
-    schema, and raise error when they do not.
+    schema, and raise an exception when they do not.
     */
     check() {
         this.type.checkContent(this.content);
+        this.type.checkAttrs(this.attrs);
         let copy = Mark.none;
-        for (let i = 0; i < this.marks.length; i++)
-            copy = this.marks[i].addToSet(copy);
+        for (let i = 0; i < this.marks.length; i++) {
+            let mark = this.marks[i];
+            mark.type.checkAttrs(mark.attrs);
+            copy = mark.addToSet(copy);
+        }
         if (!Mark.sameSet(copy, this.marks))
             throw new RangeError(`Invalid collection of marks for node ${this.type.name}: ${this.marks.map(m => m.type.name)}`);
         this.content.forEach(node => node.check());
@@ -26545,7 +26555,9 @@ class Node {
             return schema.text(json.text, marks);
         }
         let content = Fragment.fromJSON(schema, json.content);
-        return schema.nodeType(json.type).create(json.attrs, content, marks);
+        let node = schema.nodeType(json.type).create(json.attrs, content, marks);
+        node.type.checkAttrs(node.attrs);
+        return node;
     }
 }
 Node.prototype.text = undefined;
@@ -27062,11 +27074,21 @@ function computeAttrs(attrs, value) {
     }
     return built;
 }
-function initAttrs(attrs) {
+function checkAttrs(attrs, values, type, name) {
+    for (let name in values)
+        if (!(name in attrs))
+            throw new RangeError(`Unsupported attribute ${name} for ${type} of type ${name}`);
+    for (let name in attrs) {
+        let attr = attrs[name];
+        if (attr.validate)
+            attr.validate(values[name]);
+    }
+}
+function initAttrs(typeName, attrs) {
     let result = Object.create(null);
     if (attrs)
         for (let name in attrs)
-            result[name] = new Attribute(attrs[name]);
+            result[name] = new Attribute(typeName, name, attrs[name]);
     return result;
 }
 /**
@@ -27101,7 +27123,7 @@ class NodeType {
         */
         this.markSet = null;
         this.groups = spec.group ? spec.group.split(" ") : [];
-        this.attrs = initAttrs(spec.attrs);
+        this.attrs = initAttrs(name, spec.attrs);
         this.defaultAttrs = defaultAttrs(this.attrs);
         this.contentMatch = null;
         this.inlineContent = null;
@@ -27226,6 +27248,12 @@ class NodeType {
             throw new RangeError(`Invalid content for node ${this.name}: ${content.toString().slice(0, 50)}`);
     }
     /**
+    @internal
+    */
+    checkAttrs(attrs) {
+        checkAttrs(this.attrs, attrs, "node", this.name);
+    }
+    /**
     Check whether the given mark type is allowed in this node.
     */
     allowsMarkType(markType) {
@@ -27276,11 +27304,20 @@ class NodeType {
         return result;
     }
 }
+function validateType(typeName, attrName, type) {
+    let types = type.split("|");
+    return (value) => {
+        let name = value === null ? "null" : typeof value;
+        if (types.indexOf(name) < 0)
+            throw new RangeError(`Expected value of type ${types} for attribute ${attrName} on type ${typeName}, got ${name}`);
+    };
+}
 // Attribute descriptors
 class Attribute {
-    constructor(options) {
+    constructor(typeName, attrName, options) {
         this.hasDefault = Object.prototype.hasOwnProperty.call(options, "default");
         this.default = options.default;
+        this.validate = typeof options.validate == "string" ? validateType(typeName, attrName, options.validate) : options.validate;
     }
     get isRequired() {
         return !this.hasDefault;
@@ -27318,7 +27355,7 @@ class MarkType {
         this.rank = rank;
         this.schema = schema;
         this.spec = spec;
-        this.attrs = initAttrs(spec.attrs);
+        this.attrs = initAttrs(name, spec.attrs);
         this.excluded = null;
         let defaults = defaultAttrs(this.attrs);
         this.instance = defaults ? new Mark(this, defaults) : null;
@@ -27360,6 +27397,12 @@ class MarkType {
         for (let i = 0; i < set.length; i++)
             if (set[i].type == this)
                 return set[i];
+    }
+    /**
+    @internal
+    */
+    checkAttrs(attrs) {
+        checkAttrs(this.attrs, attrs, "mark", this.name);
     }
     /**
     Queries whether a given mark type is
@@ -28328,7 +28371,7 @@ class DOMSerializer {
     @internal
     */
     serializeNodeInner(node, options) {
-        let { dom, contentDOM } = DOMSerializer.renderSpec(doc(options), this.nodes[node.type.name](node));
+        let { dom, contentDOM } = renderSpec(doc(options), this.nodes[node.type.name](node), null, node.attrs);
         if (contentDOM) {
             if (node.isLeaf)
                 throw new RangeError("Content hole not allowed in a leaf node spec");
@@ -28359,57 +28402,10 @@ class DOMSerializer {
     */
     serializeMark(mark, inline, options = {}) {
         let toDOM = this.marks[mark.type.name];
-        return toDOM && DOMSerializer.renderSpec(doc(options), toDOM(mark, inline));
+        return toDOM && renderSpec(doc(options), toDOM(mark, inline), null, mark.attrs);
     }
-    /**
-    Render an [output spec](https://prosemirror.net/docs/ref/#model.DOMOutputSpec) to a DOM node. If
-    the spec has a hole (zero) in it, `contentDOM` will point at the
-    node with the hole.
-    */
-    static renderSpec(doc, structure, xmlNS = null) {
-        if (typeof structure == "string")
-            return { dom: doc.createTextNode(structure) };
-        if (structure.nodeType != null)
-            return { dom: structure };
-        if (structure.dom && structure.dom.nodeType != null)
-            return structure;
-        let tagName = structure[0], space = tagName.indexOf(" ");
-        if (space > 0) {
-            xmlNS = tagName.slice(0, space);
-            tagName = tagName.slice(space + 1);
-        }
-        let contentDOM;
-        let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
-        let attrs = structure[1], start = 1;
-        if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
-            start = 2;
-            for (let name in attrs)
-                if (attrs[name] != null) {
-                    let space = name.indexOf(" ");
-                    if (space > 0)
-                        dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
-                    else
-                        dom.setAttribute(name, attrs[name]);
-                }
-        }
-        for (let i = start; i < structure.length; i++) {
-            let child = structure[i];
-            if (child === 0) {
-                if (i < structure.length - 1 || i > start)
-                    throw new RangeError("Content hole must be the only child of its parent node");
-                return { dom, contentDOM: dom };
-            }
-            else {
-                let { dom: inner, contentDOM: innerContent } = DOMSerializer.renderSpec(doc, child, xmlNS);
-                dom.appendChild(inner);
-                if (innerContent) {
-                    if (contentDOM)
-                        throw new RangeError("Multiple content holes");
-                    contentDOM = innerContent;
-                }
-            }
-        }
-        return { dom, contentDOM };
+    static renderSpec(doc, structure, xmlNS = null, blockArraysIn) {
+        return renderSpec(doc, structure, xmlNS, blockArraysIn);
     }
     /**
     Build a serializer using the [`toDOM`](https://prosemirror.net/docs/ref/#model.NodeSpec.toDOM)
@@ -28448,6 +28444,88 @@ function gatherToDOM(obj) {
 function doc(options) {
     return options.document || window.document;
 }
+const suspiciousAttributeCache = new WeakMap();
+function suspiciousAttributes(attrs) {
+    let value = suspiciousAttributeCache.get(attrs);
+    if (value === undefined)
+        suspiciousAttributeCache.set(attrs, value = suspiciousAttributesInner(attrs));
+    return value;
+}
+function suspiciousAttributesInner(attrs) {
+    let result = null;
+    function scan(value) {
+        if (value && typeof value == "object") {
+            if (Array.isArray(value)) {
+                if (typeof value[0] == "string") {
+                    if (!result)
+                        result = [];
+                    result.push(value);
+                }
+                else {
+                    for (let i = 0; i < value.length; i++)
+                        scan(value[i]);
+                }
+            }
+            else {
+                for (let prop in value)
+                    scan(value[prop]);
+            }
+        }
+    }
+    scan(attrs);
+    return result;
+}
+function renderSpec(doc, structure, xmlNS, blockArraysIn) {
+    if (typeof structure == "string")
+        return { dom: doc.createTextNode(structure) };
+    if (structure.nodeType != null)
+        return { dom: structure };
+    if (structure.dom && structure.dom.nodeType != null)
+        return structure;
+    let tagName = structure[0], suspicious;
+    if (typeof tagName != "string")
+        throw new RangeError("Invalid array passed to renderSpec");
+    if (blockArraysIn && (suspicious = suspiciousAttributes(blockArraysIn)) &&
+        suspicious.indexOf(structure) > -1)
+        throw new RangeError("Using an array from an attribute object as a DOM spec. This may be an attempted cross site scripting attack.");
+    let space = tagName.indexOf(" ");
+    if (space > 0) {
+        xmlNS = tagName.slice(0, space);
+        tagName = tagName.slice(space + 1);
+    }
+    let contentDOM;
+    let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
+    let attrs = structure[1], start = 1;
+    if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
+        start = 2;
+        for (let name in attrs)
+            if (attrs[name] != null) {
+                let space = name.indexOf(" ");
+                if (space > 0)
+                    dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
+                else
+                    dom.setAttribute(name, attrs[name]);
+            }
+    }
+    for (let i = start; i < structure.length; i++) {
+        let child = structure[i];
+        if (child === 0) {
+            if (i < structure.length - 1 || i > start)
+                throw new RangeError("Content hole must be the only child of its parent node");
+            return { dom, contentDOM: dom };
+        }
+        else {
+            let { dom: inner, contentDOM: innerContent } = renderSpec(doc, child, xmlNS, blockArraysIn);
+            dom.appendChild(inner);
+            if (innerContent) {
+                if (contentDOM)
+                    throw new RangeError("Multiple content holes");
+                contentDOM = innerContent;
+            }
+        }
+    }
+    return { dom, contentDOM };
+}
 
 export { ContentMatch, DOMParser, DOMSerializer, Fragment, Mark, MarkType, Node, NodeRange, NodeType, ReplaceError, ResolvedPos, Schema, Slice };
 `````
@@ -28459,7 +28537,7 @@ export { ContentMatch, DOMParser, DOMSerializer, Fragment, Mark, MarkType, Node,
 `````
 {
   "name": "prosemirror-model",
-  "version": "1.21.3",
+  "version": "1.22.2",
   "description": "ProseMirror's document model",
   "type": "module",
   "main": "dist/index.cjs",
@@ -28845,9 +28923,9 @@ class StyleSet {
   "requires": true,
   "packages": {
     "node_modules/@codemirror/autocomplete": {
-      "version": "6.16.3",
-      "resolved": "https://registry.npmjs.org/@codemirror/autocomplete/-/autocomplete-6.16.3.tgz",
-      "integrity": "sha512-Vl/tIeRVVUCRDuOG48lttBasNQu8usGgXQawBXI7WJAiUDSFOfzflmEsZFZo48mAvAaa4FZ/4/yLLxFtdJaKYA==",
+      "version": "6.17.0",
+      "resolved": "https://registry.npmjs.org/@codemirror/autocomplete/-/autocomplete-6.17.0.tgz",
+      "integrity": "sha512-fdfj6e6ZxZf8yrkMHUSJJir7OJkHkZKaOZGzLWIYp2PZ3jd+d+UjG8zVPqJF6d3bKxkhvXTPan/UZ1t7Bqm0gA==",
       "dependencies": {
         "@codemirror/language": "^6.0.0",
         "@codemirror/state": "^6.0.0",
@@ -29033,10 +29111,21 @@ class StyleSet {
       "resolved": "https://registry.npmjs.org/@codemirror/state/-/state-6.4.1.tgz",
       "integrity": "sha512-QkEyUiLhsJoZkbumGZlswmAhA7CBU02Wrz7zvH4SrcifbsqwlXShVXg65f3v/ts57W3dqyamEriMhij1Z3Zz4A=="
     },
+    "node_modules/@codemirror/theme-one-dark": {
+      "version": "6.1.2",
+      "resolved": "https://registry.npmjs.org/@codemirror/theme-one-dark/-/theme-one-dark-6.1.2.tgz",
+      "integrity": "sha512-F+sH0X16j/qFLMAfbciKTxVOwkdAS336b7AXTKOZhy8BR3eH/RelsnLgLFINrpST63mmN2OuwUt0W2ndUgYwUA==",
+      "dependencies": {
+        "@codemirror/language": "^6.0.0",
+        "@codemirror/state": "^6.0.0",
+        "@codemirror/view": "^6.0.0",
+        "@lezer/highlight": "^1.0.0"
+      }
+    },
     "node_modules/@codemirror/view": {
-      "version": "6.28.2",
-      "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.28.2.tgz",
-      "integrity": "sha512-A3DmyVfjgPsGIjiJqM/zvODUAPQdQl3ci0ghehYNnbt5x+o76xq+dL5+mMBuysDXnI3kapgOkoeJ0sbtL/3qPw==",
+      "version": "6.28.5",
+      "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.28.5.tgz",
+      "integrity": "sha512-NkUtfUa1lV7Jqg5DfHE/uLl7jKyoymDkaueMQXzePYuezL7FwX3ATANy74iAGlHCGe25hBGB0R+I5dC5EZ5JBg==",
       "dependencies": {
         "@codemirror/state": "^6.4.0",
         "style-mod": "^4.1.0",
@@ -29206,9 +29295,9 @@ class StyleSet {
       }
     },
     "node_modules/prosemirror-history": {
-      "version": "1.4.0",
-      "resolved": "https://registry.npmjs.org/prosemirror-history/-/prosemirror-history-1.4.0.tgz",
-      "integrity": "sha512-UUiGzDVcqo1lovOPdi9YxxUps3oBFWAIYkXLu3Ot+JPv1qzVogRbcizxK3LhHmtaUxclohgiOVesRw5QSlMnbQ==",
+      "version": "1.4.1",
+      "resolved": "https://registry.npmjs.org/prosemirror-history/-/prosemirror-history-1.4.1.tgz",
+      "integrity": "sha512-2JZD8z2JviJrboD9cPuX/Sv/1ChFng+xh2tChQ2X4bB2HeK+rra/bmJ3xGntCcjhOqIzSDG6Id7e8RJ9QPXLEQ==",
       "dependencies": {
         "prosemirror-state": "^1.2.2",
         "prosemirror-transform": "^1.0.0",
@@ -29246,25 +29335,25 @@ class StyleSet {
       }
     },
     "node_modules/prosemirror-model": {
-      "version": "1.21.3",
-      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.3.tgz",
-      "integrity": "sha512-nt2Xs/RNGepD9hrrkzXvtCm1mpGJoQfFSPktGa0BF/aav6XsnmVGZ9sTXNWRLupAz5SCLa3EyKlFeK7zJWROKg==",
+      "version": "1.22.2",
+      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.22.2.tgz",
+      "integrity": "sha512-I4lS7HHIW47D0Xv/gWmi4iUWcQIDYaJKd8Hk4+lcSps+553FlQrhmxtItpEvTr75iAruhzVShVp6WUwsT6Boww==",
       "dependencies": {
         "orderedmap": "^2.0.0"
       }
     },
     "node_modules/prosemirror-schema-basic": {
-      "version": "1.2.2",
-      "resolved": "https://registry.npmjs.org/prosemirror-schema-basic/-/prosemirror-schema-basic-1.2.2.tgz",
-      "integrity": "sha512-/dT4JFEGyO7QnNTe9UaKUhjDXbTNkiWTq/N4VpKaF79bBjSExVV2NXmJpcM7z/gD7mbqNjxbmWW5nf1iNSSGnw==",
+      "version": "1.2.3",
+      "resolved": "https://registry.npmjs.org/prosemirror-schema-basic/-/prosemirror-schema-basic-1.2.3.tgz",
+      "integrity": "sha512-h+H0OQwZVqMon1PNn0AG9cTfx513zgIG2DY00eJ00Yvgb3UD+GQ/VlWW5rcaxacpCGT1Yx8nuhwXk4+QbXUfJA==",
       "dependencies": {
         "prosemirror-model": "^1.19.0"
       }
     },
     "node_modules/prosemirror-schema-list": {
-      "version": "1.4.0",
-      "resolved": "https://registry.npmjs.org/prosemirror-schema-list/-/prosemirror-schema-list-1.4.0.tgz",
-      "integrity": "sha512-nZOIq/AkBSzCENxUyLm5ltWE53e2PLk65ghMN8qLQptOmDVixZlPqtMeQdiNw0odL9vNpalEjl3upgRkuJ/Jyw==",
+      "version": "1.4.1",
+      "resolved": "https://registry.npmjs.org/prosemirror-schema-list/-/prosemirror-schema-list-1.4.1.tgz",
+      "integrity": "sha512-jbDyaP/6AFfDfu70VzySsD75Om2t3sXTOdl5+31Wlxlg62td1haUpty/ybajSfJ1pkGadlOfwQq9kgW5IMo1Rg==",
       "dependencies": {
         "prosemirror-model": "^1.0.0",
         "prosemirror-state": "^1.0.0",
@@ -29290,9 +29379,9 @@ class StyleSet {
       }
     },
     "node_modules/prosemirror-view": {
-      "version": "1.33.8",
-      "resolved": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-1.33.8.tgz",
-      "integrity": "sha512-4PhMr/ufz2cdvFgpUAnZfs+0xij3RsFysreeG9V/utpwX7AJtYCDVyuRxzWoMJIEf4C7wVihuBNMPpFLPCiLQw==",
+      "version": "1.33.9",
+      "resolved": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-1.33.9.tgz",
+      "integrity": "sha512-xV1A0Vz9cIcEnwmMhKKFAOkfIp8XmJRnaZoPqNXrPS7EK5n11Ov8V76KhR0RsfQd/SIzmWY+bg+M44A2Lx/Nnw==",
       "dependencies": {
         "prosemirror-model": "^1.20.0",
         "prosemirror-state": "^1.0.0",
@@ -29906,10 +29995,19 @@ class CompletionContext {
     only return completions when either there is part of a
     completable entity before the cursor, or `explicit` is true.
     */
-    explicit) {
+    explicit, 
+    /**
+    The editor view. May be undefined if the context was created
+    in a situation where there is no such view available, such as
+    in synchronous updates via
+    [`CompletionResult.update`](https://codemirror.net/6/docs/ref/#autocomplete.CompletionResult.update)
+    or when called by test code.
+    */
+    view) {
         this.state = state;
         this.pos = pos;
         this.explicit = explicit;
+        this.view = view;
         /**
         @internal
         */
@@ -30762,13 +30860,18 @@ function makeAttrs(id, selected) {
     return result;
 }
 const none = [];
-function getUserEvent(tr, conf) {
+function getUpdateType(tr, conf) {
     if (tr.isUserEvent("input.complete")) {
         let completion = tr.annotation(pickedCompletion);
         if (completion && conf.activateOnCompletion(completion))
-            return "input";
+            return 4 /* UpdateType.Activate */ | 8 /* UpdateType.Reset */;
     }
-    return tr.isUserEvent("input.type") ? "input" : tr.isUserEvent("delete.backward") ? "delete" : null;
+    let typing = tr.isUserEvent("input.type");
+    return typing && conf.activateOnTyping ? 4 /* UpdateType.Activate */ | 1 /* UpdateType.Typing */
+        : typing ? 1 /* UpdateType.Typing */
+            : tr.isUserEvent("delete.backward") ? 2 /* UpdateType.Backspacing */
+                : tr.selection ? 8 /* UpdateType.Reset */
+                    : tr.docChanged ? 16 /* UpdateType.ResetIfTouching */ : 0 /* UpdateType.None */;
 }
 class ActiveSource {
     constructor(source, state, explicitPos = -1) {
@@ -30778,13 +30881,12 @@ class ActiveSource {
     }
     hasResult() { return false; }
     update(tr, conf) {
-        let event = getUserEvent(tr, conf), value = this;
-        if (event)
-            value = value.handleUserEvent(tr, event, conf);
-        else if (tr.docChanged)
-            value = value.handleChange(tr);
-        else if (tr.selection && value.state != 0 /* State.Inactive */)
+        let type = getUpdateType(tr, conf), value = this;
+        if ((type & 8 /* UpdateType.Reset */) || (type & 16 /* UpdateType.ResetIfTouching */) && this.touches(tr))
             value = new ActiveSource(value.source, 0 /* State.Inactive */);
+        if ((type & 4 /* UpdateType.Activate */) && value.state == 0 /* State.Inactive */)
+            value = new ActiveSource(this.source, 1 /* State.Pending */);
+        value = value.updateFor(tr, type);
         for (let effect of tr.effects) {
             if (effect.is(startCompletionEffect))
                 value = new ActiveSource(value.source, 1 /* State.Pending */, effect.value ? cur(tr.state) : -1);
@@ -30797,14 +30899,12 @@ class ActiveSource {
         }
         return value;
     }
-    handleUserEvent(tr, type, conf) {
-        return type == "delete" || !conf.activateOnTyping ? this.map(tr.changes) : new ActiveSource(this.source, 1 /* State.Pending */);
-    }
-    handleChange(tr) {
-        return tr.changes.touchesRange(cur(tr.startState)) ? new ActiveSource(this.source, 0 /* State.Inactive */) : this.map(tr.changes);
-    }
+    updateFor(tr, type) { return this.map(tr.changes); }
     map(changes) {
         return changes.empty || this.explicitPos < 0 ? this : new ActiveSource(this.source, this.state, changes.mapPos(this.explicitPos));
+    }
+    touches(tr) {
+        return tr.changes.touchesRange(cur(tr.state));
     }
 }
 class ActiveResult extends ActiveSource {
@@ -30815,8 +30915,10 @@ class ActiveResult extends ActiveSource {
         this.to = to;
     }
     hasResult() { return true; }
-    handleUserEvent(tr, type, conf) {
+    updateFor(tr, type) {
         var _a;
+        if (!(type & 3 /* UpdateType.SimpleInteraction */))
+            return this.map(tr.changes);
         let result = this.result;
         if (result.map && !tr.changes.empty)
             result = result.map(result, tr.changes);
@@ -30824,8 +30926,8 @@ class ActiveResult extends ActiveSource {
         let pos = cur(tr.state);
         if ((this.explicitPos < 0 ? pos <= from : pos < this.from) ||
             pos > to || !result ||
-            type == "delete" && cur(tr.startState) == this.from)
-            return new ActiveSource(this.source, type == "input" && conf.activateOnTyping ? 1 /* State.Pending */ : 0 /* State.Inactive */);
+            (type & 2 /* UpdateType.Backspacing */) && cur(tr.startState) == this.from)
+            return new ActiveSource(this.source, type & 4 /* UpdateType.Activate */ ? 1 /* State.Pending */ : 0 /* State.Inactive */);
         let explicitPos = this.explicitPos < 0 ? -1 : tr.changes.mapPos(this.explicitPos);
         if (checkValid(result.validFor, tr.state, from, to))
             return new ActiveResult(this.source, explicitPos, result, from, to);
@@ -30834,9 +30936,6 @@ class ActiveResult extends ActiveSource {
             return new ActiveResult(this.source, explicitPos, result, result.from, (_a = result.to) !== null && _a !== void 0 ? _a : cur(tr.state));
         return new ActiveSource(this.source, 1 /* State.Pending */, explicitPos);
     }
-    handleChange(tr) {
-        return tr.changes.touchesRange(this.from, this.to) ? new ActiveSource(this.source, 0 /* State.Inactive */) : this.map(tr.changes);
-    }
     map(mapping) {
         if (mapping.empty)
             return this;
@@ -30844,6 +30943,9 @@ class ActiveResult extends ActiveSource {
         if (!result)
             return new ActiveSource(this.source, 0 /* State.Inactive */);
         return new ActiveResult(this.source, this.explicitPos < 0 ? -1 : mapping.mapPos(this.explicitPos), this.result, mapping.mapPos(this.from), mapping.mapPos(this.to, 1));
+    }
+    touches(tr) {
+        return tr.changes.touchesRange(this.from, this.to);
     }
 }
 function checkValid(validFor, state, from, to) {
@@ -30961,7 +31063,8 @@ const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
         if (!update.selectionSet && !update.docChanged && update.startState.field(completionState) == cState)
             return;
         let doesReset = update.transactions.some(tr => {
-            return (tr.selection || tr.docChanged) && !getUserEvent(tr, conf);
+            let type = getUpdateType(tr, conf);
+            return (type & 8 /* UpdateType.Reset */) || (tr.selection || tr.docChanged) && !(type & 3 /* UpdateType.SimpleInteraction */);
         });
         for (let i = 0; i < this.running.length; i++) {
             let query = this.running[i];
@@ -30991,7 +31094,7 @@ const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
             ? setTimeout(() => this.startUpdate(), delay) : -1;
         if (this.composing != 0 /* CompositionState.None */)
             for (let tr of update.transactions) {
-                if (getUserEvent(tr, conf) == "input")
+                if (tr.isUserEvent("input.type"))
                     this.composing = 2 /* CompositionState.Changed */;
                 else if (this.composing == 2 /* CompositionState.Changed */ && tr.selection)
                     this.composing = 3 /* CompositionState.ChangedAndMoved */;
@@ -31008,7 +31111,7 @@ const completionPlugin = /*@__PURE__*/ViewPlugin.fromClass(class {
     }
     startQuery(active) {
         let { state } = this.view, pos = cur(state);
-        let context = new CompletionContext(state, pos, active.explicitPos == pos);
+        let context = new CompletionContext(state, pos, active.explicitPos == pos, this.view);
         let pending = new RunningQuery(active, context);
         this.running.push(pending);
         Promise.resolve(active.source(context)).then(result => {
@@ -31921,7 +32024,7 @@ export { CompletionContext, acceptCompletion, autocompletion, clearSnippet, clos
 `````
 {
   "name": "@codemirror/autocomplete",
-  "version": "6.16.3",
+  "version": "6.17.0",
   "description": "Autocompletion for the CodeMirror code editor",
   "scripts": {
     "test": "cm-runtests",
@@ -31964,6 +32067,195 @@ export { CompletionContext, acceptCompletion, autocompletion, clearSnippet, clos
   "repository": {
     "type": "git",
     "url": "https://github.com/codemirror/autocomplete.git"
+  }
+}
+`````
+
+
+
+`node_modules/@codemirror/theme-one-dark/dist/index.js`
+
+`````
+import { EditorView } from '@codemirror/view';
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
+
+// Using https://github.com/one-dark/vscode-one-dark-theme/ as reference for the colors
+const chalky = "#e5c07b", coral = "#e06c75", cyan = "#56b6c2", invalid = "#ffffff", ivory = "#abb2bf", stone = "#7d8799", // Brightened compared to original to increase contrast
+malibu = "#61afef", sage = "#98c379", whiskey = "#d19a66", violet = "#c678dd", darkBackground = "#21252b", highlightBackground = "#2c313a", background = "#282c34", tooltipBackground = "#353a42", selection = "#3E4451", cursor = "#528bff";
+/**
+The colors used in the theme, as CSS color strings.
+*/
+const color = {
+    chalky,
+    coral,
+    cyan,
+    invalid,
+    ivory,
+    stone,
+    malibu,
+    sage,
+    whiskey,
+    violet,
+    darkBackground,
+    highlightBackground,
+    background,
+    tooltipBackground,
+    selection,
+    cursor
+};
+/**
+The editor theme styles for One Dark.
+*/
+const oneDarkTheme = /*@__PURE__*/EditorView.theme({
+    "&": {
+        color: ivory,
+        backgroundColor: background
+    },
+    ".cm-content": {
+        caretColor: cursor
+    },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: cursor },
+    "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: selection },
+    ".cm-panels": { backgroundColor: darkBackground, color: ivory },
+    ".cm-panels.cm-panels-top": { borderBottom: "2px solid black" },
+    ".cm-panels.cm-panels-bottom": { borderTop: "2px solid black" },
+    ".cm-searchMatch": {
+        backgroundColor: "#72a1ff59",
+        outline: "1px solid #457dff"
+    },
+    ".cm-searchMatch.cm-searchMatch-selected": {
+        backgroundColor: "#6199ff2f"
+    },
+    ".cm-activeLine": { backgroundColor: "#6699ff0b" },
+    ".cm-selectionMatch": { backgroundColor: "#aafe661a" },
+    "&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket": {
+        backgroundColor: "#bad0f847"
+    },
+    ".cm-gutters": {
+        backgroundColor: background,
+        color: stone,
+        border: "none"
+    },
+    ".cm-activeLineGutter": {
+        backgroundColor: highlightBackground
+    },
+    ".cm-foldPlaceholder": {
+        backgroundColor: "transparent",
+        border: "none",
+        color: "#ddd"
+    },
+    ".cm-tooltip": {
+        border: "none",
+        backgroundColor: tooltipBackground
+    },
+    ".cm-tooltip .cm-tooltip-arrow:before": {
+        borderTopColor: "transparent",
+        borderBottomColor: "transparent"
+    },
+    ".cm-tooltip .cm-tooltip-arrow:after": {
+        borderTopColor: tooltipBackground,
+        borderBottomColor: tooltipBackground
+    },
+    ".cm-tooltip-autocomplete": {
+        "& > ul > li[aria-selected]": {
+            backgroundColor: highlightBackground,
+            color: ivory
+        }
+    }
+}, { dark: true });
+/**
+The highlighting style for code in the One Dark theme.
+*/
+const oneDarkHighlightStyle = /*@__PURE__*/HighlightStyle.define([
+    { tag: tags.keyword,
+        color: violet },
+    { tag: [tags.name, tags.deleted, tags.character, tags.propertyName, tags.macroName],
+        color: coral },
+    { tag: [/*@__PURE__*/tags.function(tags.variableName), tags.labelName],
+        color: malibu },
+    { tag: [tags.color, /*@__PURE__*/tags.constant(tags.name), /*@__PURE__*/tags.standard(tags.name)],
+        color: whiskey },
+    { tag: [/*@__PURE__*/tags.definition(tags.name), tags.separator],
+        color: ivory },
+    { tag: [tags.typeName, tags.className, tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace],
+        color: chalky },
+    { tag: [tags.operator, tags.operatorKeyword, tags.url, tags.escape, tags.regexp, tags.link, /*@__PURE__*/tags.special(tags.string)],
+        color: cyan },
+    { tag: [tags.meta, tags.comment],
+        color: stone },
+    { tag: tags.strong,
+        fontWeight: "bold" },
+    { tag: tags.emphasis,
+        fontStyle: "italic" },
+    { tag: tags.strikethrough,
+        textDecoration: "line-through" },
+    { tag: tags.link,
+        color: stone,
+        textDecoration: "underline" },
+    { tag: tags.heading,
+        fontWeight: "bold",
+        color: coral },
+    { tag: [tags.atom, tags.bool, /*@__PURE__*/tags.special(tags.variableName)],
+        color: whiskey },
+    { tag: [tags.processingInstruction, tags.string, tags.inserted],
+        color: sage },
+    { tag: tags.invalid,
+        color: invalid },
+]);
+/**
+Extension to enable the One Dark theme (both the editor theme and
+the highlight style).
+*/
+const oneDark = [oneDarkTheme, /*@__PURE__*/syntaxHighlighting(oneDarkHighlightStyle)];
+
+export { color, oneDark, oneDarkHighlightStyle, oneDarkTheme };
+`````
+
+
+
+`node_modules/@codemirror/theme-one-dark/package.json`
+
+`````
+{
+  "name": "@codemirror/theme-one-dark",
+  "version": "6.1.2",
+  "description": "One Dark theme for the CodeMirror code editor",
+  "scripts": {
+    "test": "cm-runtests",
+    "prepare": "cm-buildhelper src/one-dark.ts"
+  },
+  "keywords": [
+    "editor",
+    "code"
+  ],
+  "author": {
+    "name": "Marijn Haverbeke",
+    "email": "marijn@haverbeke.berlin",
+    "url": "http://marijnhaverbeke.nl"
+  },
+  "type": "module",
+  "main": "dist/index.cjs",
+  "exports": {
+    "import": "./dist/index.js",
+    "require": "./dist/index.cjs"
+  },
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "sideEffects": false,
+  "license": "MIT",
+  "dependencies": {
+    "@lezer/highlight": "^1.0.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0"
+  },
+  "devDependencies": {
+    "@codemirror/buildhelper": "^0.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/codemirror/theme-one-dark.git"
   }
 }
 `````
@@ -43220,15 +43512,17 @@ function scrollRectIntoView(dom, rect, side, x, y, xMargin, yMargin, ltr) {
         }
     }
 }
-function scrollableParent(dom) {
-    let doc = dom.ownerDocument;
+function scrollableParents(dom) {
+    let doc = dom.ownerDocument, x, y;
     for (let cur = dom.parentNode; cur;) {
-        if (cur == doc.body) {
+        if (cur == doc.body || (x && y)) {
             break;
         }
         else if (cur.nodeType == 1) {
-            if (cur.scrollHeight > cur.clientHeight || cur.scrollWidth > cur.clientWidth)
-                return cur;
+            if (!y && cur.scrollHeight > cur.clientHeight)
+                y = cur;
+            if (!x && cur.scrollWidth > cur.clientWidth)
+                x = cur;
             cur = cur.assignedSlot || cur.parentNode;
         }
         else if (cur.nodeType == 11) {
@@ -43238,7 +43532,7 @@ function scrollableParent(dom) {
             break;
         }
     }
-    return null;
+    return { x, y };
 }
 class DOMSelectionState {
     constructor() {
@@ -46992,7 +47286,7 @@ class MouseSelection {
         this.scrollSpeed = { x: 0, y: 0 };
         this.scrolling = -1;
         this.lastEvent = startEvent;
-        this.scrollParent = scrollableParent(view.contentDOM);
+        this.scrollParents = scrollableParents(view.contentDOM);
         this.atoms = view.state.facet(atomicRanges).map(f => f(view));
         let doc = view.contentDOM.ownerDocument;
         doc.addEventListener("mousemove", this.move = this.move.bind(this));
@@ -47008,24 +47302,26 @@ class MouseSelection {
             this.select(event);
     }
     move(event) {
-        var _a;
         if (event.buttons == 0)
             return this.destroy();
         if (this.dragging || this.dragging == null && dist(this.startEvent, event) < 10)
             return;
         this.select(this.lastEvent = event);
         let sx = 0, sy = 0;
-        let rect = ((_a = this.scrollParent) === null || _a === void 0 ? void 0 : _a.getBoundingClientRect())
-            || { left: 0, top: 0, right: this.view.win.innerWidth, bottom: this.view.win.innerHeight };
+        let left = 0, top = 0, right = this.view.win.innerWidth, bottom = this.view.win.innerHeight;
+        if (this.scrollParents.x)
+            ({ left, right } = this.scrollParents.x.getBoundingClientRect());
+        if (this.scrollParents.y)
+            ({ top, bottom } = this.scrollParents.y.getBoundingClientRect());
         let margins = getScrollMargins(this.view);
-        if (event.clientX - margins.left <= rect.left + dragScrollMargin)
-            sx = -dragScrollSpeed(rect.left - event.clientX);
-        else if (event.clientX + margins.right >= rect.right - dragScrollMargin)
-            sx = dragScrollSpeed(event.clientX - rect.right);
-        if (event.clientY - margins.top <= rect.top + dragScrollMargin)
-            sy = -dragScrollSpeed(rect.top - event.clientY);
-        else if (event.clientY + margins.bottom >= rect.bottom - dragScrollMargin)
-            sy = dragScrollSpeed(event.clientY - rect.bottom);
+        if (event.clientX - margins.left <= left + dragScrollMargin)
+            sx = -dragScrollSpeed(left - event.clientX);
+        else if (event.clientX + margins.right >= right - dragScrollMargin)
+            sx = dragScrollSpeed(event.clientX - right);
+        if (event.clientY - margins.top <= top + dragScrollMargin)
+            sy = -dragScrollSpeed(top - event.clientY);
+        else if (event.clientY + margins.bottom >= bottom - dragScrollMargin)
+            sy = dragScrollSpeed(event.clientY - bottom);
         this.setScrollSpeed(sx, sy);
     }
     up(event) {
@@ -47054,13 +47350,17 @@ class MouseSelection {
         }
     }
     scroll() {
-        if (this.scrollParent) {
-            this.scrollParent.scrollLeft += this.scrollSpeed.x;
-            this.scrollParent.scrollTop += this.scrollSpeed.y;
+        let { x, y } = this.scrollSpeed;
+        if (x && this.scrollParents.x) {
+            this.scrollParents.x.scrollLeft += x;
+            x = 0;
         }
-        else {
-            this.view.win.scrollBy(this.scrollSpeed.x, this.scrollSpeed.y);
+        if (y && this.scrollParents.y) {
+            this.scrollParents.y.scrollTop += y;
+            y = 0;
         }
+        if (x || y)
+            this.view.win.scrollBy(x, y);
         if (this.dragging === false)
             this.select(this.lastEvent);
     }
@@ -50037,6 +50337,10 @@ class DOMObserver {
         clearTimeout(this.resizeTimeout);
         this.win.cancelAnimationFrame(this.delayedFlush);
         this.win.cancelAnimationFrame(this.flushingAndroidKey);
+        if (this.editContext) {
+            this.view.contentDOM.editContext = null;
+            this.editContext.destroy();
+        }
     }
 }
 function findChild(cView, dom, dir) {
@@ -50096,13 +50400,14 @@ class EditContextManager {
         // that sometimes breaks series of multiple edits made for a single
         // user action on some Android keyboards)
         this.pendingContextChange = null;
+        this.handlers = Object.create(null);
         this.resetRange(view.state);
         let context = this.editContext = new window.EditContext({
             text: view.state.doc.sliceString(this.from, this.to),
             selectionStart: this.toContextPos(Math.max(this.from, Math.min(this.to, view.state.selection.main.anchor))),
             selectionEnd: this.toContextPos(view.state.selection.main.head)
         });
-        context.addEventListener("textupdate", e => {
+        this.handlers.textupdate = e => {
             let { anchor } = view.state.selection.main;
             let change = { from: this.toEditorPos(e.updateRangeStart),
                 to: this.toEditorPos(e.updateRangeEnd),
@@ -50113,7 +50418,7 @@ class EditContextManager {
                 change.from = anchor;
             else if (change.to == this.to && anchor > this.to)
                 change.to = anchor;
-            // Edit context sometimes fire empty changes
+            // Edit contexts sometimes fire empty changes
             if (change.from == change.to && !change.insert.length)
                 return;
             this.pendingContextChange = change;
@@ -50122,18 +50427,18 @@ class EditContextManager {
             // that the context is in sync with the editor state again.
             if (this.pendingContextChange)
                 this.revertPending(view.state);
-        });
-        context.addEventListener("characterboundsupdate", e => {
+        };
+        this.handlers.characterboundsupdate = e => {
             let rects = [], prev = null;
             for (let i = this.toEditorPos(e.rangeStart), end = this.toEditorPos(e.rangeEnd); i < end; i++) {
                 let rect = view.coordsForChar(i);
-                prev = (rect && new DOMRect(rect.left, rect.right, rect.right - rect.left, rect.bottom - rect.top))
+                prev = (rect && new DOMRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top))
                     || prev || new DOMRect;
                 rects.push(prev);
             }
             context.updateCharacterBounds(e.rangeStart, rects);
-        });
-        context.addEventListener("textformatupdate", e => {
+        };
+        this.handlers.textformatupdate = e => {
             let deco = [];
             for (let format of e.getTextFormats()) {
                 let lineStyle = format.underlineStyle, thickness = format.underlineThickness;
@@ -50144,17 +50449,19 @@ class EditContextManager {
                 }
             }
             view.dispatch({ effects: setEditContextFormatting.of(Decoration.set(deco)) });
-        });
-        context.addEventListener("compositionstart", () => {
+        };
+        this.handlers.compositionstart = () => {
             if (view.inputState.composing < 0) {
                 view.inputState.composing = 0;
                 view.inputState.compositionFirstChange = true;
             }
-        });
-        context.addEventListener("compositionend", () => {
+        };
+        this.handlers.compositionend = () => {
             view.inputState.composing = -1;
             view.inputState.compositionFirstChange = null;
-        });
+        };
+        for (let event in this.handlers)
+            context.addEventListener(event, this.handlers[event]);
         this.measureReq = { read: view => {
                 this.editContext.updateControlBounds(view.contentDOM.getBoundingClientRect());
                 let sel = getSelection(view.root);
@@ -50172,6 +50479,7 @@ class EditContextManager {
                 if (pending.from == fromA && pending.to == toA && pending.insert.eq(insert)) {
                     pending = this.pendingContextChange = null; // Match
                     off += dLen;
+                    this.to += dLen;
                     return;
                 }
                 else { // Mismatch, revert
@@ -50237,6 +50545,10 @@ class EditContextManager {
     }
     toEditorPos(contextPos) { return contextPos + this.from; }
     toContextPos(editorPos) { return editorPos - this.from; }
+    destroy() {
+        for (let event in this.handlers)
+            this.editContext.removeEventListener(event, this.handlers[event]);
+    }
 }
 
 // The editor's update state machine looks something like this:
@@ -53990,7 +54302,7 @@ export { BidiSpan, BlockInfo, BlockType, Decoration, Direction, EditorView, Gutt
 `````
 {
   "name": "@codemirror/view",
-  "version": "6.28.2",
+  "version": "6.28.5",
   "description": "DOM view component for the CodeMirror code editor",
   "scripts": {
     "test": "cm-runtests",
@@ -57384,7 +57696,7 @@ function add(elt, child) {
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@codemirror/autocomplete": "^6.16.3",
+    "@codemirror/autocomplete": "^6.17.0",
     "@codemirror/commands": "^6.6.0",
     "@codemirror/lang-css": "^6.2.1",
     "@codemirror/lang-html": "^6.4.9",
@@ -57400,18 +57712,19 @@ function add(elt, child) {
     "@codemirror/lint": "^6.8.1",
     "@codemirror/search": "^6.5.6",
     "@codemirror/state": "^6.4.1",
-    "@codemirror/view": "^6.28.2",
+    "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.28.5",
     "@lezer/highlight": "^1.2.0",
     "@rollup/browser": "^3.29.1",
     "prosemirror-commands": "^1.5.2",
     "prosemirror-example-setup": "^1.2.2",
-    "prosemirror-history": "^1.4.0",
+    "prosemirror-history": "^1.4.1",
     "prosemirror-keymap": "^1.2.2",
-    "prosemirror-model": "^1.21.3",
-    "prosemirror-schema-basic": "^1.2.2",
-    "prosemirror-schema-list": "^1.4.0",
+    "prosemirror-model": "^1.22.2",
+    "prosemirror-schema-basic": "^1.2.3",
+    "prosemirror-schema-list": "^1.4.1",
     "prosemirror-state": "^1.4.3",
-    "prosemirror-view": "^1.33.8"
+    "prosemirror-view": "^1.33.9"
   }
 }
 `````
@@ -57432,7 +57745,7 @@ function add(elt, child) {
       "version": "1.0.0",
       "license": "ISC",
       "dependencies": {
-        "@codemirror/autocomplete": "^6.16.3",
+        "@codemirror/autocomplete": "^6.17.0",
         "@codemirror/commands": "^6.6.0",
         "@codemirror/lang-css": "^6.2.1",
         "@codemirror/lang-html": "^6.4.9",
@@ -57448,24 +57761,25 @@ function add(elt, child) {
         "@codemirror/lint": "^6.8.1",
         "@codemirror/search": "^6.5.6",
         "@codemirror/state": "^6.4.1",
-        "@codemirror/view": "^6.28.2",
+        "@codemirror/theme-one-dark": "^6.1.2",
+        "@codemirror/view": "^6.28.5",
         "@lezer/highlight": "^1.2.0",
         "@rollup/browser": "^3.29.1",
         "prosemirror-commands": "^1.5.2",
         "prosemirror-example-setup": "^1.2.2",
-        "prosemirror-history": "^1.4.0",
+        "prosemirror-history": "^1.4.1",
         "prosemirror-keymap": "^1.2.2",
-        "prosemirror-model": "^1.21.3",
-        "prosemirror-schema-basic": "^1.2.2",
-        "prosemirror-schema-list": "^1.4.0",
+        "prosemirror-model": "^1.22.2",
+        "prosemirror-schema-basic": "^1.2.3",
+        "prosemirror-schema-list": "^1.4.1",
         "prosemirror-state": "^1.4.3",
-        "prosemirror-view": "^1.33.8"
+        "prosemirror-view": "^1.33.9"
       }
     },
     "node_modules/@codemirror/autocomplete": {
-      "version": "6.16.3",
-      "resolved": "https://registry.npmjs.org/@codemirror/autocomplete/-/autocomplete-6.16.3.tgz",
-      "integrity": "sha512-Vl/tIeRVVUCRDuOG48lttBasNQu8usGgXQawBXI7WJAiUDSFOfzflmEsZFZo48mAvAaa4FZ/4/yLLxFtdJaKYA==",
+      "version": "6.17.0",
+      "resolved": "https://registry.npmjs.org/@codemirror/autocomplete/-/autocomplete-6.17.0.tgz",
+      "integrity": "sha512-fdfj6e6ZxZf8yrkMHUSJJir7OJkHkZKaOZGzLWIYp2PZ3jd+d+UjG8zVPqJF6d3bKxkhvXTPan/UZ1t7Bqm0gA==",
       "dependencies": {
         "@codemirror/language": "^6.0.0",
         "@codemirror/state": "^6.0.0",
@@ -57651,10 +57965,21 @@ function add(elt, child) {
       "resolved": "https://registry.npmjs.org/@codemirror/state/-/state-6.4.1.tgz",
       "integrity": "sha512-QkEyUiLhsJoZkbumGZlswmAhA7CBU02Wrz7zvH4SrcifbsqwlXShVXg65f3v/ts57W3dqyamEriMhij1Z3Zz4A=="
     },
+    "node_modules/@codemirror/theme-one-dark": {
+      "version": "6.1.2",
+      "resolved": "https://registry.npmjs.org/@codemirror/theme-one-dark/-/theme-one-dark-6.1.2.tgz",
+      "integrity": "sha512-F+sH0X16j/qFLMAfbciKTxVOwkdAS336b7AXTKOZhy8BR3eH/RelsnLgLFINrpST63mmN2OuwUt0W2ndUgYwUA==",
+      "dependencies": {
+        "@codemirror/language": "^6.0.0",
+        "@codemirror/state": "^6.0.0",
+        "@codemirror/view": "^6.0.0",
+        "@lezer/highlight": "^1.0.0"
+      }
+    },
     "node_modules/@codemirror/view": {
-      "version": "6.28.2",
-      "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.28.2.tgz",
-      "integrity": "sha512-A3DmyVfjgPsGIjiJqM/zvODUAPQdQl3ci0ghehYNnbt5x+o76xq+dL5+mMBuysDXnI3kapgOkoeJ0sbtL/3qPw==",
+      "version": "6.28.5",
+      "resolved": "https://registry.npmjs.org/@codemirror/view/-/view-6.28.5.tgz",
+      "integrity": "sha512-NkUtfUa1lV7Jqg5DfHE/uLl7jKyoymDkaueMQXzePYuezL7FwX3ATANy74iAGlHCGe25hBGB0R+I5dC5EZ5JBg==",
       "dependencies": {
         "@codemirror/state": "^6.4.0",
         "style-mod": "^4.1.0",
@@ -57824,9 +58149,9 @@ function add(elt, child) {
       }
     },
     "node_modules/prosemirror-history": {
-      "version": "1.4.0",
-      "resolved": "https://registry.npmjs.org/prosemirror-history/-/prosemirror-history-1.4.0.tgz",
-      "integrity": "sha512-UUiGzDVcqo1lovOPdi9YxxUps3oBFWAIYkXLu3Ot+JPv1qzVogRbcizxK3LhHmtaUxclohgiOVesRw5QSlMnbQ==",
+      "version": "1.4.1",
+      "resolved": "https://registry.npmjs.org/prosemirror-history/-/prosemirror-history-1.4.1.tgz",
+      "integrity": "sha512-2JZD8z2JviJrboD9cPuX/Sv/1ChFng+xh2tChQ2X4bB2HeK+rra/bmJ3xGntCcjhOqIzSDG6Id7e8RJ9QPXLEQ==",
       "dependencies": {
         "prosemirror-state": "^1.2.2",
         "prosemirror-transform": "^1.0.0",
@@ -57864,25 +58189,25 @@ function add(elt, child) {
       }
     },
     "node_modules/prosemirror-model": {
-      "version": "1.21.3",
-      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.21.3.tgz",
-      "integrity": "sha512-nt2Xs/RNGepD9hrrkzXvtCm1mpGJoQfFSPktGa0BF/aav6XsnmVGZ9sTXNWRLupAz5SCLa3EyKlFeK7zJWROKg==",
+      "version": "1.22.2",
+      "resolved": "https://registry.npmjs.org/prosemirror-model/-/prosemirror-model-1.22.2.tgz",
+      "integrity": "sha512-I4lS7HHIW47D0Xv/gWmi4iUWcQIDYaJKd8Hk4+lcSps+553FlQrhmxtItpEvTr75iAruhzVShVp6WUwsT6Boww==",
       "dependencies": {
         "orderedmap": "^2.0.0"
       }
     },
     "node_modules/prosemirror-schema-basic": {
-      "version": "1.2.2",
-      "resolved": "https://registry.npmjs.org/prosemirror-schema-basic/-/prosemirror-schema-basic-1.2.2.tgz",
-      "integrity": "sha512-/dT4JFEGyO7QnNTe9UaKUhjDXbTNkiWTq/N4VpKaF79bBjSExVV2NXmJpcM7z/gD7mbqNjxbmWW5nf1iNSSGnw==",
+      "version": "1.2.3",
+      "resolved": "https://registry.npmjs.org/prosemirror-schema-basic/-/prosemirror-schema-basic-1.2.3.tgz",
+      "integrity": "sha512-h+H0OQwZVqMon1PNn0AG9cTfx513zgIG2DY00eJ00Yvgb3UD+GQ/VlWW5rcaxacpCGT1Yx8nuhwXk4+QbXUfJA==",
       "dependencies": {
         "prosemirror-model": "^1.19.0"
       }
     },
     "node_modules/prosemirror-schema-list": {
-      "version": "1.4.0",
-      "resolved": "https://registry.npmjs.org/prosemirror-schema-list/-/prosemirror-schema-list-1.4.0.tgz",
-      "integrity": "sha512-nZOIq/AkBSzCENxUyLm5ltWE53e2PLk65ghMN8qLQptOmDVixZlPqtMeQdiNw0odL9vNpalEjl3upgRkuJ/Jyw==",
+      "version": "1.4.1",
+      "resolved": "https://registry.npmjs.org/prosemirror-schema-list/-/prosemirror-schema-list-1.4.1.tgz",
+      "integrity": "sha512-jbDyaP/6AFfDfu70VzySsD75Om2t3sXTOdl5+31Wlxlg62td1haUpty/ybajSfJ1pkGadlOfwQq9kgW5IMo1Rg==",
       "dependencies": {
         "prosemirror-model": "^1.0.0",
         "prosemirror-state": "^1.0.0",
@@ -57908,9 +58233,9 @@ function add(elt, child) {
       }
     },
     "node_modules/prosemirror-view": {
-      "version": "1.33.8",
-      "resolved": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-1.33.8.tgz",
-      "integrity": "sha512-4PhMr/ufz2cdvFgpUAnZfs+0xij3RsFysreeG9V/utpwX7AJtYCDVyuRxzWoMJIEf4C7wVihuBNMPpFLPCiLQw==",
+      "version": "1.33.9",
+      "resolved": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-1.33.9.tgz",
+      "integrity": "sha512-xV1A0Vz9cIcEnwmMhKKFAOkfIp8XmJRnaZoPqNXrPS7EK5n11Ov8V76KhR0RsfQd/SIzmWY+bg+M44A2Lx/Nnw==",
       "dependencies": {
         "prosemirror-model": "^1.20.0",
         "prosemirror-state": "^1.0.0",
@@ -57979,6 +58304,7 @@ const packages = [
   '@codemirror/lang-xml',
   '@codemirror/lang-sql',
   '@codemirror/lang-wast',
+  '@codemirror/theme-one-dark',
   '@lezer/highlight',
   'prosemirror-state',
   'prosemirror-view',

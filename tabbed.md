@@ -121,6 +121,7 @@ export class FileContentView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.editEl = document.createElement('m-editor-code-edit')
+    this.editEl.dark = true
     this.shadowRoot.replaceChildren(this.editEl)
     this._name = ''
   }
@@ -263,6 +264,7 @@ export class NotebookCode extends HTMLElement {
     this.editor = document.createElement('m-editor-code-edit')
     this.editor.fileType = 'md'
     this.editor.lineWrapping = true
+    this.editor.dark = true
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }

@@ -165,8 +165,8 @@ export class TabItem extends HTMLElement {
 
   icons = {
     menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 14 24">
+        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
       </svg>
     `,
   }
@@ -260,7 +260,12 @@ export class TabItem extends HTMLElement {
         }
         svg {
           height: 24px;
-          width: 20px;
+          width: 10px;
+          margin-right: -3px;
+          opacity: 33%;
+        }
+        :host(.selected) svg {
+          opacity: 75%;
         }
       `)
     }

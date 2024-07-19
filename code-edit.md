@@ -27,11 +27,13 @@ import { history, defaultKeymap, historyKeymap } from '@codemirror/commands'
 import { closeBrackets, autocompletion, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
 import { lintKeymap } from '@codemirror/lint'
+import { oneDark } from '@codemirror/theme-one-dark'
 
 export class CodeEdit extends HTMLElement {
   constructor() {
     super()
     this.lineWrapping = false
+    this.dark = false
   }
 
   connectedCallback() {
@@ -80,12 +82,27 @@ export class CodeEdit extends HTMLElement {
   }
 
   set fileType(value) {
+    const previousFileType = this.fileType
     this._fileType = value
-    this.reconfigure()
+    if (this.fileType !== previousFileType) {
+      this.reconfigureLanguage()
+    }
   }
 
   get fileType() {
     return this._fileType
+  }
+
+  set dark(value) {
+    const previousDark = this.dark
+    this._dark = value
+    if (this.dark !== previousDark) {
+      this.reconfigureTheme()
+    }
+  }
+
+  get dark() {
+    return this._dark
   }
 
   set lineWrapping(value) {
@@ -96,11 +113,20 @@ export class CodeEdit extends HTMLElement {
     return this._lineWrapping
   }
 
-  reconfigure() {
+  reconfigureLanguage() {
     if (this.view) {
       const {langPlugins} = this
       this.view.dispatch({
         effects: this.languageCompartment.reconfigure(langPlugins)
+      })
+    }
+  }
+
+  reconfigureTheme() {
+    if (this.view) {
+      const {themePlugins} = this
+      this.view.dispatch({
+        effects: this.themeCompartment.reconfigure(themePlugins)
       })
     }
   }
@@ -159,9 +185,15 @@ export class CodeEdit extends HTMLElement {
     return langPlugins
   }
 
+  get themePlugins() {
+    return this.dark ? [oneDark] : []
+  }
+
   initEditor() {
     this.languageCompartment = new Compartment()
+    this.themeCompartment = new Compartment()
     const langPlugins = this.langPlugins
+    const themePlugins = this.themePlugins
     const basicSetup = [
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -202,6 +234,7 @@ export class CodeEdit extends HTMLElement {
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
         viewTheme,
+        this.themeCompartment.of(themePlugins),
         EditorView.updateListener.of(e => {
           if (e.docChanged) {
             this.dispatchEvent(new CustomEvent(
@@ -254,7 +287,13 @@ export class AppView extends HTMLElement {
     const codeEdit = document.createElement('code-edit')
     codeEdit.fileType = 'js'
     codeEdit.value = `const x = 9`
-    codeEdit.lineWrapping = true
+    codeEdit.dark = false
+    // setTimeout(() => {
+    //   codeEdit.dark = true
+    // }, 1500)
+    // setTimeout(() => {
+    //   codeEdit.fileType = 'html'
+    // }, 3000)
     this.shadowRoot.append(codeEdit)
   }
 }

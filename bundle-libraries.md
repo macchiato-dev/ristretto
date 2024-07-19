@@ -44,6 +44,7 @@ import {
 import { rust, rustLanguage } from '@codemirror/lang-rust'
 import { wast, wastLanguage } from '@codemirror/lang-wast'
 import { xml, xmlLanguage, completeFromSchema } from '@codemirror/lang-xml'
+import { oneDark, oneDarkTheme, oneDarkHighlightStyle, color } from '@codemirror/theme-one-dark'
 
 Macchiato.externalModules = {
   ...Macchiato.externalModules,
@@ -120,6 +121,9 @@ Macchiato.externalModules = {
   '@codemirror/lang-xml': {
     xml, xmlLanguage, completeFromSchema,
   },
+  '@codemirror/theme-one-dark': {
+    oneDark, oneDarkTheme, oneDarkHighlightStyle, color
+  }
 }
 ```
 
