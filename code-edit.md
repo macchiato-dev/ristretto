@@ -38,25 +38,26 @@ export class CodeEdit extends HTMLElement {
 
   connectedCallback() {
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styleSheet]
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.initEditor()
   }
 
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      flex-grow: 1;
-      background-color: #fff;
-      height: 100%;
-    }
-  `
-
-  static get styleSheet() {
+  static get styles() {
     if (this._styleSheet === undefined) {
       this._styleSheet = new CSSStyleSheet()
-      this._styleSheet.replaceSync(this.css)
+      this._styleSheet.replaceSync(`
+        :host {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          flex-grow: 1;
+          background-color: #fff;
+          height: 100%;
+        }
+        :host(.dark) {
+          background-color: #000;
+        }
+      `)
     }
     return this._styleSheet
   }
@@ -98,6 +99,7 @@ export class CodeEdit extends HTMLElement {
     this._dark = value
     if (this.dark !== previousDark) {
       this.reconfigureTheme()
+      this.classList.toggle('dark', Boolean(this.dark))
     }
   }
 
@@ -298,12 +300,17 @@ export class AppView extends HTMLElement {
 
     const style = document.createElement('style')
     style.textContent = `
+      code-edit {
+        scrollbar-color: yellow #0000;
+        max-height: 100vh;
+        overflow: auto;
+      }
     `
     this.shadowRoot.append(style)
 
     const codeEdit = document.createElement('code-edit')
     codeEdit.fileType = 'js'
-    codeEdit.value = `const x = 9\n`.repeat(100).trim()
+    codeEdit.value = `const x = 9 /* ${'-'.repeat(99)}*/\n`.repeat(100).trim()
     codeEdit.dark = true
     // setTimeout(() => {
     //   codeEdit.dark = true
