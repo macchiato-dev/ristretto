@@ -11,7 +11,16 @@ export class BlankPage extends HTMLElement {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.placeholder = document.createElement('div')
     this.placeholder.classList.add('placeholder')
-    this.placeholder.innerHTML = 'Escribe, arrastra o pega aquí...<br><br>Escriba <kbd>/</kbd> para comandos'
+    const kbd = document.createElement('kbd')
+    kbd.innerText = '/'
+    this.placeholder.append(
+      this.text.typePasteDrag,
+      document.createElement('br'),
+      document.createElement('br'),
+      this.text.commandBefore,
+      kbd,
+      this.text.commandAfter,
+    )
     this.blankPage = document.createElement('div')
     this.blankPage.classList.add('blank-page')
     this.blankPage.classList.add('edited')
@@ -56,6 +65,23 @@ export class BlankPage extends HTMLElement {
       this.blankPage.innerText = this.savedText
       this.savedText = undefined
     }
+  }
+
+  textByLang = {
+    es: {
+      typePasteDrag: 'Escribe, arrastra o pega aquí...',
+      commandBefore: 'Escriba ',
+      commandAfter: ' para comandos'
+    },
+    en: {
+      typePasteDrag: 'Type, drag, or paste here...',
+      commandBefore: 'Type ',
+      commandAfter: ' for commands'
+    }
+  }
+
+  get text() {
+    return this.textByLang[(this.lang || navigator.language).slice(0, 2)] ?? this.textByLang.en
   }
 
   static get styles() {
@@ -106,6 +132,7 @@ export class ExampleView extends HTMLElement {
     const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
     document.adoptedStyleSheets = [...sheets, this.constructor.globalStyles]
     this.blankPage = document.createElement('blank-page')
+    this.blankPage.lang = 'en'
     document.body.append(this.blankPage)
   }
 
