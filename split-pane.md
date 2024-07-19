@@ -12,10 +12,10 @@ export class SplitView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.start = this.start.bind(this)
-    this.mousemove = this.mousemove.bind(this)
-    this.mouseup = this.mouseup.bind(this)
-    this.mousedown = this.mousedown.bind(this)
-    this.addEventListener('mousedown', this.start)
+    this.pointermove = this.pointermove.bind(this)
+    this.pointerup = this.pointerup.bind(this)
+    this.pointerdown = this.pointerdown.bind(this)
+    this.addEventListener('pointerdown', this.start)
   }
 
   connectedCallback() {
@@ -32,10 +32,11 @@ export class SplitView extends HTMLElement {
     const {offsetX} = e
     e.preventDefault()
     e.stopPropagation()
-    document.body.removeEventListener('mousemove', this.mousemove)
-    document.body.removeEventListener('mouseup', this.mouseup)
-    document.body.addEventListener('mousemove', this.mousemove)
-    document.body.addEventListener('mouseup', this.mouseup)
+    this.shadowRoot.host.setPointerCapture(e.pointerId)
+    document.body.removeEventListener('pointermove', this.pointermove)
+    document.body.removeEventListener('pointerup', this.pointerup)
+    document.body.addEventListener('pointermove', this.pointermove)
+    document.body.addEventListener('pointerup', this.pointerup)
     if (!this.tempStyle) {
       this.tempStyle = document.createElement('style')
       this.tempStyle.textContent = `body { cursor: col-resize !important }`
@@ -46,7 +47,7 @@ export class SplitView extends HTMLElement {
     ))
   }
 
-  mousemove(e) {
+  pointermove(e) {
     const {offsetX} = e
     e.preventDefault()
     e.stopPropagation()
@@ -55,14 +56,14 @@ export class SplitView extends HTMLElement {
     ))
   }
 
-  mouseup(e) {
+  pointerup(e) {
     const {offsetX} = e
     e.preventDefault()
     e.stopPropagation()
     this.end({offsetX})
   }
 
-  mousedown(e) {
+  pointerdown(e) {
     const {offsetX} = e
     e.preventDefault()
     e.stopPropagation()
@@ -70,9 +71,9 @@ export class SplitView extends HTMLElement {
   }
 
   end({offsetX}) {
-    document.body.removeEventListener('mousemove', this.mousemove)
-    document.body.removeEventListener('mouseup', this.mouseup)
-    document.body.removeEventListener('mousedown', this.mousedown)
+    document.body.removeEventListener('pointermove', this.pointermove)
+    document.body.removeEventListener('pointerup', this.pointerup)
+    document.body.removeEventListener('pointerdown', this.pointerdown)
     if (this.tempStyle) {
       this.tempStyle.remove()
       this.tempStyle = undefined
