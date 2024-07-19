@@ -112,7 +112,7 @@ This is for adding new content (currently just an upload link to test uploading)
 
 `[new-content]`
 
-[Test link to Mars wikipedia page](https://en.wikipedia.org/Mars)
+[Test link to Mars wikipedia page](https://en.wikipedia.org/wiki/Mars)
 ```
 
 `ExampleView.js`

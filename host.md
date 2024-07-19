@@ -253,7 +253,7 @@ export class ExampleView extends HTMLElement {
   }
 
   link() {
-    this.accessView.link('https://en.wikipedia.org/Mars')
+    this.accessView.link('https://en.wikipedia.org/wiki/Mars')
   }
 
   static get styles() {
@@ -576,10 +576,10 @@ frame.addEventListener('load', async () => {
 addEventListener('message', e => {
   if (e.source === frame.contentWindow) {
     const [command, ...args] = e.data
+    const accessView = document.querySelector('access-view')
     if (command === 'download') {
       const [download] = args
       const blob = new Blob([download.data], {type: download.type})
-      const accessView = document.querySelector('access-view')
       accessView.download(download.name, blob)
     } else if (command === 'link') {
       const [url] = args
