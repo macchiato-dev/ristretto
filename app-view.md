@@ -35,8 +35,8 @@ export class AppView extends HTMLElement {
         'app-content.md',
       ],
       'example-notebook.md': [
-        'list.md',
         'tabbed.md',
+        'list.md',
         // 'overlay.md',  # TODO
       ],
       'planets.csv': [
