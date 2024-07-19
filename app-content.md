@@ -12,7 +12,7 @@ export class AppContent extends HTMLElement {
     this.shadowRoot.append(...this.renderContent(this.content))
     this.shadowRoot.addEventListener('click', e => {
       if (e.target.tagName === 'A') {
-        console.log('clicked link', e.target.href)
+        parent.postMessage(['link', e.target.href], '*')
         e.preventDefault()
         return false
       }
