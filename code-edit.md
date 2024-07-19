@@ -186,7 +186,7 @@ export class CodeEdit extends HTMLElement {
   }
 
   get themePlugins() {
-    return this.dark ? [oneDark] : []
+    return this.dark ? [this.constructor.viewThemeDark, oneDark] : [this.constructor.viewTheme]
   }
 
   initEditor() {
@@ -224,16 +224,11 @@ export class CodeEdit extends HTMLElement {
         ...lintKeymap,
       ]),
     ]
-    const viewTheme = EditorView.theme({
-      '&': {flexGrow: '1', height: '100%'},
-      '.cm-scroller': {overflow: 'auto'}
-    })
     this.view = new EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
-        viewTheme,
         this.themeCompartment.of(themePlugins),
         EditorView.updateListener.of(e => {
           if (e.docChanged) {
@@ -250,6 +245,28 @@ export class CodeEdit extends HTMLElement {
 
   focus() {
     this.view.focus()
+  }
+
+  static get viewTheme() {
+    if (!this._viewTheme) {
+      this._viewTheme = EditorView.theme({
+        '&': {flexGrow: '1', height: '100%'},
+        '.cm-scroller': {overflow: 'auto'}
+      })
+    }
+    return this._viewTheme
+  }
+
+  static get viewThemeDark() {
+    if (!this._viewThemeDark) {
+      this._viewThemeDark = EditorView.theme({
+        '&': {flexGrow: '1', height: '100%'},
+        '.cm-scroller': {
+          overflow: 'auto',
+        },
+      })
+    }
+    return this._viewThemeDark
   }
 }
 ```
@@ -286,8 +303,8 @@ export class AppView extends HTMLElement {
 
     const codeEdit = document.createElement('code-edit')
     codeEdit.fileType = 'js'
-    codeEdit.value = `const x = 9`
-    codeEdit.dark = false
+    codeEdit.value = `const x = 9\n`.repeat(100).trim()
+    codeEdit.dark = true
     // setTimeout(() => {
     //   codeEdit.dark = true
     // }, 1500)
