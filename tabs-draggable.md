@@ -30,59 +30,102 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
-    this.nameEl.addEventListener('input', e => {
-      this.contentEl.name = this.nameEl.innerText
-    })
-    this.nameEl.addEventListener('blur', () => {
-      this.nameEl.removeAttribute('contenteditable')
-      if (this.isNew) {
-        this.selected = true
-        this.isNew = false
-      }
-    })
-    this.nameEl.addEventListener('keydown', e => {
-      if (e.which === 13) {
-        e.preventDefault()
-        const isNew = this.isNew
-        this.nameEl.blur()
-        if (isNew) {
-          this.dispatchEvent(new CustomEvent(
-            'ready-to-edit', {bubbles: true}
-          ))
-        }
-        return false
-      }
-    })
-
-    this.nameEl.addEventListener('mousedown', e => {
-      if (e.detail > 1) {
-        e.preventDefault()
-      }
-    })
-    this.nameEl.addEventListener('dblclick', e => {
-      this.rename()
-      e.preventDefault()
-    })
     this.headerEl.appendChild(this.nameEl)
     this.menuBtn = document.createElement('button')
     this.menuBtn.innerHTML = this.icons.menu
-    this.menuBtn.addEventListener('click', e => {
-      this.openMenu()
-    })
     this.headerEl.appendChild(this.menuBtn)
-    this.menu = document.createElement(
-      'm-menu-dropdown'
-    )
+    this.menu = document.createElement('m-menu-dropdown')
     this.shadowRoot.appendChild(this.menu)
-    this.shadowRoot.addEventListener('click', e => {
-      if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
-        this.selected = true
-      }
-    })
   }
 
   connectedCallback() {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+
+    if (!this.classList.contains('drag')) {
+      this.nameEl.addEventListener('input', e => {
+        this.contentEl.name = this.name
+      })
+      this.nameEl.addEventListener('blur', () => {
+        this.nameEl.contentEditable = 'false'
+        if (this.isNew) {
+          this.selected = true
+          this.isNew = false
+        }
+      })
+      this.nameEl.addEventListener('keydown', e => {
+        if (e.which === 13) {
+          e.preventDefault()
+          const isNew = this.isNew
+          this.nameEl.blur()
+          if (isNew) {
+            this.dispatchEvent(new CustomEvent(
+              'ready-to-edit', {bubbles: true}
+            ))
+          }
+          return false
+        }
+      })
+      this.headerEl.addEventListener('pointerdown', e => {
+        if (e.isPrimary && this.nameEl.contentEditable !== 'true' && !this.menu.contains(e.target)) {
+          this.headerEl.setPointerCapture(e.pointerId)
+          e.preventDefault()
+          this.pointerDown = true
+          this.pointerOnMenu = this.menuBtn.contains(e.target)
+          this.moved = false
+          const rect = this.getBoundingClientRect()
+          this.offsetX = e.clientX - rect.left
+          this.offsetY = e.clientY - rect.top
+        }
+      })
+      this.headerEl.addEventListener('pointermove', e => {
+        if (!this.moved) {
+          this.moved = true
+          if (this.pointerDown) {
+            this.tabList.dragItem.name = this.name
+            this.tabList.dragItem.selected = this.selected
+            this.tabList.dragItem.classList.add('dragging')
+          }
+        }
+        if (this.pointerDown) {
+          this.tabList.dragItem.setDragPosition(
+            e.clientX - this.offsetX, e.clientY - this.offsetY
+          )
+          const hoverTab = [
+            ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+          ].find(el => (
+            el !== this.tabList.dragItem && el.tagName === 'TAB-ITEM'
+          ))
+          if (this.hoverTab !== hoverTab) {
+            if (this.hoverTab) {
+              this.hoverTab.classList.remove('drop-hover')
+            }
+            if (hoverTab) {
+              hoverTab.classList.add('drop-hover')
+            }
+            this.hoverTab = hoverTab
+          }
+        }
+      })
+      this.headerEl.addEventListener('pointerup', e => {
+        this.tabList.dragItem.classList.remove('dragging')
+        if (!this.moved) {
+          if (this.pointerOnMenu) {
+            this.openMenu()
+          } else {
+            this.selected = true            
+          }
+        }
+        this.moved = false
+        this.pointerDown = false
+      })
+      this.headerEl.addEventListener('lostpointercapture', e => {
+        this.tabList.dragItem.classList.remove('dragging')
+        if (this.hoverTab) {
+          this.hoverTab.classList.remove('drop-hover')
+          this.hoverTab = undefined
+        }
+      })
+    }
   }
 
   openMenu() {
@@ -125,7 +168,7 @@ export class TabItem extends HTMLElement {
   }
 
   rename() {
-    this.nameEl.setAttribute('contenteditable', '')
+    this.nameEl.contentEditable = 'true'
     const range = document.createRange()
     const sel = window.getSelection()
     range.setStart(this.nameEl, this.nameEl.childNodes.length)
@@ -151,22 +194,28 @@ export class TabItem extends HTMLElement {
   set selected(value) {
     if (value) {      
       this.classList.add('selected')
-      this.contentEl.selected = true
     } else {
       this.classList.remove('selected')
-      this.contentEl.selected = false
     }
-    if (value === true) {
-      for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
-        el.selected = false
+    if (!this.classList.contains('drag')) {
+      this.contentEl.selected = value
+      if (value) {
+        for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
+          el.selected = false
+        }
       }
     }
   }
 
+  setDragPosition(x, y) {
+    this.style.setProperty('--drag-left', `${x}px`)
+    this.style.setProperty('--drag-top', `${y}px`)
+  }
+
   icons = {
     menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-three-dots" viewBox="0 0 16 16">
-        <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 14 24">
+        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
       </svg>
     `,
   }
@@ -211,6 +260,15 @@ export class TabItem extends HTMLElement {
           flex-direction: column;
           align-items: stretch;
         }
+        :host(.drag) {
+          position: absolute;
+          top: var(--drag-top, 0px);
+          left: var(--drag-left, 0px);
+          display: none;
+        }
+        :host(.drag.dragging) {
+          display: block;
+        }
         div.header {
           display: flex;
           flex-direction: row;
@@ -220,10 +278,15 @@ export class TabItem extends HTMLElement {
           color: var(--fg, #070707);
           background-color: var(--bg, rgb(212,212,216));
           align-items: center;
+          user-select: none;
         }
         :host(.selected) div.header {
           background-color: var(--bg-selected, rgb(15,118,110));
           color: var(--fg-selected, #e7e7e7);
+        }
+        :host(.drop-hover) div.header, :host(.selected.drop-hover) div.header {
+          background-color: var(--bg-drop-hover, rgb(122, 122, 126));
+          color: var(--fg, #070707);
         }
         div.header > * {
           background: inherit;
@@ -260,7 +323,12 @@ export class TabItem extends HTMLElement {
         }
         svg {
           height: 24px;
-          width: 20px;
+          width: 10px;
+          margin-right: -3px;
+          opacity: 33%;
+        }
+        :host(.selected) svg {
+          opacity: 75%;
         }
       `)
     }
@@ -281,18 +349,24 @@ export class TabList extends HTMLElement {
     this.listEl.addEventListener('click', e => this.childClicked(e))
     this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
     this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
-    this.shadowRoot.append(this.listEl)
+    this.dragItem = document.createElement('tab-item')
+    this.dragItem.classList.add('drag')
+    this.shadowRoot.append(this.listEl, this.dragItem)
   }
 
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      :host {
+        overflow-x: auto;
+      }
       .list {
         display: flex;
         flex-direction: row;
         gap: 3px;
         color: #111;
         overflow-x: auto;
+        scrollbar-width: thin;
       }
     `
     this.shadowRoot.append(style)
@@ -313,6 +387,7 @@ export class TabList extends HTMLElement {
     const tabEl = document.createElement('tab-item')
     const contentEl = this.createContentEl(tabEl)
     tabEl.contentEl = contentEl
+    tabEl.tabList = this
     contentEl.codeMirror = this.codeMirror
     const position = direction == 'left' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, tabEl)
@@ -351,6 +426,9 @@ export class TabList extends HTMLElement {
   }
 
   set items(value) {
+    for (const tabItem of value) {
+      tabItem.tabList = this
+    }
     this.listEl.replaceChildren(...value)
   }
 

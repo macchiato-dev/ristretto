@@ -2,7 +2,7 @@
 
 This takes the downloaded libraries in `library-source.md` and bundles them using rollup.
 
-`bundle-source.js`
+`codemirror-bundle-source.js`
 
 ```js
 import {
@@ -16,7 +16,7 @@ import { EditorState, Compartment, StateEffect, Prec, Text } from '@codemirror/s
 import {
   defaultHighlightStyle, syntaxHighlighting, indentOnInput, 
   bracketMatching, foldGutter, foldKeymap, LanguageDescription,
-  LanguageSupport
+  LanguageSupport, HighlightStyle
 } from '@codemirror/language'
 import {
   defaultKeymap, history, historyKeymap
@@ -27,6 +27,7 @@ import {
 import {
   autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap
 } from '@codemirror/autocomplete'
+import {tags} from '@lezer/highlight'
 import {lintKeymap} from '@codemirror/lint'
 import { javascriptLanguage } from '@codemirror/lang-javascript'
 import { cssLanguage } from '@codemirror/lang-css'
@@ -44,9 +45,10 @@ import { rust, rustLanguage } from '@codemirror/lang-rust'
 import { wast, wastLanguage } from '@codemirror/lang-wast'
 import { xml, xmlLanguage, completeFromSchema } from '@codemirror/lang-xml'
 
-window.CodeMirrorModules = {
+Macchiato.externalModules = {
+  ...Macchiato.externalModules,
   '@codemirror/view': {
-    keymap, highlightSpecialChars, 
+    keymap, highlightSpecialChars,
     drawSelection, highlightActiveLine, dropCursor,
     rectangularSelection, crosshairCursor,
     lineNumbers, highlightActiveLineGutter,
@@ -58,10 +60,11 @@ window.CodeMirrorModules = {
   '@codemirror/language': {
     defaultHighlightStyle,
     syntaxHighlighting,
-    indentOnInput, 
+    indentOnInput,
     bracketMatching,
     foldGutter,
     foldKeymap,
+    HighlightStyle,
     LanguageDescription,
     LanguageSupport,
   },
@@ -79,6 +82,9 @@ window.CodeMirrorModules = {
     completionKeymap,
     closeBrackets,
     closeBracketsKeymap,
+  },
+  '@lezer/highlight': {
+    tags,
   },
   '@codemirror/lint': {
     lintKeymap,
@@ -117,18 +123,199 @@ window.CodeMirrorModules = {
 }
 ```
 
+`prosemirror-bundle-source.js`
+
+```js
+import {
+  EditorState,
+  Selection,
+  SelectionRange,
+  TextSelection,
+  NodeSelection,
+  AllSelection,
+  Transaction,
+  Plugin,
+  PluginKey
+} from 'prosemirror-state'
+import {
+  EditorView,
+  Decoration,
+  DecorationSet
+} from 'prosemirror-view'
+import {
+  Node,
+  ResolvedPos,
+  NodeRange,
+  Fragment,
+  Slice,
+  ReplaceError,
+  Mark,
+  Schema,
+  NodeType,
+  MarkType,
+  ContentMatch,
+  DOMParser,
+  DOMSerializer
+} from 'prosemirror-model'
+import {schema} from 'prosemirror-schema-basic'
+import {addListNodes} from 'prosemirror-schema-list'
+import {exampleSetup} from 'prosemirror-example-setup'
+import {
+  history,
+  undo,
+  redo,
+  undoNoScroll,
+  redoNoScroll,
+  undoDepth,
+  redoDepth,
+  closeHistory
+} from 'prosemirror-history'
+import {
+  keymap,
+  keydownHandler
+} from 'prosemirror-keymap'
+import {
+  deleteSelection,
+  joinBackward,
+  joinTextblockBackward,
+  joinTextblockForward,
+  selectNodeBackward,
+  joinForward,
+  selectNodeForward,
+  joinUp,
+  joinDown,
+  lift,
+  newlineInCode,
+  exitCode,
+  createParagraphNear,
+  liftEmptyBlock,
+  splitBlockAs,
+  splitBlock,
+  splitBlockKeepMarks,
+  selectParentNode,
+  selectAll,
+  selectTextblockStart,
+  selectTextblockEnd,
+  wrapIn,
+  setBlockType,
+  toggleMark,
+  autoJoin,
+  chainCommands,
+  pcBaseKeymap,
+  macBaseKeymap,
+  baseKeymap
+} from 'prosemirror-commands'
+
+Macchiato.externalModules = {
+  ...Macchiato.externalModules,
+  'prosemirror-state': {
+    EditorState,
+    Selection,
+    SelectionRange,
+    TextSelection,
+    NodeSelection,
+    AllSelection,
+    Transaction,
+    Plugin,
+    PluginKey
+  },
+  'prosemirror-view': {
+    EditorView,
+    Decoration,
+    DecorationSet
+  },
+  'prosemirror-model': {
+    Node,
+    ResolvedPos,
+    NodeRange,
+    Fragment,
+    Slice,
+    ReplaceError,
+    Mark,
+    Schema,
+    NodeType,
+    MarkType,
+    ContentMatch,
+    DOMParser,
+    DOMSerializer
+  },
+  'prosemirror-schema-basic': {
+    schema
+  },
+  'prosemirror-schema-list': {
+    addListNodes
+  },
+  'prosemirror-example-setup': {
+    exampleSetup
+  },
+  'prosemirror-history': {
+    history,
+    undo,
+    redo,
+    undoNoScroll,
+    redoNoScroll,
+    undoDepth,
+    redoDepth,
+    closeHistory
+  },
+  'prosemirror-keymap': {
+    keymap,
+    keydownHandler
+  },
+  'prosemirror-commands': {
+    deleteSelection,
+    joinBackward,
+    joinTextblockBackward,
+    joinTextblockForward,
+    selectNodeBackward,
+    joinForward,
+    selectNodeForward,
+    joinUp,
+    joinDown,
+    lift,
+    newlineInCode,
+    exitCode,
+    createParagraphNear,
+    liftEmptyBlock,
+    splitBlockAs,
+    splitBlock,
+    splitBlockKeepMarks,
+    selectParentNode,
+    selectAll,
+    selectTextblockStart,
+    selectTextblockEnd,
+    wrapIn,
+    setBlockType,
+    toggleMark,
+    autoJoin,
+    chainCommands,
+    pcBaseKeymap,
+    macBaseKeymap,
+    baseKeymap
+  }
+}
+```
+
 `run-bundle-libraries.js`
 
 ```js
+const files = ['codemirror-bundle.md', 'prosemirror-bundle.md']
+
 const commands = {
   async getLibrarySource() {
     return await Deno.readTextFile('./build/build-libraries/library-source.md')
   },
-  async loadBundle() {
-    return await Deno.readTextFile('./codemirror-bundle.md')
+  async loadBundle(filename) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    return await Deno.readTextFile(filename)
   },
-  async saveBundle(text) {
-    await Deno.writeTextFile('./codemirror-bundle.md', text)
+  async saveBundle(filename, text) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    await Deno.writeTextFile(filename, text)
   },
 }
 
@@ -196,7 +383,7 @@ async function toBase64(bytes) {
   })
 }
 
-async function bundle(librarySource) {
+async function bundle(librarySource, bundleSourceFilename) {
   const blocks = await Array.fromAsync(readBlocksWithNames(librarySource))
   const localBlocks = await Array.fromAsync(readBlocksWithNames(__source))
   const nodeModules = Object.fromEntries(
@@ -212,7 +399,7 @@ async function bundle(librarySource) {
   const pkgLock = JSON.parse(librarySource.slice(...otherBlocks['package-lock.json'].contentRange))
   const rollupBlock = nodeModules['@rollup/browser/dist/es/rollup.browser.js']
   const rollupContent = await toBase64(librarySource.slice(...rollupBlock.contentRange))
-  const bundleSourceBlock = localBlocks.find(({name}) => name === 'bundle-source.js')
+  const bundleSourceBlock = localBlocks.find(({name}) => name === bundleSourceFilename)
   const bundleSourceContent = __source.slice(...bundleSourceBlock.contentRange)
   const scripts = {'bundle-source.js': bundleSourceContent}
   for (const key of Object.keys(pkgLock.packages).filter(name => name.startsWith('node_modules'))) {
@@ -253,19 +440,24 @@ async function bundle(librarySource) {
   return output[0].code
 }
 
-async function updateBundle(bundleNotebook, bundleSource) {
+async function updateBundle(bundleNotebook, filename, bundleSource) {
   const blocks = await Array.fromAsync(readBlocksWithNames(bundleNotebook))
-  const range = blocks.find(({name}) => name === 'codemirror-bundle.js').contentRange
+  const range = blocks.find(({name}) => name === filename).contentRange
   return bundleNotebook.slice(0, range[0]) + bundleSource.replace(/\n$/, '') + bundleNotebook.slice(range[1])
 }
 
 async function build() {
   try {
     const librarySource = await parentRequest('getLibrarySource')
-    const output = await bundle(librarySource)
-    const bundleNotebookInput = await parentRequest('loadBundle')
-    const bundleNotebookOutput = await updateBundle(bundleNotebookInput, output)
-    await parentRequest('saveBundle', bundleNotebookOutput)
+    for (const library of ['codemirror', 'prosemirror']) {
+      const mdFilename = `${library}-bundle.md`
+      const jsFilename = `${library}-bundle.js`
+      const bundleSourceFilename = `${library}-bundle-source.js`
+      const output = await bundle(librarySource, bundleSourceFilename)
+      const bundleNotebookInput = await parentRequest('loadBundle', mdFilename)
+      const bundleNotebookOutput = await updateBundle(bundleNotebookInput, jsFilename, output)
+      await parentRequest('saveBundle', mdFilename, bundleNotebookOutput)
+    }
     close()
   } catch (err) {
     console.error(err)

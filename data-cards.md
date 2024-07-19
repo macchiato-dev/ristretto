@@ -1,5 +1,15 @@
 # Data Cards
 
+`notebook.json`
+
+```json
+{
+  "dataFiles": [
+    ["planets.csv.md", "planets.csv"]
+  ]
+}
+```
+
 `data-cards.js`
 
 ```js
@@ -90,7 +100,19 @@ export class AppView extends HTMLElement {
     if (!this._data) {
       for (const block of readBlocksWithNames(__source)) {
         if (block.name === 'planets.csv') {
-          return __source.slice(...block.contentRange)
+          this._data = __source.slice(...block.contentRange)
+          return this._data
+        }
+      }
+      for (const block of readBlocksWithNames(__source)) {
+        if (block.name === 'planets.csv.md') {
+          const blockContent = __source.slice(...block.contentRange)
+          for (const subBlock of readBlocksWithNames(blockContent)) {
+            if (subBlock.name === 'planets.csv') {
+              this._data = blockContent.slice(...subBlock.contentRange)
+              return this._data
+            }
+          }
         }
       }
     }

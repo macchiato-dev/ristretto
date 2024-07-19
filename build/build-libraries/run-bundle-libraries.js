@@ -1,12 +1,20 @@
+const files = ['codemirror-bundle.md', 'prosemirror-bundle.md']
+
 const commands = {
   async getLibrarySource() {
     return await Deno.readTextFile('./build/build-libraries/library-source.md')
   },
-  async loadBundle() {
-    return await Deno.readTextFile('./codemirror-bundle.md')
+  async loadBundle(filename) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    return await Deno.readTextFile(filename)
   },
-  async saveBundle(text) {
-    await Deno.writeTextFile('./codemirror-bundle.md', text)
+  async saveBundle(filename, text) {
+    if (!files.includes(filename)) {
+      throw new Error('Unknown bundle')
+    }
+    await Deno.writeTextFile(filename, text)
   },
 }
 

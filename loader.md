@@ -111,13 +111,15 @@ export class Loader {
       (match, p1, p2) => {
         const vars = p1.replaceAll(' as ', ': ')
         const importPath = p2.slice(1, -1)
-        const path = JSON.stringify(
-          importPath.slice(
-            importPath.indexOf('/') + 1
-          )
-        )
-        const ref = `Macchiato.modules[${path}]`
-        return `const ${vars} = ${ref}`
+        if (importPath.startsWith('/')) {
+          const path = JSON.stringify(importPath.slice(1))
+          const ref = `Macchiato.modules[${path}]`
+          return `const ${vars} = ${ref}`
+        } else {
+          const path = JSON.stringify(importPath)
+          const ref = `Macchiato.externalModules[${path}]`
+          return `const ${vars} = ${ref}`
+        }
       }
     )
     return (
@@ -184,10 +186,15 @@ export class Loader {
       this.buildStyle(file)
     ))
     this.styles = styles
-    this.scripts = [intro, ...dataModules, ...modules]
+    this.intro = intro
+    this.scripts = [...dataModules, ...modules]
   }
 
-  loadBundles(document) {
+  render(document) {
+    const script = document.createElement('script')
+    script.type = 'module'
+    script.textContent = this.intro
+    document.head.append(script)
     for (const bundle of this.bundles) {
       const scriptSrc = bundle.content
       const scriptEl = document.createElement('script')
@@ -195,9 +202,6 @@ export class Loader {
       scriptEl.textContent = scriptSrc
       document.head.appendChild(scriptEl)
     }
-  }
-
-  render(document) {
     for (const styleText of this.styles) {
       const style = document.createElement('style')
       style.textContent = styleText
@@ -305,7 +309,6 @@ async function run(src) {
           const loader = new Loader(__source)
           loader.read()
           loader.build()
-          loader.loadBundles(document)
           loader.render(document)
         }
       }

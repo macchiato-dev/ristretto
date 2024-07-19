@@ -21,40 +21,103 @@ export class FileTree extends HTMLElement {
     this.attachShadow({mode: 'open'})
   }
 
+  icons = {
+    expand: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="6 2 12 14">
+        <path fill="currentColor" d="M10 17V7l5 5z"/>
+      </svg>
+    `,
+    collapse: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="6 2 12 14">
+        <path fill="currentColor" d="m12 15l-5-5h10z"/>
+      </svg>
+    `,
+  }
+
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
       ul {
         list-style-type: none;
-        padding-inline-start: 15px;
+        padding-inline-start: 0;
+      }
+      li li .item {
+        padding-left: 15px;
+      }
+      li li li .item {
+        padding-left: 30px;
+      }
+      li li li li .item {
+        padding-left: 45px;
+      }
+      li li li li li .item {
+        padding-left: 60px;
+      }
+      li li li li li li .item {
+        padding-left: 75px;
+      }
+      li li li li li li li .item {
+        padding-left: 90px;
+      }
+      li li li li li li li li .item {
+        padding-left: 105px;
       }
       li.active > .item {
-        background: #fff5;
+        background: var(--bg-selected, #fff5);
+      }
+      button {
+        all: unset;
+        opacity: 0;
+        padding-right: 3px;
+      }
+      li.has-children > .item > button {
+        opacity: 1.0;
+      }
+      li.collapsed > ul {
+        display: none;
       }
     `
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('click', e => {
+      const li = e.target.closest('li')
       this.shadowRoot.querySelector('li.active').classList.remove('active')
-      const el = e.target.closest('li')
-      el.classList.add('active')
+      li.classList.add('active')
       this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
+      if (e.target.closest('button') && li.classList.contains('has-children')) {
+        this.toggleExpand(li)
+      }
     })
+  }
+
+  toggleExpand(li) {
+    const btn = li.querySelector(':scope > .item > button')
+    li.classList.toggle('collapsed')
+    if (li.classList.contains('collapsed')) {
+      btn.innerHTML = this.icons.expand
+    } else {
+      btn.innerHTML = this.icons.collapse
+    }
   }
 
   renderObject(ul, data, parents) {
     ul.replaceChildren(...Object.entries(data).map(([key, value]) => {
       const li = document.createElement('li')
       const item = document.createElement('div')
+      const expand = document.createElement('button')
+      expand.innerHTML = this.icons.collapse
+      const name = document.createElement('span')
       item.classList.add('item')
+      item.append(expand, name)
       li.append(item)
       if (typeof value === 'object' && value !== null) {
-        item.innerText = key
+        name.innerText = key
+        li.classList.add('has-children')
         item.dataset.path = JSON.stringify([...parents, key])
         const child = document.createElement('ul')
         li.append(child)
         this.renderObject(child, value, [...parents, key])
       } else {
-        item.innerText = key
+        name.innerText = key
         item.dataset.path = JSON.stringify([...parents, key])
       }
       return li

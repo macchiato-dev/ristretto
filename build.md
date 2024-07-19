@@ -4,9 +4,6 @@ This builds Ristretto. It runs a Markdown file with Deno, using a wrapper that g
 
 Run it with this command:
 
-```
-deno run --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js
-```
 
 `run-build.js`
 
@@ -151,7 +148,7 @@ function arrEquals(a1, a2) {
 }
 
 async function renderNotebook() {
-  const exploreSrc = new TextDecoder().decode(await readFile(['explore.md']))
+  const appViewSrc = new TextDecoder().decode(await readFile(['app-view.md']))
   const loaderSrc = new TextDecoder().decode(await readFile(['loader.md']))
   let entry = ''
   for (const block of readBlocksWithNames(loaderSrc)) {
@@ -159,7 +156,7 @@ async function renderNotebook() {
       entry = loaderSrc.slice(...block.blockRange)
     }
   }
-  return `${exploreSrc}\n\n${entry}`
+  return `${appViewSrc}\n\n${entry}`
 }
 
 async function buildNotebook() {
@@ -335,4 +332,10 @@ async function run(src) {
 }
 
 run(__source)
+```
+
+``
+
+```
+deno run --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js
 ```

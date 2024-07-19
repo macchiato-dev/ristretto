@@ -262,6 +262,7 @@ export class NotebookCode extends HTMLElement {
     editorContainer.classList.add('editor-container')
     this.editor = document.createElement('m-editor-code-edit')
     this.editor.fileType = 'md'
+    this.editor.lineWrapping = true
     editorContainer.append(this.editor)
     this.shadowRoot.append(toolbar, editorContainer)
   }
@@ -334,14 +335,17 @@ export class Toolbar extends HTMLElement {
     this.attachShadow({mode: 'open'})
     const selectContainer = document.createElement('div')
     const iconContainer = document.createElement('div')
-    const codeBtn = document.createElement(
-      'button'
-    )
+    const downloadBtn = document.createElement('button')
+    downloadBtn.innerHTML = this.icons.download
+    downloadBtn.addEventListener('click', () => {
+      this.onDownload()
+    })
+    const codeBtn = document.createElement('button')
     codeBtn.innerHTML = this.icons.code
     codeBtn.addEventListener('click', () => {
       this.onShowNotebookCode()
     })
-    iconContainer.append(codeBtn)
+    iconContainer.append(downloadBtn, codeBtn)
     iconContainer.classList.add('icon-container')
     this.shadowRoot.append(selectContainer, iconContainer)
   }
@@ -373,6 +377,11 @@ export class Toolbar extends HTMLElement {
   }
 
   icons = {
+    download: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M4 22v-2h16v2zm8-4L5 9h4V2h6v7h4z"/>
+      </svg>
+    `,
     code: `
       <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
         <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6l6 6zm5.2 0l4.6-4.6l-4.6-4.6L16 6l6 6l-6 6z" />
@@ -399,6 +408,9 @@ export class AppView extends HTMLElement {
     this.toolbar = document.createElement('m-toolbar')
     this.toolbar.onShowNotebookCode = () => {
       this.showNotebookCode()
+    }
+    this.toolbar.onDownload = () => {
+      this.downloadNotebookCode()
     }
     this.editor = document.createElement('m-tab-editor')
     this.viewFrameWrap = document.createElement('div')
@@ -650,6 +662,16 @@ ${runEntry}
         [messageData.buffer]
       )
     }, {once: true})
+  }
+
+  async downloadNotebookCode() {
+    const value = await this.buildNotebook(this.notebook, this.editor.el.files)
+    const download = {
+      name: 'notebook.md',
+      data: value,
+      type: 'text/markdown',
+    }
+    parent.postMessage(['download', download], '*')
   }
 
   async showNotebookCode() {
