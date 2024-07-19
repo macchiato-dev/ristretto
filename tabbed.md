@@ -431,56 +431,10 @@ export class AppView extends HTMLElement {
   }
 
   connectedCallback() {
-    const style = document.createElement('style')
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-      }
-      html, body {
-        margin: 0;
-        padding: 0;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
-    style.textContent = `
-      :host {
-        display: grid;
-        grid-template-rows: 30px calc(50% - 15px) 1fr;
-        grid-template-columns: 100%;
-        height: 100vh;
-        width: 100vw;
-      }
-      .view-frame-wrap {
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-      }
-      iframe {
-        padding: 0;
-        border: none;
-        overflow: inherit;
-        overflow-clip-margin: inherit;
-        grid-row: 3;
-        grid-column: 1;
-        flex-grow: 1;
-      }
-      .notebook-code {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-      }
-    `
-    this.shadowRoot.append(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
+    }
     this.editor.load(this.readNotebookFiles(this.notebook))
     this.renderView()
   }
@@ -703,6 +657,66 @@ ${runEntry}
       this.notebookCodeEl.remove()
       this.notebookCodeEl = undefined
     }
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-rows: 30px calc(50% - 15px) 1fr;
+          grid-template-columns: 100%;
+          height: 100vh;
+          width: 100vw;
+        }
+        .view-frame-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+        }
+        iframe {
+          padding: 0;
+          border: none;
+          overflow: inherit;
+          overflow-clip-margin: inherit;
+          grid-row: 3;
+          grid-column: 1;
+          flex-grow: 1;
+        }
+        .notebook-code {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+        }
+      `)
+    }
+    return this._styles
+  }
+
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(`
+        body {
+          margin: 0;
+          padding: 0;
+        }
+        html, body {
+          margin: 0;
+          padding: 0;
+        }
+        html {
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+      `)
+    }
+    return this._globalStyles
   }
 }
 ```
