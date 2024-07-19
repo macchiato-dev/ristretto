@@ -645,7 +645,9 @@ class Mark {
         let type = schema.marks[json.type];
         if (!type)
             throw new RangeError(`There is no mark type ${json.type} in this schema`);
-        return type.create(json.attrs);
+        let mark = type.create(json.attrs);
+        type.checkAttrs(mark.attrs);
+        return mark;
     }
     /**
     Test whether two sets of marks are identical.
@@ -1625,13 +1627,17 @@ let Node$1 = class Node {
     }
     /**
     Check whether this node and its descendants conform to the
-    schema, and raise error when they do not.
+    schema, and raise an exception when they do not.
     */
     check() {
         this.type.checkContent(this.content);
+        this.type.checkAttrs(this.attrs);
         let copy = Mark.none;
-        for (let i = 0; i < this.marks.length; i++)
-            copy = this.marks[i].addToSet(copy);
+        for (let i = 0; i < this.marks.length; i++) {
+            let mark = this.marks[i];
+            mark.type.checkAttrs(mark.attrs);
+            copy = mark.addToSet(copy);
+        }
         if (!Mark.sameSet(copy, this.marks))
             throw new RangeError(`Invalid collection of marks for node ${this.type.name}: ${this.marks.map(m => m.type.name)}`);
         this.content.forEach(node => node.check());
@@ -1669,7 +1675,9 @@ let Node$1 = class Node {
             return schema.text(json.text, marks);
         }
         let content = Fragment.fromJSON(schema, json.content);
-        return schema.nodeType(json.type).create(json.attrs, content, marks);
+        let node = schema.nodeType(json.type).create(json.attrs, content, marks);
+        node.type.checkAttrs(node.attrs);
+        return node;
     }
 };
 Node$1.prototype.text = undefined;
@@ -2186,11 +2194,21 @@ function computeAttrs(attrs, value) {
     }
     return built;
 }
-function initAttrs(attrs) {
+function checkAttrs(attrs, values, type, name) {
+    for (let name in values)
+        if (!(name in attrs))
+            throw new RangeError(`Unsupported attribute ${name} for ${type} of type ${name}`);
+    for (let name in attrs) {
+        let attr = attrs[name];
+        if (attr.validate)
+            attr.validate(values[name]);
+    }
+}
+function initAttrs(typeName, attrs) {
     let result = Object.create(null);
     if (attrs)
         for (let name in attrs)
-            result[name] = new Attribute(attrs[name]);
+            result[name] = new Attribute(typeName, name, attrs[name]);
     return result;
 }
 /**
@@ -2225,7 +2243,7 @@ let NodeType$1 = class NodeType {
         */
         this.markSet = null;
         this.groups = spec.group ? spec.group.split(" ") : [];
-        this.attrs = initAttrs(spec.attrs);
+        this.attrs = initAttrs(name, spec.attrs);
         this.defaultAttrs = defaultAttrs(this.attrs);
         this.contentMatch = null;
         this.inlineContent = null;
@@ -2350,6 +2368,12 @@ let NodeType$1 = class NodeType {
             throw new RangeError(`Invalid content for node ${this.name}: ${content.toString().slice(0, 50)}`);
     }
     /**
+    @internal
+    */
+    checkAttrs(attrs) {
+        checkAttrs(this.attrs, attrs, "node", this.name);
+    }
+    /**
     Check whether the given mark type is allowed in this node.
     */
     allowsMarkType(markType) {
@@ -2400,11 +2424,20 @@ let NodeType$1 = class NodeType {
         return result;
     }
 };
+function validateType(typeName, attrName, type) {
+    let types = type.split("|");
+    return (value) => {
+        let name = value === null ? "null" : typeof value;
+        if (types.indexOf(name) < 0)
+            throw new RangeError(`Expected value of type ${types} for attribute ${attrName} on type ${typeName}, got ${name}`);
+    };
+}
 // Attribute descriptors
 class Attribute {
-    constructor(options) {
+    constructor(typeName, attrName, options) {
         this.hasDefault = Object.prototype.hasOwnProperty.call(options, "default");
         this.default = options.default;
+        this.validate = typeof options.validate == "string" ? validateType(typeName, attrName, options.validate) : options.validate;
     }
     get isRequired() {
         return !this.hasDefault;
@@ -2442,7 +2475,7 @@ class MarkType {
         this.rank = rank;
         this.schema = schema;
         this.spec = spec;
-        this.attrs = initAttrs(spec.attrs);
+        this.attrs = initAttrs(name, spec.attrs);
         this.excluded = null;
         let defaults = defaultAttrs(this.attrs);
         this.instance = defaults ? new Mark(this, defaults) : null;
@@ -2484,6 +2517,12 @@ class MarkType {
         for (let i = 0; i < set.length; i++)
             if (set[i].type == this)
                 return set[i];
+    }
+    /**
+    @internal
+    */
+    checkAttrs(attrs) {
+        checkAttrs(this.attrs, attrs, "mark", this.name);
     }
     /**
     Queries whether a given mark type is
@@ -3452,7 +3491,7 @@ class DOMSerializer {
     @internal
     */
     serializeNodeInner(node, options) {
-        let { dom, contentDOM } = DOMSerializer.renderSpec(doc$1(options), this.nodes[node.type.name](node));
+        let { dom, contentDOM } = renderSpec(doc$1(options), this.nodes[node.type.name](node), null, node.attrs);
         if (contentDOM) {
             if (node.isLeaf)
                 throw new RangeError("Content hole not allowed in a leaf node spec");
@@ -3483,57 +3522,10 @@ class DOMSerializer {
     */
     serializeMark(mark, inline, options = {}) {
         let toDOM = this.marks[mark.type.name];
-        return toDOM && DOMSerializer.renderSpec(doc$1(options), toDOM(mark, inline));
+        return toDOM && renderSpec(doc$1(options), toDOM(mark, inline), null, mark.attrs);
     }
-    /**
-    Render an [output spec](https://prosemirror.net/docs/ref/#model.DOMOutputSpec) to a DOM node. If
-    the spec has a hole (zero) in it, `contentDOM` will point at the
-    node with the hole.
-    */
-    static renderSpec(doc, structure, xmlNS = null) {
-        if (typeof structure == "string")
-            return { dom: doc.createTextNode(structure) };
-        if (structure.nodeType != null)
-            return { dom: structure };
-        if (structure.dom && structure.dom.nodeType != null)
-            return structure;
-        let tagName = structure[0], space = tagName.indexOf(" ");
-        if (space > 0) {
-            xmlNS = tagName.slice(0, space);
-            tagName = tagName.slice(space + 1);
-        }
-        let contentDOM;
-        let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
-        let attrs = structure[1], start = 1;
-        if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
-            start = 2;
-            for (let name in attrs)
-                if (attrs[name] != null) {
-                    let space = name.indexOf(" ");
-                    if (space > 0)
-                        dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
-                    else
-                        dom.setAttribute(name, attrs[name]);
-                }
-        }
-        for (let i = start; i < structure.length; i++) {
-            let child = structure[i];
-            if (child === 0) {
-                if (i < structure.length - 1 || i > start)
-                    throw new RangeError("Content hole must be the only child of its parent node");
-                return { dom, contentDOM: dom };
-            }
-            else {
-                let { dom: inner, contentDOM: innerContent } = DOMSerializer.renderSpec(doc, child, xmlNS);
-                dom.appendChild(inner);
-                if (innerContent) {
-                    if (contentDOM)
-                        throw new RangeError("Multiple content holes");
-                    contentDOM = innerContent;
-                }
-            }
-        }
-        return { dom, contentDOM };
+    static renderSpec(doc, structure, xmlNS = null, blockArraysIn) {
+        return renderSpec(doc, structure, xmlNS, blockArraysIn);
     }
     /**
     Build a serializer using the [`toDOM`](https://prosemirror.net/docs/ref/#model.NodeSpec.toDOM)
@@ -3571,6 +3563,88 @@ function gatherToDOM(obj) {
 }
 function doc$1(options) {
     return options.document || window.document;
+}
+const suspiciousAttributeCache = new WeakMap();
+function suspiciousAttributes(attrs) {
+    let value = suspiciousAttributeCache.get(attrs);
+    if (value === undefined)
+        suspiciousAttributeCache.set(attrs, value = suspiciousAttributesInner(attrs));
+    return value;
+}
+function suspiciousAttributesInner(attrs) {
+    let result = null;
+    function scan(value) {
+        if (value && typeof value == "object") {
+            if (Array.isArray(value)) {
+                if (typeof value[0] == "string") {
+                    if (!result)
+                        result = [];
+                    result.push(value);
+                }
+                else {
+                    for (let i = 0; i < value.length; i++)
+                        scan(value[i]);
+                }
+            }
+            else {
+                for (let prop in value)
+                    scan(value[prop]);
+            }
+        }
+    }
+    scan(attrs);
+    return result;
+}
+function renderSpec(doc, structure, xmlNS, blockArraysIn) {
+    if (typeof structure == "string")
+        return { dom: doc.createTextNode(structure) };
+    if (structure.nodeType != null)
+        return { dom: structure };
+    if (structure.dom && structure.dom.nodeType != null)
+        return structure;
+    let tagName = structure[0], suspicious;
+    if (typeof tagName != "string")
+        throw new RangeError("Invalid array passed to renderSpec");
+    if (blockArraysIn && (suspicious = suspiciousAttributes(blockArraysIn)) &&
+        suspicious.indexOf(structure) > -1)
+        throw new RangeError("Using an array from an attribute object as a DOM spec. This may be an attempted cross site scripting attack.");
+    let space = tagName.indexOf(" ");
+    if (space > 0) {
+        xmlNS = tagName.slice(0, space);
+        tagName = tagName.slice(space + 1);
+    }
+    let contentDOM;
+    let dom = (xmlNS ? doc.createElementNS(xmlNS, tagName) : doc.createElement(tagName));
+    let attrs = structure[1], start = 1;
+    if (attrs && typeof attrs == "object" && attrs.nodeType == null && !Array.isArray(attrs)) {
+        start = 2;
+        for (let name in attrs)
+            if (attrs[name] != null) {
+                let space = name.indexOf(" ");
+                if (space > 0)
+                    dom.setAttributeNS(name.slice(0, space), name.slice(space + 1), attrs[name]);
+                else
+                    dom.setAttribute(name, attrs[name]);
+            }
+    }
+    for (let i = start; i < structure.length; i++) {
+        let child = structure[i];
+        if (child === 0) {
+            if (i < structure.length - 1 || i > start)
+                throw new RangeError("Content hole must be the only child of its parent node");
+            return { dom, contentDOM: dom };
+        }
+        else {
+            let { dom: inner, contentDOM: innerContent } = renderSpec(doc, child, xmlNS, blockArraysIn);
+            dom.appendChild(inner);
+            if (innerContent) {
+                if (contentDOM)
+                    throw new RangeError("Multiple content holes");
+                contentDOM = innerContent;
+            }
+        }
+    }
+    return { dom, contentDOM };
 }
 
 // Recovery values encode a range index and an offset. They are
@@ -7869,7 +7943,7 @@ class MarkViewDesc extends ViewDesc {
         let custom = view.nodeViews[mark.type.name];
         let spec = custom && custom(mark, view, inline);
         if (!spec || !spec.dom)
-            spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline));
+            spec = DOMSerializer.renderSpec(document, mark.type.spec.toDOM(mark, inline), null, mark.attrs);
         return new MarkViewDesc(parent, mark, spec.dom, spec.contentDOM || spec.dom);
     }
     parseRule() {
@@ -7941,7 +8015,8 @@ class NodeViewDesc extends ViewDesc {
                 throw new RangeError("Text must be rendered as a DOM text node");
         }
         else if (!dom) {
-            ({ dom, contentDOM } = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node)));
+            let spec = DOMSerializer.renderSpec(document, node.type.spec.toDOM(node), null, node.attrs);
+            ({ dom, contentDOM } = spec);
         }
         if (!contentDOM && !node.isText && dom.nodeName != "BR") { // Chrome gets confused by <br contenteditable=false>
             if (!dom.hasAttribute("contenteditable"))
@@ -10305,7 +10380,9 @@ handlers.dragstart = (view, _event) => {
     }
     let draggedSlice = (node || view.state.selection).content();
     let { dom, text, slice } = serializeForClipboard(view, draggedSlice);
-    event.dataTransfer.clearData();
+    // Pre-120 Chrome versions clear files when calling `clearData` (#1472)
+    if (!event.dataTransfer.files.length || !chrome || chrome_version > 120)
+        event.dataTransfer.clearData();
     event.dataTransfer.setData(brokenClipboardAPI ? "Text" : "text/html", dom.innerHTML);
     // See https://github.com/ProseMirror/prosemirror/issues/1156
     event.dataTransfer.effectAllowed = "copyMove";
@@ -12426,7 +12503,7 @@ const nodes = {
     `<h6>` elements.
     */
     heading: {
-        attrs: { level: { default: 1 } },
+        attrs: { level: { default: 1, validate: "number" } },
         content: "inline*",
         group: "block",
         defining: true,
@@ -12466,9 +12543,9 @@ const nodes = {
     image: {
         inline: true,
         attrs: {
-            src: {},
-            alt: { default: null },
-            title: { default: null }
+            src: { validate: "string" },
+            alt: { default: null, validate: "string|null" },
+            title: { default: null, validate: "string|null" }
         },
         group: "inline",
         draggable: true,
@@ -12504,8 +12581,8 @@ const marks = {
     */
     link: {
         attrs: {
-            href: {},
-            title: { default: null }
+            href: { validate: "string" },
+            title: { default: null, validate: "string|null" }
         },
         inclusive: false,
         parseDOM: [{ tag: "a[href]", getAttrs(dom) {
@@ -12568,7 +12645,7 @@ starts counting, and defaults to 1. Represented as an `<ol>`
 element.
 */
 const orderedList = {
-    attrs: { order: { default: 1 } },
+    attrs: { order: { default: 1, validate: "number" } },
     parseDOM: [{ tag: "ol", getAttrs(dom) {
                 return { order: dom.hasAttribute("start") ? +dom.getAttribute("start") : 1 };
             } }],
@@ -13525,7 +13602,7 @@ function applyTransaction(history, state, tr, options) {
     }
     else if (appended && appended.getMeta(historyKey)) {
         if (appended.getMeta(historyKey).redo)
-            return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps[tr.steps.length - 1]), history.prevTime, history.prevComposition);
+            return new HistoryState(history.done.addTransform(tr, undefined, options, mustPreserveItems(state)), history.undone, rangesFor(tr.mapping.maps), history.prevTime, history.prevComposition);
         else
             return new HistoryState(history.done, history.undone.addTransform(tr, undefined, options, mustPreserveItems(state)), null, history.prevTime, history.prevComposition);
     }
@@ -13535,7 +13612,7 @@ function applyTransaction(history, state, tr, options) {
         let newGroup = history.prevTime == 0 ||
             (!appended && history.prevComposition != composition &&
                 (history.prevTime < (tr.time || 0) - options.newGroupDelay || !isAdjacentTo(tr, history.prevRanges)));
-        let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps[tr.steps.length - 1]);
+        let prevRanges = appended ? mapRanges(history.prevRanges, tr.mapping) : rangesFor(tr.mapping.maps);
         return new HistoryState(history.done.addTransform(tr, newGroup ? state.selection.getBookmark() : undefined, options, mustPreserveItems(state)), Branch.empty, prevRanges, tr.time, composition == null ? history.prevComposition : composition);
     }
     else if (rebased = tr.getMeta("rebased")) {
@@ -13560,9 +13637,10 @@ function isAdjacentTo(transform, prevRanges) {
     });
     return adjacent;
 }
-function rangesFor(map) {
+function rangesFor(maps) {
     let result = [];
-    map.forEach((_from, _to, from, to) => result.push(from, to));
+    for (let i = maps.length - 1; i >= 0 && result.length == 0; i--)
+        maps[i].forEach((_from, _to, from, to) => result.push(from, to));
     return result;
 }
 function mapRanges(ranges, mapping) {

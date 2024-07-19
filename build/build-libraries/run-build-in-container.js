@@ -36,6 +36,7 @@ const packages = [
   '@codemirror/lang-xml',
   '@codemirror/lang-sql',
   '@codemirror/lang-wast',
+  '@codemirror/theme-one-dark',
   '@lezer/highlight',
   'prosemirror-state',
   'prosemirror-view',
