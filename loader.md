@@ -318,3 +318,52 @@ async function run(src) {
 
 run(__source)
 ```
+
+`TestView.js`
+
+```js
+import {Loader} from '/loader.js'
+
+export class TestView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    const loader = new Loader('')
+    const results = ['test'].map(result => {
+      const el = document.createElement('p')
+      el.innerText = result
+      return el
+    })
+    this.shadowRoot.append(...results)
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          color: white;
+          height: 50px;
+          background-color: yellow;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+`app.js`
+
+```js
+import {TestView} from '/TestView.js'
+
+customElements.define('test-view', TestView)
+
+function setup() {
+  const testView = document.createElement('test-view')
+  document.body.append(testView)
+}
+
+setup()
+```
