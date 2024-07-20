@@ -233,11 +233,6 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg-selected-hover, #0c6860);
           color: var(--fg-selected-hover, #f7f7f7);
         }
-        div.header > * {
-          background: inherit;
-          color: inherit;
-          border: none;
-        }
         .name {
           flex-grow: 1;
           padding: 0 5px;
@@ -262,7 +257,8 @@ export class TabItem extends HTMLElement {
           padding: 0;
           margin: 0;
         }
-        button {
+        div.header > button {
+          all: unset;
           padding: 0 4px 0 2px;
           border-radius: 5px;
         }

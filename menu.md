@@ -32,13 +32,12 @@ export class Dropdown extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = `
       dialog {
-        min-width: 200px;
-        border: 1px solid rgba(0, 0, 0, 0.3);
         border-radius: 6px;
-        box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+        border: none;
+        box-shadow: 0 3px 7px #9995;
       }
       dialog {
-        background: #222;
+        background: #555d;
         color: #ddd;
         padding: 3px;
         margin-left: var(--dialog-left);
@@ -64,12 +63,15 @@ export class Dropdown extends HTMLElement {
         height: var(--window-width);
       }
       button {
-        background: #222;
+        all: unset;
         font-size: 16px;
         border: none;
         color: inherit;
-        padding: 8px 10px;
+        padding: 5px 8px;
         text-align: left;
+      }
+      button:hover {
+        background: #99b3;
       }
     `
     this.shadowRoot.append(style)
@@ -211,7 +213,7 @@ export class ExampleView extends HTMLElement {
         margin: 0;
         padding: 10px;
         color: #bfcfcd;
-        background: #fff;
+        background: #000;
       }
       div {
         display: flex;
@@ -242,7 +244,7 @@ export class ExampleView extends HTMLElement {
   openMenu(btn) {
     this.menu.clear()
     //this.menu.alignX = 'center'
-    //this.menu.offsetY = 0
+    this.menu.offsetY = 0
     for (const name of [
       'Test Item A', 'Item with long text here', 'Test Item B', 'Test Item C', 'Test Item D'
     ]) {
