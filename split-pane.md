@@ -24,15 +24,23 @@ export class SplitView extends HTMLElement {
       :host {
         cursor: col-resize;
       }
+      :host([vertical]) {
+        cursor: row-resize;
+      }
     `
     this.shadowRoot.appendChild(style)
   }
 
   start(e) {
-    const {offsetX} = e
+    const {offsetX, offsetY} = e
     e.preventDefault()
     e.stopPropagation()
     this.shadowRoot.host.setPointerCapture(e.pointerId)
+    this.startOffset = (
+      this.vertical ?
+      offsetY - this.shadowRoot.host.clientTop :
+      offsetX - this.shadowRoot.host.clientLeft
+    )
     document.body.removeEventListener('pointermove', this.pointermove)
     document.body.removeEventListener('pointerup', this.pointerup)
     document.body.addEventListener('pointermove', this.pointermove)
@@ -43,34 +51,50 @@ export class SplitView extends HTMLElement {
     }
     document.head.append(this.tempStyle)
     this.dispatchEvent(new CustomEvent(
-      'split-view-start', {bubbles: true, detail: {offsetX}}
+      'split-view-start', {bubbles: true, detail: {offsetX, offsetY}}
     ))
   }
 
+  get vertical() {
+    return this.hasAttribute('vertical')
+  }
+
+  set vertical(value) {
+    if (value) {
+      this.setAttribute('vertical', '')
+    } else {
+      this.removeAttribute('vertical')
+    }
+  }
+
+  getOffsetDetail(e) {
+    const key = `offset${this.vertical ? 'Y' : 'X'}`
+    return {[key]: e[key] - this.startOffset}
+  }
+
   pointermove(e) {
-    const {offsetX} = e
     e.preventDefault()
     e.stopPropagation()
     this.dispatchEvent(new CustomEvent(
-      'split-view-resize', {bubbles: true, detail: {offsetX}}
+      'split-view-resize', {bubbles: true, detail: this.getOffsetDetail(e)}
     ))
   }
 
   pointerup(e) {
-    const {offsetX} = e
+    const {offsetX, offsetY} = e
     e.preventDefault()
     e.stopPropagation()
-    this.end({offsetX})
+    this.end({offsetX, offsetY})
   }
 
   pointerdown(e) {
-    const {offsetX} = e
+    const {offsetX, offsetY} = e
     e.preventDefault()
     e.stopPropagation()
-    this.end({offsetX})
+    this.end({offsetX, offsetY})
   }
 
-  end({offsetX}) {
+  end({offsetX, offsetY}) {
     document.body.removeEventListener('pointermove', this.pointermove)
     document.body.removeEventListener('pointerup', this.pointerup)
     document.body.removeEventListener('pointerdown', this.pointerdown)
@@ -79,7 +103,7 @@ export class SplitView extends HTMLElement {
       this.tempStyle = undefined
     }
     this.dispatchEvent(new CustomEvent(
-      'split-view-end', {bubbles: true, detail: {offsetX}}
+      'split-view-end', {bubbles: true, detail: {offsetX, offsetY}}
     ))
   }
 }
@@ -96,10 +120,21 @@ export class ExampleView extends HTMLElement {
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
-      this.style.setProperty('--sidebar-width', `${x + 5}px`)
+      this.style.setProperty('--main-width', `${x}px`)
     })
     const main = document.createElement('main')
-    this.shadowRoot.append(sidebar, this.split, main)
+    this.mainSplit = document.createElement('split-view')
+    this.mainSplit.vertical = true
+    this.mainSplit.addEventListener('split-view-resize', e => {
+      const y = e.detail.offsetY - this.offsetTop
+      this.style.setProperty('--top-height', `${y}px`)
+    })
+    const top = document.createElement('div')
+    top.classList.add('top')
+    const bottom = document.createElement('div')
+    bottom.classList.add('bottom')
+    main.append(top, this.mainSplit, bottom)
+    this.shadowRoot.append(main, this.split, sidebar)
   }
 
   connectedCallback() {
@@ -107,6 +142,9 @@ export class ExampleView extends HTMLElement {
     globalStyle.textContent = `
       html {
         box-sizing: border-box;
+      }
+      body {
+        margin: 0;
       }
       *, *:before, *:after {
         box-sizing: inherit;
@@ -119,14 +157,25 @@ export class ExampleView extends HTMLElement {
         display: grid;
         height: 100vh;
         background: green;
-        grid-template-columns: var(--sidebar-width, 0.5fr) auto 1fr;
+        grid-template-columns: var(--main-width, 2fr) auto 1fr;
       }
       aside {
         background: color-mix(in oklch, plum 70%, blue);
       }
-      split-view {
+      :host > split-view {
         min-width: 3px;
         background: #000;
+      }
+      main {
+        display: grid;
+        grid-template-rows: var(--top-height, 1fr) auto 1fr;
+      }
+      main split-view {
+        min-height: 3px;
+        background: #000;
+      }
+      .bottom {
+        background-color: cyan;
       }
     `
     this.shadowRoot.appendChild(style)
