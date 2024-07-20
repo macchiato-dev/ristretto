@@ -217,13 +217,21 @@ export class TabItem extends HTMLElement {
           align-items: stretch;
           padding-left: 3px 0;
           border-radius: var(--radius, 5px);
-          color: var(--fg, #070707);
-          background-color: var(--bg, rgb(212,212,216));
+          color: var(--fg, #b9b9bc);
+          background-color: var(--bg, #484850);
           align-items: center;
         }
         :host(.selected) div.header {
-          background-color: var(--bg-selected, rgb(15,118,110));
+          background-color: var(--bg-selected, #0e544f);
           color: var(--fg-selected, #e7e7e7);
+        }
+        :host(:hover) div.header {
+          background-color: var(--bg-hover, #52525b);
+          color: var(--fg-hover, #c7c7c7);
+        }
+        :host(.selected:hover) div.header {
+          background-color: var(--bg-selected-hover, #0c6860);
+          color: var(--fg-selected-hover, #f7f7f7);
         }
         div.header > * {
           background: inherit;
@@ -234,7 +242,7 @@ export class TabItem extends HTMLElement {
           flex-grow: 1;
           padding: 0 5px;
           font: inherit;
-          font-family: monospace;
+          font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
           outline: none;
           white-space: nowrap;
         }
@@ -255,14 +263,14 @@ export class TabItem extends HTMLElement {
           margin: 0;
         }
         button {
-          padding: 0 4px;
+          padding: 0 4px 0 2px;
           border-radius: 5px;
         }
         svg {
           height: 24px;
           width: 10px;
           margin-right: -3px;
-          opacity: 33%;
+          opacity: 50%;
         }
         :host(.selected) svg {
           opacity: 75%;
@@ -412,7 +420,7 @@ export class ExampleView extends HTMLElement {
         margin: 0;
         padding: 10px;
         color: #bfcfcd;
-        background: #fff;
+        background: #000;
       }
     `
     this.shadowRoot.append(style)
