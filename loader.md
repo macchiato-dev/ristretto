@@ -96,7 +96,7 @@ export class Loader {
     let initAppend = ""
     let append = ""
     const out = data.replaceAll(
-      /^\s*export\s+(?:class|function|async\s+function|const)\s+(\S+)/gms,
+      /^\s*export\s+(?:class|function|async\s+function|const)\s+([^\s(]+)/gms,
       (match, p1) => {
         const path = JSON.stringify(name)
         const mref = `Macchiato.modules[${path}]`
