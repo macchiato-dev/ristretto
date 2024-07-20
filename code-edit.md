@@ -253,7 +253,11 @@ export class CodeEdit extends HTMLElement {
     if (!this._viewTheme) {
       this._viewTheme = EditorView.theme({
         '&': {flexGrow: '1', height: '100%'},
-        '.cm-scroller': {overflow: 'auto'}
+        '.cm-scroller': {
+          overflow: 'auto',
+          'scrollbar-color': 'var(--scrollbar-thumb-color, #2a05e2) #0000',
+          'scrollbar-width': 'thin',
+        }
       })
     }
     return this._viewTheme
@@ -265,6 +269,8 @@ export class CodeEdit extends HTMLElement {
         '&': {flexGrow: '1', height: '100%'},
         '.cm-scroller': {
           overflow: 'auto',
+          'scrollbar-color': 'var(--scrollbar-thumb-color-dark, #49cff1) #0000',
+          'scrollbar-width': 'thin',
         },
       })
     }
@@ -301,9 +307,8 @@ export class AppView extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = `
       code-edit {
-        scrollbar-color: yellow #0000;
-        max-height: 100vh;
-        overflow: auto;
+        height: 90vh;
+        width: 90vw;
       }
     `
     this.shadowRoot.append(style)
@@ -313,7 +318,7 @@ export class AppView extends HTMLElement {
     codeEdit.value = `const x = 9 /* ${'-'.repeat(99)}*/\n`.repeat(100).trim()
     codeEdit.dark = true
     // setTimeout(() => {
-    //   codeEdit.dark = true
+    //   codeEdit.dark = false
     // }, 1500)
     // setTimeout(() => {
     //   codeEdit.fileType = 'html'

@@ -403,9 +403,20 @@ export class AppView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.depsConfig = {bundleFiles: [], importFiles: []}
-    this.notebook = this.getBlockContent('notebook.md') ?? (
-      `\n\n\`app.js\`\n\n${this.fence(`document.body.innerText = 'hello'`)}`
-    )
+    this.notebook = this.getBlockContent('notebook.md')
+    if ((this.notebook ?? true) === true) {
+      const defExample = `export class Test {}`
+      const runExample = `for (let i=0; i < 100; i++) {
+  document.body.innerHTML += '<p style="color: green">' + String(i + 1) + '</p>'
+}
+
+${"\n".repeat(50)}
+
+document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
+      this.notebook = Array(5).fill(0).map((v, i) => (
+        `\n\n\`${i === 4 ? `app` : `File${i + 1}`}.js\`\n\n${this.fence(i === 4 ? runExample : defExample)}`
+      )).join(`\n\n`)
+    }
     this.loaded = false
     this.toolbar = document.createElement('m-toolbar')
     this.toolbar.onShowNotebookCode = () => {
