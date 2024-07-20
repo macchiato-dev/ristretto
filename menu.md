@@ -31,14 +31,17 @@ export class Dropdown extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
+      :host {
+        font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
+      }
       dialog {
         border-radius: 6px;
         border: none;
-        box-shadow: 0 3px 7px #9995;
+        box-shadow: 0 2px 2px #9995;
       }
       dialog {
-        background: #555d;
-        color: #ddd;
+        background: #373740e7;
+        color: #b7b7b7;
         padding: 3px;
         margin-left: var(--dialog-left);
         margin-right: var(--dialog-right);
@@ -72,6 +75,7 @@ export class Dropdown extends HTMLElement {
       }
       button:hover {
         background: #99b3;
+        color: #d7d7d7;
       }
     `
     this.shadowRoot.append(style)
@@ -244,7 +248,7 @@ export class ExampleView extends HTMLElement {
   openMenu(btn) {
     this.menu.clear()
     //this.menu.alignX = 'center'
-    this.menu.offsetY = 0
+    //this.menu.offsetY = 0
     for (const name of [
       'Test Item A', 'Item with long text here', 'Test Item B', 'Test Item C', 'Test Item D'
     ]) {
