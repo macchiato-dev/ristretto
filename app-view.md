@@ -53,7 +53,10 @@ export class AppView extends HTMLElement {
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
-      this.style.setProperty('--sidebar-width', `${x}px`)
+      this.style.setProperty(
+        `--${this.classList.contains('explore') ? 'explore-' : ''}sidebar-width`,
+        `${x}px`
+      )
     })
     this.split.setAttribute('draggable', 'false')
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
@@ -80,12 +83,15 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-columns: var(--sidebar-width, 1fr) auto 1.8fr;
+        grid-template-columns: var(--sidebar-width, 280px) auto 1.8fr;
         grid-template-rows: 1fr;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
+      }
+      :host(.explore) {
+        grid-template-columns: var(--explore-sidebar-width, 1fr) auto 1.8fr;
       }
       *, *:before, *:after {
         box-sizing: inherit;
@@ -114,8 +120,6 @@ export class AppView extends HTMLElement {
         display: flex;
         flex-direction: column;
         overflow-y: auto;
-      }
-      div.files {
         padding-right: 8px;
       }
       div.select-tabs {
@@ -373,6 +377,7 @@ ${runEntry}
     for (const child of el.parentElement.children) {
       child.classList.remove('active')
     }
+    this.classList.toggle('explore', name === 'Explore')
     if (name === 'Files' && !this.filesView) {
       await this.initFiles()
     } else if (name === 'Explore' && !this.exploreView) {
