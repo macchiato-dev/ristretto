@@ -104,9 +104,12 @@ export class FileTree extends HTMLElement {
       const li = document.createElement('li')
       const item = document.createElement('div')
       const expand = document.createElement('button')
-      expand.innerHTML = this.icons.collapse
+      expand.innerHTML = parents.length >= 1 ? this.icons.expand : this.icons.collapse
       const name = document.createElement('span')
       item.classList.add('item')
+      if (parents.length >= 1) {
+        li.classList.add('collapsed')
+      }
       item.append(expand, name)
       li.append(item)
       if (typeof value === 'object' && value !== null) {
