@@ -53,13 +53,7 @@ export class AppView extends HTMLElement {
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
-      this.style.setProperty('--sidebar-width', `${x - 4}px`)
-    })
-    this.split.addEventListener('split-view-start', e => {
-      this.viewPane.classList.add('split-move')
-    })
-    this.split.addEventListener('split-view-end', e => {
-      this.viewPane.classList.remove('split-move')
+      this.style.setProperty('--sidebar-width', `${x}px`)
     })
     this.split.setAttribute('draggable', 'false')
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
@@ -88,25 +82,25 @@ export class AppView extends HTMLElement {
         display: grid;
         grid-template-columns: var(--sidebar-width, 1fr) auto 1.8fr;
         grid-template-rows: 1fr;
-        gap: 4px;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
       }
-      div.view-pane.split-move iframe {
-        pointer-events: none;
+      *, *:before, *:after {
+        box-sizing: inherit;
       }
       split-view {
-        min-width: 4px;
+        min-width: 5px;
       }
       div.select {
         display: flex;
         flex-direction: column;
         padding: 10px;
         padding-right: 0px;
-        overflow-y: auto;
         scrollbar-color: #0000004d #0000;
+        align-items: stretch;
+        height: 100vh;
       }
       div.select::-webkit-scrollbar {
         width: 6px;
@@ -116,9 +110,13 @@ export class AppView extends HTMLElement {
         background-color: #0000004d;
         border-radius: 4px;
       }
-      div.explore {
+      div.explore, div.files {
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
+      }
+      div.files {
+        padding-right: 8px;
       }
       div.select-tabs {
         display: flex;
