@@ -448,6 +448,11 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
     }
     this.editor.load(this.readNotebookFiles(this.notebook))
     this.renderView()
+    addEventListener('message', e => {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*')
+      }
+    })
   }
 
   readNotebookFiles(notebook) {
