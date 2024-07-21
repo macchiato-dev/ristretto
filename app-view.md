@@ -302,7 +302,7 @@ ${runEntry}
       const src = __source
       let dataSrc = '', notebookSrc = ''
       const notebookFile = this.mode === 'explore' ? this.notebookSelect.selectedItem?.name : 'tabbed.md'
-      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.join('/')
+      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -398,7 +398,9 @@ ${runEntry}
     this.filesView = document.createElement('div')
     this.filesView.classList.add('files', 'tab-content')
     this.fileTree = document.createElement('file-tree')
-    this.fileTree.data = {'System': this.systemFiles}
+    const fileTreeData = {'System': this.systemFiles}
+    this.fileTree.data = fileTreeData
+    this.fileTree.selected = ['System', Object.keys(fileTreeData['System'])[0]]
     this.fileTree.addEventListener('select-item', () => {
       this.displayNotebook()
     })
