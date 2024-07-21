@@ -336,17 +336,7 @@ export class TestView extends HTMLElement {
     ].map(name => {
       const el = document.createElement('td')
       try {
-        const result = this[name].call(this)
-        const frame = this.createFrame(result)
-        const message = document.createElement('span')
-        const listener = addEventListener('message', e => {
-          if (e.source === frame.contentWindow) {
-            message.innerText = e.data
-            removeEventListener('message', listener)
-            el.classList.add('pass')
-          }
-        })
-        el.append(frame, message)
+        const message = this[name].call(this, el)
       } catch (e) {
         el.innerText = `Error: ${e}`
         el.classList.add('error')
@@ -408,7 +398,7 @@ ${runEntry}
     return frame
   }
 
-  testClass() {
+  testClass(el) {
     const [entrySrc, loaderSrc] = ['entry.js', 'loader.js'].map(filename => {
       const block = Array.from(readBlocksWithNames(__source)).find(({name}) => name === filename)
       return __source.slice(...block.contentRange)
@@ -456,8 +446,16 @@ ${entrySrc}
 ${'```'}
 
 `
-    console.log(src)
-    return src
+    const frame = this.createFrame(src)
+    const message = document.createElement('span')
+    const listener = addEventListener('message', e => {
+      if (e.source === frame.contentWindow) {
+        message.innerText = e.data
+        removeEventListener('message', listener)
+        el.classList.add('pass')
+      }
+    })
+    el.append(frame, message)
   }
 
   testFunction() {
