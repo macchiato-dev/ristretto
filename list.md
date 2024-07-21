@@ -640,6 +640,11 @@ export class AppView extends HTMLElement {
     this.shadowRoot.addEventListener('input', (e) => {
       this.handleInput()
     })
+    addEventListener('message', e => {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*')
+      }
+    })
   }
 
   connectedCallback() {
