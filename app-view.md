@@ -457,6 +457,7 @@ ${runEntry}
       this.updateNotebookItems()
       this.displayNotebook()
     })
+    this.initImages(this.dataSelect.items)
     this.notebookSelect = document.createElement('file-card-list')
     this.notebookSelect.name = 'Notebook'
     this.updateNotebookItems()
