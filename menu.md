@@ -37,7 +37,7 @@ export class Dropdown extends HTMLElement {
       dialog {
         border-radius: 6px;
         border: none;
-        box-shadow: 0 2px 2px #9995;
+        box-shadow: rgba(25, 25, 25, 0.15) 1.95px 1.95px 2.6px;
       }
       dialog {
         background: #373740e7;
