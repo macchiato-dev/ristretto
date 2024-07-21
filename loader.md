@@ -96,7 +96,7 @@ export class Loader {
     let initAppend = ""
     let append = ""
     const out = data.replaceAll(
-      /^\s*export\s+(?:class|function|async\s+function|const)\s+(\S+)/gms,
+      /^\s*export\s+(?:class|function|async\s+function|const)\s+([^\s(]+)/gms,
       (match, p1) => {
         const path = JSON.stringify(name)
         const mref = `Macchiato.modules[${path}]`
@@ -317,4 +317,203 @@ async function run(src) {
 }
 
 run(__source)
+```
+
+`TestView.js`
+
+```js
+import {Loader} from '/loader.js'
+import {Builder} from '/builder.js'
+
+export class TestView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    const results = [
+      'testClass',
+      //'testFunction',
+      //'testConst'
+    ].map(name => {
+      const el = document.createElement('td')
+      try {
+        const result = this[name].call(this)
+        const frame = this.createFrame(result)
+        const message = document.createElement('span')
+        const listener = addEventListener('message', e => {
+          if (e.source === frame.contentWindow) {
+            message.innerText = e.data
+            removeEventListener('message', listener)
+            el.classList.add('pass')
+          }
+        })
+        el.append(frame, message)
+      } catch (e) {
+        el.innerText = `Error: ${e}`
+        el.classList.add('error')
+      }
+      const tr = document.createElement('tr')
+      const nameEl = document.createElement('th')
+      nameEl.innerText = name
+      tr.append(nameEl, el)
+      return tr
+    })
+    const table = document.createElement('table')
+    table.append(...['thead', 'tbody'].map(tag => document.createElement(tag)))
+    table.children[0].append(...['Test', 'Result'].map(s => {
+      const el = document.createElement('th')
+      el.innerText = s
+      return el
+    }))
+    table.children[1].append(...results)
+    this.shadowRoot.append(table)
+  }
+
+  createFrame(notebookSrc) {
+    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+    const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+    `.trim()
+    const src = `
+<!doctype html>
+<html>
+<head>
+  <title>preview</title>
+<script type="module">
+${runEntry}
+</script>
+</head>
+<body>
+</body>
+</html>
+`.trim()
+    const frame = document.createElement('iframe')
+    frame.sandbox = 'allow-scripts'
+    frame.src = `data:text/html;base64,${btoa(src.trim())}`
+    frame.addEventListener('load', () => {
+      const messageText = `\n\n${notebookSrc}\n\n`
+      const messageData = new TextEncoder().encode(messageText)
+      frame.contentWindow.postMessage(
+        ['notebook', messageData],
+        '*',
+        [messageData.buffer]
+      )
+    }, {once: true})
+    return frame
+  }
+
+  testClass() {
+    const [entrySrc, loaderSrc] = ['entry.js', 'loader.js'].map(filename => {
+      const block = Array.from(readBlocksWithNames(__source)).find(({name}) => name === filename)
+      return __source.slice(...block.contentRange)
+    })
+    const src = `# testClass
+
+${'`TestClass.js`'}
+
+${'```js'}
+${`export`} class TestClass {
+  sayHi() {
+    return 'Hi!'
+  }
+}
+${'```'}
+
+${'`run.js`'}
+
+${'```js'}
+${`import`} {TestClass} from '/TestClass.js'
+
+const test = new TestClass()
+parent.postMessage(test.sayHi(), '*')
+console.log('posted message')
+
+${'```'}
+
+${'`loader.md`'}
+
+${'````md'}
+# Loader
+
+${'`loader.js`'}
+
+${'```js'}
+${loaderSrc}
+${'```'}
+
+${'````'}
+
+${'`entry.js`'}
+
+${'```js'}
+${entrySrc}
+${'```'}
+
+`
+    console.log(src)
+    return src
+  }
+
+  testFunction() {
+    
+  }
+
+  testConst() {
+    
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          color: white;
+          height: 50px;
+          background-color: yellow;
+        }
+        table {
+          border-collapse: collapse;
+        }
+        td, th {
+          border: 2px solid black;
+          background-color: #555;
+          padding: 5px;
+        }
+        .pass {
+          background-color: green;
+        }
+        .error, .fail {
+          background-color: red;
+        }
+        iframe {
+          width: 18px;
+          height: 18px;
+          border: 1px solid black;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+`app.js`
+
+```js
+import {TestView} from '/TestView.js'
+
+customElements.define('test-view', TestView)
+
+function setup() {
+  const testView = document.createElement('test-view')
+  document.body.append(testView)
+}
+
+setup()
 ```

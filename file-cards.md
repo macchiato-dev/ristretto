@@ -181,14 +181,14 @@ export class FileCardList extends HTMLElement {
     const style = document.createElement('style')
     style.textContent = `
       .list-wrap {
-        display: flex;
-        flex-direction: row;
+        display: grid;
+        grid-template-rows: min-content;
+        grid-template-columns: min-content 1fr min-content;
         gap: 0px;
         color: #bfcfcd;
         background-color: #2b172a;
         padding: 5px 2px;
         border-radius: 10px;
-        overflow-x: auto;
         align-items: center;
       }
       .list {
@@ -274,25 +274,6 @@ export class FileCardList extends HTMLElement {
 }
 ```
 
-
-
-`app.js`
-
-```js
-import {FileCard} from '/FileCard.js'
-import {FileCardList} from '/FileCardList.js'
-import {ExampleApp} from '/ExampleApp.js'
-
-customElements.define('file-card', FileCard)
-customElements.define('file-card-list', FileCardList)
-customElements.define('example-app', ExampleApp)
-
-async function setup() {
-  document.body.append(document.createElement('example-app'))
-}
-
-setup()
-```
 
 `ExampleApp.js`
 
@@ -413,4 +394,23 @@ export class ExampleApp extends HTMLElement {
     })
   }
 }
+```
+
+
+`app.js`
+
+```js
+import {FileCard} from '/FileCard.js'
+import {FileCardList} from '/FileCardList.js'
+import {ExampleApp} from '/ExampleApp.js'
+
+customElements.define('file-card', FileCard)
+customElements.define('file-card-list', FileCardList)
+customElements.define('example-app', ExampleApp)
+
+async function setup() {
+  document.body.append(document.createElement('example-app'))
+}
+
+setup()
 ```

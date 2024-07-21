@@ -38,25 +38,26 @@ export class CodeEdit extends HTMLElement {
 
   connectedCallback() {
     this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styleSheet]
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.initEditor()
   }
 
-  static css = `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      flex-grow: 1;
-      background-color: #fff;
-      height: 100%;
-    }
-  `
-
-  static get styleSheet() {
+  static get styles() {
     if (this._styleSheet === undefined) {
       this._styleSheet = new CSSStyleSheet()
-      this._styleSheet.replaceSync(this.css)
+      this._styleSheet.replaceSync(`
+        :host {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          flex-grow: 1;
+          background-color: #fff;
+          height: 100%;
+        }
+        :host(.dark) {
+          background-color: #000;
+        }
+      `)
     }
     return this._styleSheet
   }
@@ -98,6 +99,7 @@ export class CodeEdit extends HTMLElement {
     this._dark = value
     if (this.dark !== previousDark) {
       this.reconfigureTheme()
+      this.classList.toggle('dark', Boolean(this.dark))
     }
   }
 
@@ -186,7 +188,7 @@ export class CodeEdit extends HTMLElement {
   }
 
   get themePlugins() {
-    return this.dark ? [oneDark] : []
+    return this.dark ? [this.constructor.viewThemeDark, oneDark] : [this.constructor.viewTheme]
   }
 
   initEditor() {
@@ -224,16 +226,11 @@ export class CodeEdit extends HTMLElement {
         ...lintKeymap,
       ]),
     ]
-    const viewTheme = EditorView.theme({
-      '&': {flexGrow: '1', height: '100%'},
-      '.cm-scroller': {overflow: 'auto'}
-    })
     this.view = new EditorView({
       doc: this._value ?? '',
       extensions: [
         ...basicSetup,
         this.languageCompartment.of(langPlugins),
-        viewTheme,
         this.themeCompartment.of(themePlugins),
         EditorView.updateListener.of(e => {
           if (e.docChanged) {
@@ -250,6 +247,34 @@ export class CodeEdit extends HTMLElement {
 
   focus() {
     this.view.focus()
+  }
+
+  static get viewTheme() {
+    if (!this._viewTheme) {
+      this._viewTheme = EditorView.theme({
+        '&': {flexGrow: '1', height: '100%'},
+        '.cm-scroller': {
+          overflow: 'auto',
+          'scrollbar-color': 'var(--scrollbar-thumb-color, #2a05e2) #0000',
+          'scrollbar-width': 'thin',
+        }
+      })
+    }
+    return this._viewTheme
+  }
+
+  static get viewThemeDark() {
+    if (!this._viewThemeDark) {
+      this._viewThemeDark = EditorView.theme({
+        '&': {flexGrow: '1', height: '100%'},
+        '.cm-scroller': {
+          overflow: 'auto',
+          'scrollbar-color': 'var(--scrollbar-thumb-color-dark, #49cff1) #0000',
+          'scrollbar-width': 'thin',
+        },
+      })
+    }
+    return this._viewThemeDark
   }
 }
 ```
@@ -281,15 +306,19 @@ export class AppView extends HTMLElement {
 
     const style = document.createElement('style')
     style.textContent = `
+      code-edit {
+        height: 90vh;
+        width: 90vw;
+      }
     `
     this.shadowRoot.append(style)
 
     const codeEdit = document.createElement('code-edit')
     codeEdit.fileType = 'js'
-    codeEdit.value = `const x = 9`
-    codeEdit.dark = false
+    codeEdit.value = `const x = 9 /* ${'-'.repeat(99)}*/\n`.repeat(100).trim()
+    codeEdit.dark = true
     // setTimeout(() => {
-    //   codeEdit.dark = true
+    //   codeEdit.dark = false
     // }, 1500)
     // setTimeout(() => {
     //   codeEdit.fileType = 'html'

@@ -30,104 +30,21 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.notebookTemplates = {
-      'intro.md': [
-        'app-content.md',
-      ],
-      'example-notebook.md': [
-        'list.md',
-        'tabbed.md',
-        // 'overlay.md',  # TODO
-      ],
-      'planets.csv': [
-        'table.md',
-        'data-cards.md',
-        'editable-data-table.md',
-      ],
-      'colors.json': [
-        'palette.md',
-        'shapes.md',
-      ],
-      'image.png': [
-        'image-filters.md',
-        'histogram.md',
-      ],
-      'font.woff2': [
-        'heading.md',
-      ],
-      'wiki-response.json': [
-        'json-tree.md',
-      ],
-      'files.json': [
-        'file-tree.md',
-        'json-tree.md',
-      ],
-    }
-    this.dataTemplates = Object.keys(this.notebookTemplates)
-    this.dataSelect = document.createElement('file-card-list')
-    this.dataSelect.name = 'Data'
-    this.dataSelect.items = this.dataTemplates.map((template, i) => {
-      const el = document.createElement('file-card')
-      el.name = template
-      if (i === 0) {
-        el.setAttribute('selected', true)
-      }
-      return el
-    })
-    this.dataSelect.addEventListener('select-item', e => {
-      this.updateNotebookItems()
-      this.displayNotebook()
-    })
-    this.notebookSelect = document.createElement('file-card-list')
-    this.notebookSelect.name = 'Notebook'
-    this.updateNotebookItems()
-    this.notebookSelect.addEventListener('select-item', e => {
-      this.displayNotebook()
-    })
     this.selectTabs = document.createElement('div')
-    this.selectTabs.append(...['Explore', 'Source'].map(name => {
+    this.selectTabs.append(...['Files', 'Explore'].map(name => {
       const el = document.createElement('a')
       el.innerText = name
-      if (name === 'Explore') {
+      if (name === 'Files') {
         el.classList.add('active')
       }
       el.addEventListener('click', () => {
-        for (const child of el.parentElement.children) {
-          child.classList.remove('active')
-        }
-        for (const [tabName, el] of [
-          ['Explore', this.exploreView], ['Source', this.sourceView]
-        ]) {
-          if (tabName === name) {
-            el.classList.add('active')
-          } else {
-            el.classList.remove('active')
-          }
-        }
-        el.classList.add('active')
-        if (name === 'Explore') {
-          this.mode = 'explore'
-        } else {
-          this.mode = 'source'
-        }
-        this.displayNotebook()
+        this.switchTab(name, el)
       })
       return el
     }))
     this.selectTabs.classList.add('select-tabs')
-    this.exploreView = document.createElement('div')
-    this.exploreView.append(this.dataSelect, this.notebookSelect)
-    this.exploreView.classList.add('explore', 'tab-content', 'active')
-    this.sourceView = document.createElement('div')
-    this.sourceView.classList.add('source', 'tab-content')
-    this.fileTree = document.createElement('file-tree')
-    this.fileTree.data = this.sourceFiles
-    this.fileTree.addEventListener('select-item', () => {
-      this.displayNotebook()
-    })
-    this.sourceView.append(this.fileTree)
     this.selectPane = document.createElement('div')
-    this.selectPane.append(this.selectTabs, this.exploreView, this.sourceView)
+    this.selectPane.append(this.selectTabs)
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
@@ -136,18 +53,14 @@ export class AppView extends HTMLElement {
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
-      this.style.setProperty('--sidebar-width', `${x - 4}px`)
-    })
-    this.split.addEventListener('split-view-start', e => {
-      this.viewPane.classList.add('split-move')
-    })
-    this.split.addEventListener('split-view-end', e => {
-      this.viewPane.classList.remove('split-move')
+      this.style.setProperty(
+        `--${this.classList.contains('explore') ? 'explore-' : ''}sidebar-width`,
+        `${x}px`
+      )
     })
     this.split.setAttribute('draggable', 'false')
-    this.mode = 'explore'
-    this.displayNotebook()
     this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
+    this.switchTab('Files', this.selectTabs.children[0])
   }
 
   connectedCallback() {
@@ -170,27 +83,30 @@ export class AppView extends HTMLElement {
     style.textContent = `
       :host {
         display: grid;
-        grid-template-columns: var(--sidebar-width, 1fr) auto 1.8fr;
+        grid-template-columns: var(--sidebar-width, 280px) auto 1.8fr;
         grid-template-rows: 1fr;
-        gap: 4px;
         height: 100vh;
         margin: 0;
         padding: 0;
         color: #bfcfcd;
       }
-      div.view-pane.split-move iframe {
-        pointer-events: none;
+      :host(.explore) {
+        grid-template-columns: var(--explore-sidebar-width, 1fr) auto 1.8fr;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
       }
       split-view {
-        min-width: 4px;
+        min-width: 5px;
       }
       div.select {
         display: flex;
         flex-direction: column;
         padding: 10px;
         padding-right: 0px;
-        overflow-y: auto;
         scrollbar-color: #0000004d #0000;
+        align-items: stretch;
+        height: 100vh;
       }
       div.select::-webkit-scrollbar {
         width: 6px;
@@ -200,9 +116,11 @@ export class AppView extends HTMLElement {
         background-color: #0000004d;
         border-radius: 4px;
       }
-      div.explore {
+      div.explore, div.files {
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
+        padding-right: 8px;
       }
       div.select-tabs {
         display: flex;
@@ -261,7 +179,6 @@ export class AppView extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-    this.initImages(this.dataSelect.items)
     addEventListener('message', async e => {
       if (e.source === this.viewFrame?.contentWindow) {
         const [cmd, ...args] = e.data
@@ -387,7 +304,7 @@ ${runEntry}
       const src = __source
       let dataSrc = '', notebookSrc = ''
       const notebookFile = this.mode === 'explore' ? this.notebookSelect.selectedItem?.name : 'tabbed.md'
-      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.join('/')
+      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -420,7 +337,7 @@ ${runEntry}
     return this.notebookSelect
   }
 
-  get sourceFiles() {
+  get systemFiles() {
     const result = {}
     for (const block of readBlocksWithNames(__source)) {
       if (block.name.endsWith('.md')) {
@@ -443,6 +360,117 @@ ${runEntry}
       )).toSorted((a, b) => a[0].localeCompare(b[0])))
     }
     return sortNested(result)
+  }
+
+  get mode() {
+    return this._mode
+  }
+
+  set mode(value) {
+    this._mode = value
+    if (value === 'explore') {
+      this.showExplore()
+    }
+  }
+
+  async switchTab(name, el) {
+    for (const child of el.parentElement.children) {
+      child.classList.remove('active')
+    }
+    this.classList.toggle('explore', name === 'Explore')
+    if (name === 'Files' && !this.filesView) {
+      await this.initFiles()
+    } else if (name === 'Explore' && !this.exploreView) {
+      await this.initExplore()
+    }
+    for (const [tabName, el] of [
+      ['Files', this.filesView], ['Explore', this.exploreView]
+    ]) {
+      el?.classList?.toggle('active', tabName === name)
+    }
+    el.classList.add('active')
+    if (name === 'Explore') {
+      this.mode = 'explore'
+    } else {
+      this.mode = 'files'
+    }
+    this.displayNotebook()
+  }
+
+  async initFiles() {
+    this.filesView = document.createElement('div')
+    this.filesView.classList.add('files', 'tab-content')
+    this.fileTree = document.createElement('file-tree')
+    const fileTreeData = {'System': this.systemFiles}
+    this.fileTree.data = fileTreeData
+    this.fileTree.selected = ['System', Object.keys(fileTreeData['System'])[0]]
+    this.fileTree.addEventListener('select-item', () => {
+      this.displayNotebook()
+    })
+    this.filesView.append(this.fileTree)
+    this.selectPane.append(this.filesView)
+  }
+
+  async initExplore() {
+    this.notebookTemplates = {
+      'intro.md': [
+        'app-content.md',
+      ],
+      'example-notebook.md': [
+        'tabbed.md',
+        'list.md',
+        // 'overlay.md',  # TODO
+      ],
+      'planets.csv': [
+        'table.md',
+        'data-cards.md',
+        'editable-data-table.md',
+      ],
+      'colors.json': [
+        'palette.md',
+        'shapes.md',
+      ],
+      'image.png': [
+        'image-filters.md',
+        'histogram.md',
+      ],
+      'font.woff2': [
+        'heading.md',
+      ],
+      'wiki-response.json': [
+        'json-tree.md',
+      ],
+      'files.json': [
+        'file-tree.md',
+        'json-tree.md',
+      ],
+    }
+    this.dataTemplates = Object.keys(this.notebookTemplates)
+    this.dataSelect = document.createElement('file-card-list')
+    this.dataSelect.name = 'Data'
+    this.dataSelect.items = this.dataTemplates.map((template, i) => {
+      const el = document.createElement('file-card')
+      el.name = template
+      if (i === 0) {
+        el.setAttribute('selected', true)
+      }
+      return el
+    })
+    this.dataSelect.addEventListener('select-item', e => {
+      this.updateNotebookItems()
+      this.displayNotebook()
+    })
+    this.initImages(this.dataSelect.items)
+    this.notebookSelect = document.createElement('file-card-list')
+    this.notebookSelect.name = 'Notebook'
+    this.updateNotebookItems()
+    this.notebookSelect.addEventListener('select-item', e => {
+      this.displayNotebook()
+    })
+    this.exploreView = document.createElement('div')
+    this.exploreView.classList.add('explore', 'tab-content')
+    this.exploreView.append(this.dataSelect, this.notebookSelect)
+    this.selectPane.append(this.exploreView)
   }
 }
 ```

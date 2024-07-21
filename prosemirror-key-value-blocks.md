@@ -90,6 +90,7 @@ export class OutlineTextEdit extends HTMLElement {
         plugins: [dataKeymap, dataPlugin, histKeymap, history()],
       }),
       root: this.shadowRoot,
+      attributes: {spellcheck: false}
     })
   }
 
@@ -109,6 +110,9 @@ export class OutlineTextEdit extends HTMLElement {
         :host {
           color: white;
         }
+        * {
+          outline: none;
+        }
         obj-key, obj-val {
           display: block;
           float: left;
@@ -116,6 +120,7 @@ export class OutlineTextEdit extends HTMLElement {
           padding: 3px 7px;
           border-radius: 9999px;
           margin-right: 5px;
+          margin-bottom: 5px;
         }
         obj-key {
           clear: both;

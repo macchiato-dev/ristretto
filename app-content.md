@@ -131,9 +131,9 @@ export class ExampleView extends HTMLElement {
       ...Array.from(readBlocksWithNames(__source)).filter(
         ({name}) => name.endsWith('.md')
       ).map(({contentRange}) => __source.slice(...contentRange)).map(blockSource => (
-        Array.from(readBlocksWithNames(blockSource).filter(
+        Array.from(readBlocksWithNames(blockSource)).filter(
           ({name}) => name === 'content.md'
-        )).map(({contentRange}) => blockSource.slice(...contentRange))
+        ).map(({contentRange}) => blockSource.slice(...contentRange))
       )).flat(),
       ...Array.from(readBlocksWithNames(__source)).filter(
         ({name}) => name === 'content.md'

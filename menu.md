@@ -31,15 +31,17 @@ export class Dropdown extends HTMLElement {
   connectedCallback() {
     const style = document.createElement('style')
     style.textContent = `
-      dialog {
-        min-width: 200px;
-        border: 1px solid rgba(0, 0, 0, 0.3);
-        border-radius: 6px;
-        box-shadow: 0 3px 7px rgba(0, 0, 0, 0.3);
+      :host {
+        font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
       }
       dialog {
-        background: #222;
-        color: #ddd;
+        border-radius: 6px;
+        border: none;
+        box-shadow: rgba(25, 25, 25, 0.15) 1.95px 1.95px 2.6px;
+      }
+      dialog {
+        background: #373740e7;
+        color: #b7b7b7;
         padding: 3px;
         margin-left: var(--dialog-left);
         margin-right: var(--dialog-right);
@@ -64,12 +66,16 @@ export class Dropdown extends HTMLElement {
         height: var(--window-width);
       }
       button {
-        background: #222;
+        all: unset;
         font-size: 16px;
         border: none;
         color: inherit;
-        padding: 8px 10px;
+        padding: 5px 8px;
         text-align: left;
+      }
+      button:hover {
+        background: #99b3;
+        color: #d7d7d7;
       }
     `
     this.shadowRoot.append(style)
@@ -211,7 +217,7 @@ export class ExampleView extends HTMLElement {
         margin: 0;
         padding: 10px;
         color: #bfcfcd;
-        background: #fff;
+        background: #000;
       }
       div {
         display: flex;
