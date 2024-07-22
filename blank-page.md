@@ -13,14 +13,14 @@ export class BlankPage extends HTMLElement {
     this.placeholder.classList.add('placeholder')
     const kbd = document.createElement('kbd')
     kbd.innerText = '/'
-    this.placeholder.append(
-      this.text.typePasteDrag,
-      document.createElement('br'),
-      document.createElement('br'),
-      this.text.commandBefore,
-      kbd,
-      this.text.commandAfter,
-    )
+    this.placeholder.append(...[
+      [this.text.typePasteDrag],
+      [this.text.commandBefore, kbd, this.text.commandAfter],
+    ].map(block => {
+      const el = document.createElement('p')
+      el.append(...block)
+      return el
+    }))
     this.blankPage = document.createElement('div')
     this.blankPage.classList.add('blank-page')
     this.blankPage.classList.add('edited')
@@ -95,6 +95,9 @@ export class BlankPage extends HTMLElement {
           gap: 10px;
           justify-content: center;
           color: white;
+        }
+        p {
+          margin-top: 0;
         }
         .placeholder {
           grid-row: 1;
