@@ -13,14 +13,14 @@ export class BlankPage extends HTMLElement {
     this.placeholder.classList.add('placeholder')
     const kbd = document.createElement('kbd')
     kbd.innerText = '/'
-    this.placeholder.append(...[
-      [this.text.typePasteDrag],
-      [this.text.commandBefore, kbd, this.text.commandAfter],
-    ].map(block => {
-      const el = document.createElement('p')
-      el.append(...block)
-      return el
-    }))
+    this.placeholder.append(
+      this.text.typePasteDrag,
+      document.createElement('br'),
+      document.createElement('br'),
+      this.text.commandBefore,
+      kbd,
+      this.text.commandAfter,
+    )
     this.blankPage = document.createElement('div')
     this.blankPage.classList.add('blank-page')
     this.blankPage.classList.add('edited')
@@ -96,9 +96,6 @@ export class BlankPage extends HTMLElement {
           justify-content: center;
           color: white;
         }
-        p {
-          margin-top: 0;
-        }
         .placeholder {
           grid-row: 1;
           grid-column: 1;
@@ -135,7 +132,7 @@ export class ExampleView extends HTMLElement {
     const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
     document.adoptedStyleSheets = [...sheets, this.constructor.globalStyles]
     this.blankPage = document.createElement('blank-page')
-    this.blankPage.lang = 'en'
+    // this.blankPage.lang = 'en'
     document.body.append(this.blankPage)
   }
 

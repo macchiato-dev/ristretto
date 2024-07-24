@@ -126,6 +126,9 @@ export class ColorPicker extends HTMLElement {
     this.updateShadeColor()
     this.colorInput.value = this.shadeColor
     this.colorTextInput.value = this.shadeColor
+    this.dispatchEvent(new CustomEvent(
+      'value-input', {bubbles: true}
+    ))
   }
 
   moveHueThumb(e) {
@@ -135,6 +138,9 @@ export class ColorPicker extends HTMLElement {
     this.updateShadeColor()
     this.colorInput.value = this.shadeColor
     this.colorTextInput.value = this.shadeColor
+    this.dispatchEvent(new CustomEvent(
+      'value-input', {bubbles: true}
+    ))
   }
 
   updateHueColor() {
@@ -216,6 +222,15 @@ export class ColorPicker extends HTMLElement {
     this.updateShadeColor()
   }
 
+  get value() {
+    return this.colorTextInput.value
+  }
+
+  set value(value) {
+    this.colorInput.value = value
+    this.colorInput.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
   static get styles() {
     if (!this._styles) {
       this._styles = new CSSStyleSheet()
@@ -251,7 +266,7 @@ export class ColorPicker extends HTMLElement {
           left: var(--shade-left, 200px);
           height: 16px;
           width: 16px;
-          border: 2px solid #cccccc;
+          border: 2px solid var(--thumb-border-color, #cccccc);
           border-radius: 8px;
           background-color: var(--shade-color, #0000ff);
         }
@@ -268,7 +283,7 @@ export class ColorPicker extends HTMLElement {
           top: var(--hue-top, 133.33px);
           height: 16px;
           width: 30px;
-          border: 2px solid #cccccc;
+          border: 2px solid var(--thumb-border-color, #cccccc);
           border-radius: 8px;
           background-color: var(--hue-color, #0000ff);
         }
@@ -296,8 +311,13 @@ export class ExampleView extends HTMLElement {
     if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
+    this.controlColorPicker = document.createElement('color-picker')
+    this.controlColorPicker.addEventListener('value-input', () => {
+      this.colorPicker.style.setProperty('--thumb-border-color', this.controlColorPicker.value)
+      this.colorPicker.value = this.controlColorPicker.value
+    })
     this.colorPicker = document.createElement('color-picker')
-    this.shadowRoot.append(this.colorPicker)
+    this.shadowRoot.append(this.controlColorPicker, this.colorPicker)
   }
 
   static get styles() {
@@ -306,9 +326,11 @@ export class ExampleView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: flex;
-          flex-direction: column;
-          padding: 10px;
+          flex-direction: row;
           align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          gap: 20px;
         }
       `)
     }
@@ -322,6 +344,7 @@ export class ExampleView extends HTMLElement {
         body {
           display: grid;
           grid-template-columns: 1fr;
+          margin: 0;
         }
       `)
     }
