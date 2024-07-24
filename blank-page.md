@@ -26,11 +26,7 @@ export class BlankPage extends HTMLElement {
     this.blankPage.classList.add('edited')
     this.blankPage.contentEditable = true
     this.blankPage.addEventListener('blur', () => {
-      if (this.blankPage.innerText.trim() === '') {
-        this.classList.remove('edited')
-      } else {
-        this.classList.add('edited')
-      }
+      this.classList.toggle('edited', this.blankPage.innerText.trim() !== '')
     })
     this.blankPage.addEventListener('beforeinput', e => {
       if (e.inputType === 'historyUndo') {
