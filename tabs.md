@@ -30,9 +30,6 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
-    this.nameEl.addEventListener('input', e => {
-      this.contentEl.name = this.nameEl.innerText
-    })
     this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
       if (this.isNew) {
@@ -113,9 +110,9 @@ export class TabItem extends HTMLElement {
     }
     if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
-        (this.previousElementSibling ?? this.nextElementSibling).selected = true
-        this.contentEl.remove()
-        this.remove()
+        this.dispatchEvent(new CustomEvent(
+          'click-delete', {bubbles: true}
+        ))
       })
     }
     this.menu.add(this.text.rename, () => {
@@ -290,6 +287,7 @@ export class TabList extends HTMLElement {
     this.listEl.addEventListener('click', e => this.childClicked(e))
     this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
     this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
+    this.listEl.addEventListener('click-delete', e => { this.handleDelete(e) })
     this.shadowRoot.append(this.listEl)
   }
 
@@ -355,6 +353,12 @@ export class TabList extends HTMLElement {
     }
   }
 
+  handleDelete(e) {
+    (e.target.previousElementSibling ?? e.target.nextElementSibling).selected = true
+    e.target.contentEl.remove()
+    e.target.remove()
+  }
+
   get items() {
     return this.listEl.children
   }
@@ -377,7 +381,7 @@ export class ExampleView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.tabList = document.createElement('tab-list')
-    const tabItems = Array(20).fill('').map((_, i) => {
+    const tabItems = Array(3).fill('').map((_, i) => {
       const el = document.createElement('tab-item')
       el.name = `Tab ${i}`
       el.contentEl = document.createElement('example-item')
