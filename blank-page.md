@@ -22,13 +22,17 @@ export class BlankPage extends HTMLElement {
       this.text.commandAfter,
     )
     this.blankPage = document.createElement('div')
-    this.blankPage.classList.add('blank-page')
-    this.blankPage.classList.add('edited')
+    this.blankPage.classList.add('blank-page', 'edited')
     this.blankPage.contentEditable = true
-    this.blankPage.addEventListener('blur', () => {
-      this.classList.toggle('edited', this.blankPage.innerText.trim() !== '')
-    })
-    this.blankPage.addEventListener('beforeinput', e => {
+    for (const key in this.blankPageEvents) {
+      this.blankPageEvents[key] = this.blankPageEvents[key].bind(this)
+      this.blankPage.addEventListener(key.toLowerCase(), this.blankPageEvents[key])
+    }
+    this.shadowRoot.append(this.placeholder, this.blankPage)
+  }
+
+  blankPageEvents = {
+    beforeInput(e) {
       if (e.inputType === 'historyUndo') {
         e.preventDefault()
         this.undo()
@@ -36,8 +40,8 @@ export class BlankPage extends HTMLElement {
         e.preventDefault()
         this.redo()
       }
-    })
-    this.blankPage.addEventListener('keydown', e => {
+    },
+    keyDown(e) {
       if ((e.code === 'KeyZ' && e.shiftKey && (e.metaKey || e.ctrlKey)) || (e.code === 'KeyY' && e.ctrlKey)) {
         e.preventDefault()
         this.redo()
@@ -45,8 +49,22 @@ export class BlankPage extends HTMLElement {
         e.preventDefault()
         this.undo()
       }
-    })
-    this.shadowRoot.append(this.placeholder, this.blankPage)
+    },
+    blur() {
+      this.classList.toggle('edited', this.blankPage.innerText.trim() !== '')
+    },
+    dragEnter(e) {
+      this.blankPage.classList.add('dragover')
+    },
+    dragLeave() {
+      this.blankPage.classList.remove('dragover')
+    },
+    dragOver(e) {
+      e.preventDefault()
+    },
+    drag(e) {
+      e.preventDefault()
+    }
   }
 
   undo() {
@@ -87,20 +105,28 @@ export class BlankPage extends HTMLElement {
         :host {
           display: grid;
           grid-template-columns: max-content;
-          padding: 10px;
           gap: 10px;
           justify-content: center;
           color: white;
+          padding: 5px;
         }
         .placeholder {
           grid-row: 1;
           grid-column: 1;
+        }
+        .blank-page, .placeholder {
+          padding: 10px;
         }
         .blank-page {
           min-width: calc(min(70vw, 800px));
           outline: none;
           grid-row: 1;
           grid-column: 1;
+          border: 2px dotted #0000;
+        }
+        :host(:not(.edited)) .blank-page.dragover {
+          border-color: #bbba;
+          background: #9993;
         }
         :host(:focus-within) .placeholder, :host(.edited) .placeholder {
           display: none;
