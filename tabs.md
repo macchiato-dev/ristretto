@@ -1,6 +1,21 @@
 # Tabs
 
-This is a component for tabs.
+This is a component for an editable list of tabs. It has a tab list and a tab item. Currently it has a menu built into it for adding, renaming, deleting, and moving the tabs. Some basic styling is supported through CSS variables.
+
+TODO:
+
+- [ ] Make the contentEl optional, and make another example that controls the contentEl itself
+- [ ] Make it call the add only after the name has been saved, and make it so empty can be disallowed, duplicate names can be disallowed, and so the event can return false and it can be left un-created. Make it so event is called after renaming, and so .
+- [ ] Move the menu to a separate component, and update objects that depend on it
+- [ ] Add optional arrows for scrolling
+- [ ] Roving keyboard navigation
+- [ ] Return focus after rename if renamed by double-click
+- [ ] Go to position on double-click
+- [ ] Support close button, optional or mobile-only dot menu, optional context menu or long press
+- [ ] Support dragging with one finger to move, dragging with two fingers or mousewheel to scroll (with arrows), and long press or right click for context menu
+- [ ] Support New Tab icon that is included in the scrolling
+
+Consider a component that allows tabs to be created and named later - call them Untitled when unfocused - and make it so the list-based editor can do the same and something could be hot-switched from tab to list. Also nested layouts and split layouts could be considered here.
 
 `notebook.json`
 
@@ -30,6 +45,11 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
+    this.nameEl.addEventListener('input', e => {
+      if (this.contentEl !== undefined) {
+        this.contentEl.name = this.nameEl.innerText
+      }
+    })
     this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
       if (this.isNew) {
@@ -110,9 +130,11 @@ export class TabItem extends HTMLElement {
     }
     if (this.nextElementSibling || this.previousElementSibling) {
       this.menu.add(this.text.delete, () => {
-        this.dispatchEvent(new CustomEvent(
-          'click-delete', {bubbles: true}
-        ))
+        (this.previousElementSibling ?? this.nextElementSibling).selected = true
+        if (this.contentEl !== undefined) {
+          this.contentEl.remove()
+        }
+        this.remove()
       })
     }
     this.menu.add(this.text.rename, () => {
@@ -148,10 +170,14 @@ export class TabItem extends HTMLElement {
   set selected(value) {
     if (value) {      
       this.classList.add('selected')
-      this.contentEl.selected = true
+      if (this.contentEl !== undefined) {
+        this.contentEl.selected = true
+      }
     } else {
       this.classList.remove('selected')
-      this.contentEl.selected = false
+      if (this.contentEl !== undefined) {
+        this.contentEl.selected = false
+      }
     }
     if (value === true) {
       for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
@@ -287,7 +313,6 @@ export class TabList extends HTMLElement {
     this.listEl.addEventListener('click', e => this.childClicked(e))
     this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
     this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
-    this.listEl.addEventListener('click-delete', e => { this.handleDelete(e) })
     this.shadowRoot.append(this.listEl)
   }
 
@@ -318,12 +343,15 @@ export class TabList extends HTMLElement {
   handleAdd(e) {
     const direction = e.detail.direction
     const tabEl = document.createElement('tab-item')
-    const contentEl = this.createContentEl(tabEl)
-    tabEl.contentEl = contentEl
-    contentEl.codeMirror = this.codeMirror
+    if (this.createContentEl !== undefined) {
+      tabEl.contentEl = this.createContentEl(tabEl)
+      tabEl.contentEl.codeMirror = this.codeMirror
+    }
     const position = direction == 'left' ? 'beforebegin' : 'afterend'
     e.target.insertAdjacentElement(position, tabEl)
-    e.target.contentEl.insertAdjacentElement(position, contentEl)
+    if (tabEl.contentEl !== undefined && e.target.contentEl !== undefined) {
+      e.target.contentEl.insertAdjacentElement(position, tabEl.contentEl)
+    }
     setTimeout(() => {
       tabEl.isNew = true
       tabEl.nameEl.setAttribute('contenteditable', '')
@@ -342,21 +370,17 @@ export class TabList extends HTMLElement {
       const position = direction == 'left' ? 'beforebegin' : 'afterend'
       siblingEl.insertAdjacentElement(position, e.target)
     }
-    const contentSiblingEl = (
-      direction == 'left' ?
-      e.target.contentEl.previousElementSibling :
-      e.target.contentEl.nextElementSibling
-    )
-    if (contentSiblingEl) {
-      const position = direction == 'left' ? 'beforebegin' : 'afterend'
-      contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
+    if (e.target.contentEl !== undefined) {
+      const contentSiblingEl = (
+        direction == 'left' ?
+        e.target.contentEl.previousElementSibling :
+        e.target.contentEl.nextElementSibling
+      )
+      if (contentSiblingEl) {
+        const position = direction == 'left' ? 'beforebegin' : 'afterend'
+        contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
+      }
     }
-  }
-
-  handleDelete(e) {
-    (e.target.previousElementSibling ?? e.target.nextElementSibling).selected = true
-    e.target.contentEl.remove()
-    e.target.remove()
   }
 
   get items() {
