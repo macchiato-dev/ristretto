@@ -62,9 +62,13 @@ export class BlankPage extends HTMLElement {
     dragOver(e) {
       e.preventDefault()
     },
-    drag(e) {
+    drop(e) {
       e.preventDefault()
-    }
+      this.blankPage.classList.remove('dragover')
+    },
+    dragEnd() {
+      this.blankPage.classList.remove('dragover')
+    },
   }
 
   undo() {
