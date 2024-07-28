@@ -21,17 +21,20 @@ export class BlankPage extends HTMLElement {
       kbd,
       this.text.commandAfter,
     )
-    this.blankPage = document.createElement('div')
-    this.blankPage.classList.add('blank-page', 'edited')
-    this.blankPage.contentEditable = true
-    for (const key in this.blankPageEvents) {
-      this.blankPageEvents[key] = this.blankPageEvents[key].bind(this)
-      this.blankPage.addEventListener(key.toLowerCase(), this.blankPageEvents[key])
+    this.content = document.createElement('div')
+    this.content.classList.add('content', 'edited')
+    this.content.contentEditable = true
+    for (const key in this.contentEvents) {
+      this.contentEvents[key] = this.contentEvents[key].bind(this)
+      this.content.addEventListener(key.toLowerCase(), this.contentEvents[key])
     }
-    this.shadowRoot.append(this.placeholder, this.blankPage)
+    this.contentWrap = document.createElement('div')
+    this.contentWrap.classList.add('content-wrap')
+    this.contentWrap.append(this.placeholder, this.content)
+    this.shadowRoot.append(this.contentWrap)
   }
 
-  blankPageEvents = {
+  contentEvents = {
     beforeInput(e) {
       if (e.inputType === 'historyUndo') {
         e.preventDefault()
@@ -51,36 +54,44 @@ export class BlankPage extends HTMLElement {
       }
     },
     blur() {
-      this.classList.toggle('edited', this.blankPage.innerText.trim() !== '')
+      this.classList.toggle('edited', this.content.innerText.trim() !== '')
     },
     dragEnter(e) {
-      this.blankPage.classList.add('dragover')
+      this.content.classList.add('dragover')
     },
     dragLeave() {
-      this.blankPage.classList.remove('dragover')
+      this.content.classList.remove('dragover')
     },
     dragOver(e) {
       e.preventDefault()
     },
     drop(e) {
       e.preventDefault()
-      this.blankPage.classList.remove('dragover')
+      this.content.classList.remove('dragover')
+      for (const item of [...e.dataTransfer.items]) {
+        if (item.kind === 'file') {
+          const el = document.createElement('p')
+          const file = item.getAsFile()
+          el.innerText = file.name
+          this.contentWrap.insertAdjacentElement('beforebegin', el)
+        }
+      }
     },
     dragEnd() {
-      this.blankPage.classList.remove('dragover')
+      this.content.classList.remove('dragover')
     },
   }
 
   undo() {
-    if (this.blankPage.innerText.trim() !== '') {
-      this.savedText = this.blankPage.innerText
+    if (this.content.innerText.trim() !== '') {
+      this.savedText = this.content.innerText
     }
-    this.blankPage.innerText = ''
+    this.content.innerText = ''
   }
 
   redo() {
-    if (this.blankPage.innerText.trim() === '' && this.savedText.trim() !== '') {
-      this.blankPage.innerText = this.savedText
+    if (this.content.innerText.trim() === '' && this.savedText.trim() !== '') {
+      this.content.innerText = this.savedText
       this.savedText = undefined
     }
   }
@@ -114,21 +125,29 @@ export class BlankPage extends HTMLElement {
           color: white;
           padding: 5px;
         }
+        .content-wrap {
+          display: grid;
+          grid-template-columns: max-content;
+          gap: 10px;
+          justify-content: center;
+          color: white;
+          padding: 5px;
+        }
         .placeholder {
           grid-row: 1;
           grid-column: 1;
         }
-        .blank-page, .placeholder {
+        .content, .placeholder {
           padding: 10px;
         }
-        .blank-page {
+        .content {
           min-width: calc(min(70vw, 800px));
           outline: none;
           grid-row: 1;
           grid-column: 1;
           border: 2px dotted #0000;
         }
-        :host(:not(.edited)) .blank-page.dragover {
+        :host(:not(.edited)) .content.dragover {
           border-color: #bbba;
           background: #9993;
         }
