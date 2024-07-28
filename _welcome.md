@@ -15,24 +15,31 @@ export class AppView extends HTMLElement {
         'in itself, that can be customized by editing the code in the environment. ',
         'This interface for editing code is composed of a collection of Markdown playground/notebook files. ',
         'They are shipped to the browser in a big Markdown file, containing smaller Markdown files as code blocks. ',
-        'These are at ', ['a', 'https://codeberg.org/macchiato/ristretto', 'macchiato/ristretto'],
+        'These are at ', ['[', 'macchiato/ristretto', '(', 'https://codeberg.org/macchiato/ristretto'],
         ' on Codeberg.'
       ],
       [
         'The code loaded dynamically from Markdown files is run inside a tiny, quickly inspectable sandbox with ' +
         'a Content Security Policy. By reading the code in ',
-        ['a', 'https://codeberg.org/ristretto/pages', 'ristretto/pages'], ' on Codeberg and understanding Codeberg Pages,',
-        ' and studying what a sandbox combined with a content security policy can do, you may feel comfortable using',
+        ['[', 'ristretto/pages', '(', 'https://codeberg.org/ristretto/pages'], ' on Codeberg and knowing how ',
+        ['[', 'Codeberg Pages', '(', 'https://docs.codeberg.org/codeberg-pages/'],
+        ' serves the content there,',
+        ' and studying what the ',
+        ['[', 'sandbox', '(', 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox'],
+        ' combined with the ',
+        ['[', 'Content Security Policy', '(', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP'],
+        ' does, you may feel comfortable using',
         ' both private data and untrusted code at the same time inside the sandbox.',
-        ' Network requests are blocked, and links can only be followed with an extra step. ' +
+        ' With the two layers of sandboxing, all network requests from inside the sandbox are blocked, and',
+        ' links can only be followed with an extra step. ',
         'There is also an extra step to download files.'
       ],
       [
         'The interface for working with code and data is meant to be powerful and flexible. Please check out the notebooks ',
-        'to the left. Some of them were quite fun to develop. There are some nifty features, such as in editable-data-table.md ',
+        'to the left. Some of them were quite fun to develop. There are some nifty features. ',
+        'For instance, in ', ['`', 'editable-data-table.md'], ', ',
         'keyboard navigation works even inside Safari which has an issue with selection ranges inside a shadow DOM. ',
-        ' The code icon in the upper right corner shows the Markdown ',
-        'code, some of which contains text, ',
+        ' The code icon in the upper right corner shows the Markdown code, some of which contains text, ',
         'indicating a notebook format. Others follow more of a playground format. A 3-pane editor that provides a ',
         'playground-notebook hybrid interface is under way in notebook-view.md.'
       ],
@@ -44,12 +51,19 @@ export class AppView extends HTMLElement {
       const el = document.createElement('p')
       el.append(...block.map(s => {
         if (Array.isArray(s)) {
-          if (s[0] = 'a') {
-            const [href, text] = s.slice(1)
-            const a = document.createElement('a')
-            a.href = href
-            a.innerText = text
-            return a
+          if (s[0] === '[') {
+            const text = s[1]
+            if (s[2] === '(') {
+              const a = document.createElement('a')
+              const href = s[3]
+              a.href = href
+              a.innerText = text
+              return a
+            }
+          } else if (s[0] === '`') {
+            const code = document.createElement('code')
+            code.innerText = s[1]
+            return code
           } else {
             return undefined
           }
@@ -101,6 +115,15 @@ export class AppView extends HTMLElement {
       }
       a {
         color: #fff596;
+      }
+      p {
+        line-height: 1.4;
+      }
+      code {
+        border: 2px #bbb7;
+        background: #bbb5;
+        padding: 2px;
+        border-radius: 3px;
       }
     `
     this.shadowRoot.appendChild(style)
