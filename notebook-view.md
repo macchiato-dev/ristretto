@@ -19,12 +19,51 @@ export class MarkdownView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.shadowRoot.append(...this.value.split(/\n\n/g).map(s => {
-      const headerMatch = s.match(/^(#{1,6}) /)
-      const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
-      el.innerText = s.slice(headerMatch?.[0]?.length ?? 0)
-      return el
+    this.shadowRoot.append(...[...this.groupBlocks(this.readBlocks(this.value))].map(block => {
+      if (typeof block === 'string') {
+        const headerMatch = block.match(/^(#{1,6}) /)
+        const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
+        el.innerText = block.slice(headerMatch?.[0]?.length ?? 0)
+        return el
+      } else {
+        return `A code block element goes here.`
+      }
     }))
+  }
+
+  *groupBlocks(iter) {
+    for (const block of iter) {
+      yield block
+    }
+  }
+
+  *readBlocks(input) {
+    let s = input
+    for (let i=0; i < 100000; i++) {  // instead of while (true) to prevent it from crashing 💥
+      const codeBlockStart = s.match(/^(?:\s*\n)?(`{3,})([^\n]*)/s)
+      if (codeBlockStart) {
+        const codeBlockEnd = s.slice(codeBlockStart[0].length).match(
+          new RegExp(`\n${codeBlockStart[1]}`, 's')
+        )
+        if (codeBlockEnd) {
+          yield ['code', s.slice(codeBlockStart.length + 1, codeBlockStart[0].length + codeBlockEnd.index)]
+          s = s.slice(codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length)
+        }
+      } else {
+        s = s.trim()
+        const index = s.indexOf('\n\n')
+        if (index !== -1) {
+          yield s.slice(0, index).trim()
+          s = s.slice(index)
+        } else {
+          const block = s.trim()
+          if (block !== '') {
+            yield block
+          }
+          break
+        }
+      }
+    }
   }
 
   static get styles() {
@@ -184,6 +223,8 @@ The main notebook, the dev notebook, and the test notebook appear here.
 ````md
 # Data Cards
 
+This renders some data cards.
+
 `data-cards.js`
 
 ```js
@@ -239,6 +280,9 @@ export class DataCards extends HTMLElement {
   }
 }
 ```
+
+The above code uses adoptedStyleSheets.
+
 ````
 
 `data-cards.dev.md`
