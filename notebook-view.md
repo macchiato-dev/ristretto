@@ -4,6 +4,17 @@ This is a hybrid notebook and playground view. It's designed to support editing 
 
 A view of the Markdown is being developed here. It may be moved out to a separate notebook, or perhaps components of it will be moved out but this notebook will have its own custom view component for Markdown.
 
+TODO:
+
+- [ ] render links in Markdown
+- [x] render TODO list in Markdown (at least partially)
+- [ ] create new tab notebook
+- [ ] copy TabList.js and TabItem.js temporarily to this notebook until it supports editing across notebooks
+- [ ] make tabs open or switch upon clicking code block
+- [ ] make tabs draggable including scrolling on hover and draggable to other tab lists
+- [ ] make context menu open on right click
+- [ ] give tabs close buttons
+
 `notebook.json`
 
 ```json
@@ -58,7 +69,9 @@ export class MarkdownView extends HTMLElement {
       }
       prevBlock = block
     }
-    yield prevBlock
+    if (prevBlock !== undefined) {
+      yield prevBlock
+    }
   }
 
   *readBlocks(input) {
@@ -73,16 +86,21 @@ export class MarkdownView extends HTMLElement {
           yield {type: 'code', value: s.slice(codeBlockStart.length + 1, codeBlockStart[0].length + codeBlockEnd.index)}
           s = s.slice(codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length)
         }
-      } else {
-        s = s.trim()
-        const match = s.match(/(?:[^\S\r\n]*\r?\n){1,}/)
+      } else if (s.match(/^- /)) {
+        const match = s.match(/\n/)
         if (match) {
-          yield s.slice(0, match.index).trim()
+          yield s.slice(0, match.index)
+        }
+        s = match ? this.constructor.trimBlankLines(s.slice(match.index)) : ''
+      } else {
+        const match = s.match(/\n[^\S\r\n]*\r?\n/)
+        if (match) {
+          yield this.constructor.removeExtraSpace(s.slice(0, match.index).trim())
           s = this.constructor.trimBlankLines(s.slice(match.index))
         } else {
           const block = this.constructor.trimBlankLines(s).trimEnd()
           if (block !== '') {
-            yield block
+            yield this.constructor.removeExtraSpace(block)
           }
           break
         }
@@ -92,6 +110,10 @@ export class MarkdownView extends HTMLElement {
 
   static trimBlankLines(s) {
     return s.replace(/^(?:[^\S\r\n]*\r?\n)*/, '')
+  }
+
+  static removeExtraSpace(s) {
+    return s.replaceAll(/\r?\n/g, ' ').replaceAll(/[ \t]+/g, ' ')
   }
 
   static get styles() {
