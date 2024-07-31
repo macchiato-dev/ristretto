@@ -1,6 +1,8 @@
 # Notebook View
 
-This is a hybrid notebook and playground view.
+This is a hybrid notebook and playground view. It's designed to support editing code blocks in a tabbed code view while viewing the content surrounding the code block in the Markdown notebook.
+
+A view of the Markdown is being developed here. It may be moved out to a separate notebook, or perhaps components of it will be moved out but this notebook will have its own custom view component for Markdown.
 
 `notebook.json`
 
@@ -11,6 +13,8 @@ This is a hybrid notebook and playground view.
   ]
 }
 ```
+
+This is a view of Markdown. It has an outer reader that starts with the beginning of a non-empty line. It reads named code blocks, un-named code blocks, lists, blockquotes, and finally, paragraphs.
 
 `MarkdownView.js`
 
@@ -26,37 +30,51 @@ export class MarkdownView extends HTMLElement {
         el.innerText = block.slice(headerMatch?.[0]?.length ?? 0)
         return el
       } else {
-        return `A code block element goes here.`
+        const el = document.createElement('p')
+        el.innerText = `Code block: ${block.name}`
+        return el
       }
     }))
   }
 
   *groupBlocks(iter) {
+    let prevBlock = undefined
     for (const block of iter) {
-      yield block
+      if (typeof block !== 'string' && block.type === 'code') {
+        const match = prevBlock.match?.(/^`([^`]+)`\s*$/)
+        if (match) {
+          block.name = match[1]
+          prevBlock = undefined
+        }
+      }
+      if (prevBlock !== undefined) {
+        yield prevBlock
+      }
+      prevBlock = block
     }
+    yield prevBlock
   }
 
   *readBlocks(input) {
-    let s = input
+    let s = this.constructor.trimBlankLines(input)
     for (let i=0; i < 100000; i++) {  // instead of while (true) to prevent it from crashing 💥
-      const codeBlockStart = s.match(/^(?:\s*\n)?(`{3,})([^\n]*)/s)
+      const codeBlockStart = s.match(/^(`{3,})([^\n]*)/s)
       if (codeBlockStart) {
         const codeBlockEnd = s.slice(codeBlockStart[0].length).match(
           new RegExp(`\n${codeBlockStart[1]}`, 's')
         )
         if (codeBlockEnd) {
-          yield ['code', s.slice(codeBlockStart.length + 1, codeBlockStart[0].length + codeBlockEnd.index)]
+          yield {type: 'code', value: s.slice(codeBlockStart.length + 1, codeBlockStart[0].length + codeBlockEnd.index)}
           s = s.slice(codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length)
         }
       } else {
         s = s.trim()
-        const index = s.indexOf('\n\n')
-        if (index !== -1) {
-          yield s.slice(0, index).trim()
-          s = s.slice(index)
+        const match = s.match(/(?:[^\S\r\n]*\r?\n){1,}/)
+        if (match) {
+          yield s.slice(0, match.index).trim()
+          s = this.constructor.trimBlankLines(s.slice(match.index))
         } else {
-          const block = s.trim()
+          const block = this.constructor.trimBlankLines(s).trimEnd()
           if (block !== '') {
             yield block
           }
@@ -66,28 +84,31 @@ export class MarkdownView extends HTMLElement {
     }
   }
 
-  static get styles() {
-    if (!this._styles) {
-      this._styles = new CSSStyleSheet()
-      this._styles.replaceSync(`
-        :host {
-          padding: 5px 10px;
-        }
-        h1, h2, h3, h4, h5, h6 {
-          font-family: sans-serif;
-          font-weight: 500;
-          margin: 5px 0;
-        }
-        h1 { font-size: 24px; }
-        h2 { font-size: 21px; }
-        h3 { font-size: 19px; }
-        h4 { font-size: 17px; }
-        h5 { font-size: 15px; font-weight: 700; }
-        h6 { font-size: 12px; font-weight: 700; }
-      `)
-    }
-    return this._styles
+  static trimBlankLines(s) {
+    return s.replace(/^(?:[^\S\r\n]*\r?\n)*/, '')
   }
+
+  static get styles() {
+    let s; return s ?? (v => { s = new CSSStyleSheet(); s.replaceSync(v); return s })(this.stylesCss)
+  }
+
+  static stylesCss = `
+    :host {
+      padding: 5px 10px;
+      overflow-y: auto;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: sans-serif;
+      font-weight: 500;
+      margin: 5px 0;
+    }
+    h1 { font-size: 24px; }
+    h2 { font-size: 21px; }
+    h3 { font-size: 19px; }
+    h4 { font-size: 17px; }
+    h5 { font-size: 15px; font-weight: 700; }
+    h6 { font-size: 12px; font-weight: 700; }
+  `
 }
 ```
 
