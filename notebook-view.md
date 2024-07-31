@@ -16,6 +16,12 @@ A view of the Markdown is being developed here. It may be moved out to a separat
 
 This is a view of Markdown. It has an outer reader that starts with the beginning of a non-empty line. It reads named code blocks, un-named code blocks, lists, blockquotes, and finally, paragraphs.
 
+It will need to read sub-blocks, for lists and blockquotes, and such.
+
+Each block will optionally store its ranges for scrolling as well as error handling (currently it doesn't).
+
+The inner reader reads inline content. This will use regexes to skip over the inline code blocks and the escaped characters. It will probably use [String.replace](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace) with [String.repeat](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/repeat), replacing them with some syntactically insignificant text, to skip over them, while saving the ranges. After that, the regexes will find the ranges for other inline features. CodeMirror calls these features *marks*. Once it has processed the inline content, it can be rendered, using the original text and the feature data with its ranges.
+
 `MarkdownView.js`
 
 ```js
