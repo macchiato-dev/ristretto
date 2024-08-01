@@ -6,7 +6,7 @@ A view of the Markdown is being developed here. It may be moved out to a separat
 
 TODO:
 
-- [ ] render links in Markdown
+- [x] render links in Markdown
 - [x] render TODO list in Markdown (at least partially)
 - [ ] create new tab notebook
 - [ ] copy TabList.js and TabItem.js temporarily to this notebook until it supports editing across notebooks
@@ -44,7 +44,17 @@ export class MarkdownView extends HTMLElement {
       if (typeof block === 'string') {
         const headerMatch = block.match(/^(#{1,6}) /)
         const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
-        el.innerText = block.slice(headerMatch?.[0]?.length ?? 0)
+        const content = block.slice(headerMatch?.[0]?.length ?? 0)
+        el.append(...[...this.readInline(content)].map(block => {
+          if (block.type === 'link') {
+            const el = document.createElement('a')
+            el.href = block.href
+            el.innerText = block.value
+            return el
+          } else {
+            return block
+          }
+        }))
         return el
       } else {
         const el = document.createElement('p')
@@ -52,6 +62,13 @@ export class MarkdownView extends HTMLElement {
         return el
       }
     }))
+    this.shadowRoot.addEventListener('click', e => {
+      if (e.target.tagName === 'A') {
+        parent.postMessage(['link', e.target.href], '*')
+        e.preventDefault()
+        return false
+      }
+    })
   }
 
   *groupBlocks(iter) {
@@ -108,6 +125,26 @@ export class MarkdownView extends HTMLElement {
     }
   }
 
+  *readInline(input) {
+    const result = []
+    let s = input
+    for (let i=0; i < 100000; i++) {
+      const linkMatch = s.match(/\[([^\]]*)\]\(([^\)]*)\)/)
+      if (linkMatch) {
+        if (linkMatch.index > 0) {
+          yield s.slice(0, linkMatch.index)
+        }
+        yield {type: 'link', href: linkMatch[2], value: linkMatch[1]}
+        s = s.slice(linkMatch.index + linkMatch[0].length)
+      } else {
+        if (s.length > 0) {
+          yield s
+        }
+        break;
+      }
+    }
+  }
+
   static trimBlankLines(s) {
     return s.replace(/^(?:[^\S\r\n]*\r?\n)*/, '')
   }
@@ -124,6 +161,10 @@ export class MarkdownView extends HTMLElement {
     :host {
       padding: 5px 10px;
       overflow-y: auto;
+      color: #eee;
+    }
+    a {
+      color: #aae;
     }
     h1, h2, h3, h4, h5, h6 {
       font-family: sans-serif;
