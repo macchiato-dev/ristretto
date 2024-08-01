@@ -38,13 +38,30 @@ export class TabItem extends HTMLElement {
     super()
     this.language = navigator.language
     this.attachShadow({mode: 'open'})
-    this.codeMirror = true
     this.headerEl = document.createElement('div')
     this.headerEl.classList.add('header')
     this.shadowRoot.appendChild(this.headerEl)
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.nameEl.setAttribute('spellcheck', 'false')
+    this.headerEl.appendChild(this.nameEl)
+    this.menuBtn = document.createElement('button')
+    this.menuBtn.innerHTML = this.icons.menu
+    this.headerEl.appendChild(this.menuBtn)
+    this.menu = document.createElement(
+      'm-menu-dropdown'
+    )
+    this.shadowRoot.appendChild(this.menu)
+  }
+
+  connectedCallback() {
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (!this.classList.contains('drag')) {
+      this.initEvents()
+    }
+  }
+
+  initEvents() {
     this.nameEl.addEventListener('input', e => {
       if (this.contentEl !== undefined) {
         this.contentEl.name = this.nameEl.innerText
@@ -80,26 +97,74 @@ export class TabItem extends HTMLElement {
       this.rename()
       e.preventDefault()
     })
-    this.headerEl.appendChild(this.nameEl)
-    this.menuBtn = document.createElement('button')
-    this.menuBtn.innerHTML = this.icons.menu
+    this.headerEl.addEventListener('pointerdown', e => {
+      if (e.isPrimary && this.nameEl.contentEditable !== 'true' && !this.menu.contains(e.target)) {
+        this.headerEl.setPointerCapture(e.pointerId)
+        e.preventDefault()
+        this.pointerDown = true
+        this.pointerOnMenu = this.menuBtn.contains(e.target)
+        this.moved = false
+        const rect = this.getBoundingClientRect()
+        this.offsetX = e.clientX - rect.left
+        this.offsetY = e.clientY - rect.top
+      }
+    })
+    this.headerEl.addEventListener('pointermove', e => {
+      if (!this.moved) {
+        this.moved = true
+        if (this.pointerDown) {
+          this.tabList.dragItem.name = this.name
+          this.tabList.dragItem.selected = this.selected
+          this.tabList.dragItem.classList.add('dragging')
+        }
+      }
+      if (this.pointerDown) {
+        this.tabList.dragItem.setDragPosition(
+          e.clientX - this.offsetX, e.clientY - this.offsetY
+        )
+        const hoverTab = [
+          ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+        ].find(el => (
+          el !== this.tabList.dragItem && el.tagName === 'TAB-ITEM'
+        ))
+        if (this.hoverTab !== hoverTab) {
+          if (this.hoverTab) {
+            this.hoverTab.classList.remove('drop-hover')
+          }
+          if (hoverTab) {
+            hoverTab.classList.add('drop-hover')
+          }
+          this.hoverTab = hoverTab
+        }
+      }
+    })
+    this.headerEl.addEventListener('pointerup', e => {
+      this.tabList.dragItem.classList.remove('dragging')
+      if (!this.moved) {
+        if (this.pointerOnMenu) {
+          this.openMenu()
+        } else {
+          this.selected = true            
+        }
+      }
+      this.moved = false
+      this.pointerDown = false
+    })
+    this.headerEl.addEventListener('lostpointercapture', e => {
+      this.tabList.dragItem.classList.remove('dragging')
+      if (this.hoverTab) {
+        this.hoverTab.classList.remove('drop-hover')
+        this.hoverTab = undefined
+      }
+    })
     this.menuBtn.addEventListener('click', e => {
       this.openMenu()
     })
-    this.headerEl.appendChild(this.menuBtn)
-    this.menu = document.createElement(
-      'm-menu-dropdown'
-    )
-    this.shadowRoot.appendChild(this.menu)
     this.shadowRoot.addEventListener('click', e => {
       if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
         this.selected = true
       }
     })
-  }
-
-  connectedCallback() {
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
   }
 
   openMenu() {
@@ -186,10 +251,21 @@ export class TabItem extends HTMLElement {
     }
   }
 
+  get tabList() {
+    return this.parentElement.parentNode.host
+  }
+
+  setDragPosition(x, y) {
+    this.style.setProperty('--drag-left', `${x}px`)
+    this.style.setProperty('--drag-top', `${y}px`)
+  }
+
   icons = {
     menu: `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 14 24">
-        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
+        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0
+        0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2
+        2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
       </svg>
     `,
   }
@@ -260,7 +336,8 @@ export class TabItem extends HTMLElement {
           flex-grow: 1;
           padding: 0 5px;
           font: inherit;
-          font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
+          font-family: ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,
+          Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
           outline: none;
           white-space: nowrap;
         }
@@ -294,6 +371,15 @@ export class TabItem extends HTMLElement {
         :host(.selected) svg {
           opacity: 75%;
         }
+        :host(.drag) {
+          position: absolute;
+          top: var(--drag-top, 0px);
+          left: var(--drag-left, 0px);
+          display: none;
+        }
+        :host(.drag.dragging) {
+          display: block;
+        }
       `)
     }
     return this._styles
@@ -313,7 +399,9 @@ export class TabList extends HTMLElement {
     this.listEl.addEventListener('click', e => this.childClicked(e))
     this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
     this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
-    this.shadowRoot.append(this.listEl)
+    this.dragItem = document.createElement('tab-item')
+    this.dragItem.classList.add('drag')
+    this.shadowRoot.append(this.listEl, this.dragItem)
   }
 
   connectedCallback() {
