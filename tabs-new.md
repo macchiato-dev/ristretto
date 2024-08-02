@@ -129,7 +129,7 @@ export class TabItem extends HTMLElement {
         const hoverTab = [
           ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
         ].find(el => (
-          el !== this.tabList.dragItem && el.tagName === 'TAB-ITEM'
+          el !== this.tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
         ))
         if (this.hoverTab !== hoverTab) {
           if (this.hoverTab) {
@@ -144,11 +144,21 @@ export class TabItem extends HTMLElement {
     })
     this.headerEl.addEventListener('pointerup', e => {
       this.tabList.dragItem.classList.remove('dragging')
-      if (!this.moved) {
+      if (this.moved) {
+        if (this.hoverTab) {
+          // TODO when dragging from outside:
+          // if it's not in the first 15px or so of the last tab,
+          // make the new tab the last tab, also consider for the last n tabs (3?)
+          const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
+          const myIndex = [...this.parentElement.children].indexOf(this)
+          const position = (hoverIndex >= myIndex) ? 'afterEnd' : 'beforeBegin'
+          this.hoverTab.insertAdjacentElement(position, this)
+        }
+      } else {
         if (this.pointerOnMenu) {
           this.openMenu()
         } else {
-          this.selected = true            
+          this.selected = true
         }
       }
       this.moved = false
