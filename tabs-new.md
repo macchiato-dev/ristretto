@@ -133,10 +133,10 @@ export class TabItem extends HTMLElement {
         ))
         if (this.hoverTab !== hoverTab) {
           if (this.hoverTab) {
-            this.hoverTab.classList.remove('drop-hover')
+            this.hoverTab.classList.remove('drag-hover')
           }
           if (hoverTab) {
-            hoverTab.classList.add('drop-hover')
+            hoverTab.classList.add('drag-hover')
           }
           this.hoverTab = hoverTab
         }
@@ -151,7 +151,7 @@ export class TabItem extends HTMLElement {
           // make the new tab the last tab, also consider for the last n tabs (3?)
           const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
           const myIndex = [...this.parentElement.children].indexOf(this)
-          const position = (hoverIndex >= myIndex) ? 'afterEnd' : 'beforeBegin'
+          const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
           this.hoverTab.insertAdjacentElement(position, this)
         }
       } else {
@@ -167,17 +167,12 @@ export class TabItem extends HTMLElement {
     this.headerEl.addEventListener('lostpointercapture', e => {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.hoverTab) {
-        this.hoverTab.classList.remove('drop-hover')
+        this.hoverTab.classList.remove('drag-hover')
         this.hoverTab = undefined
       }
     })
     this.menuBtn.addEventListener('click', e => {
       this.openMenu()
-    })
-    this.shadowRoot.addEventListener('click', e => {
-      if (!(this.menuBtn.contains(e.target) || this.menu.contains(e.target))) {
-        this.selected = true
-      }
     })
   }
 
@@ -346,9 +341,10 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg-selected-hover, #0c6860);
           color: var(--fg-selected-hover, #f7f7f7);
         }
-        :host(.drop-hover) div.header {
-          background-color: var(--bg-drop-hover, #64646d);
+        :host(.drag-hover) div.header {
+          background-color: var(--bg-drag-hover, #64646d);
           color: var(--fg, #c7c7c7);
+          pointer-events: none;
         }
         .name {
           flex-grow: 1;
