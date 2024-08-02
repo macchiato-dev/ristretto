@@ -4,7 +4,8 @@ This is a set of components for tabs that are draggable across different lists a
 
 TODO:
 
-- [ ] Add drag and drop from tabs-draggable
+- [x] Add drag and drop from tabs-draggable
+- [ ] Move on drag
 - [ ] Move context menu to example
 - [ ] Support dragging with one finger to move, and dragging with two fingers or mousewheel to scroll (with arrows)
 - [ ] Make it show an x on hover
@@ -331,6 +332,10 @@ export class TabItem extends HTMLElement {
         :host(.selected:hover) div.header {
           background-color: var(--bg-selected-hover, #0c6860);
           color: var(--fg-selected-hover, #f7f7f7);
+        }
+        :host(.drop-hover) div.header {
+          background-color: var(--bg-drop-hover, #64646d);
+          color: var(--fg, #c7c7c7);
         }
         .name {
           flex-grow: 1;
