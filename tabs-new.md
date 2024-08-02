@@ -71,7 +71,7 @@ export class TabItem extends HTMLElement {
         this.contentEl.name = this.nameEl.innerText
       }
     })
-    this.nameEl.addEventListener('blur', e => {
+    this.nameEl.addEventListener('blur', () => {
       this.nameEl.removeAttribute('contenteditable')
       if (this.isNew) {
         this.selected = true
@@ -108,9 +108,9 @@ export class TabItem extends HTMLElement {
         this.pointerDown = true
         this.pointerOnMenu = this.menuBtn.contains(e.target)
         this.moved = false
-        this.rect = this.getBoundingClientRect()
-        this.startX = e.clientX
-        this.startY = e.clientY
+        const rect = this.getBoundingClientRect()
+        this.offsetX = e.clientX - rect.left
+        this.offsetY = e.clientY - rect.top
       }
     })
     this.headerEl.addEventListener('pointermove', e => {
@@ -123,36 +123,27 @@ export class TabItem extends HTMLElement {
         }
       }
       if (this.pointerDown) {
-        const offsetX = this.startX - this.rect.left
-        const offsetY = this.startY - this.rect.top
-        const left = e.clientX - offsetX
-        const top = e.clientY - offsetY
-        this.tabList.dragItem.setDragPosition(left, top)
-        let hoverTab
-        for (const point of [0, 0.1, -0.1, 0.2, -0.2, 0.3, -0.3].map(n =>
-          [left + Math.round(this.rect.width * (0.5 + (e.clientX > this.startX ? 1 : -1) * n)), e.clientY]
-        )) {
-          hoverTab = [
-            ...this.tabList.shadowRoot.elementsFromPoint(...point)
-          ].find(el => (
-            el !== this.tabList.dragItem && el != this && el.tagName === 'TAB-ITEM'
-          ))
-          if (hoverTab !== undefined) {
-            break
-          }
-        }
+        this.tabList.dragItem.setDragPosition(
+          e.clientX - this.offsetX, e.clientY - this.offsetY
+        )
+        const hoverTab = [
+          ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+        ].find(el => (
+          el !== this.tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
+        ))
         if (this.hoverTab !== hoverTab) {
           if (this.hoverTab) {
-            this.hoverTab.hover = false
+            this.hoverTab.classList.remove('drag-hover')
           }
           if (hoverTab) {
-            hoverTab.hover = true
+            hoverTab.classList.add('drag-hover')
           }
           this.hoverTab = hoverTab
         }
       }
     })
     this.headerEl.addEventListener('pointerup', e => {
+      this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
           // TODO when dragging from outside:
@@ -167,19 +158,18 @@ export class TabItem extends HTMLElement {
         if (this.pointerOnMenu) {
           this.openMenu()
         } else {
-          console.log('setting selected', e)
           this.selected = true
         }
       }
+      this.moved = false
+      this.pointerDown = false
     })
     this.headerEl.addEventListener('lostpointercapture', e => {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.hoverTab) {
-        this.hoverTab.hover = false
+        this.hoverTab.classList.remove('drag-hover')
         this.hoverTab = undefined
       }
-      this.moved = false
-      this.pointerDown = false
     })
     this.menuBtn.addEventListener('click', e => {
       this.openMenu()
@@ -252,7 +242,7 @@ export class TabItem extends HTMLElement {
   }
 
   set selected(value) {
-    if (value) {
+    if (value) {      
       this.classList.add('selected')
       if (this.contentEl !== undefined) {
         this.contentEl.selected = true
@@ -277,32 +267,6 @@ export class TabItem extends HTMLElement {
   setDragPosition(x, y) {
     this.style.setProperty('--drag-left', `${x}px`)
     this.style.setProperty('--drag-top', `${y}px`)
-  }
-
-  set hover(value) {
-    if (value) {
-      this.classList.add('drag-hover')
-    } else {
-      this.classList.remove('drag-hover')
-    }
-  }
-
-  get hover() {
-    return this.classList.contains('drag-hover')
-  }
-
-  get moved() {
-    return this.parentElement.classList.contains('moved')
-  }
-
-  set moved(value) {
-    if (value) {
-      this.parentElement.classList.add('moved')
-    } else {
-      setTimeout(() => {
-        this.parentElement.classList.remove('moved')
-      }, 50)
-    }
   }
 
   icons = {
