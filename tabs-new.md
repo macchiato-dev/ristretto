@@ -5,7 +5,10 @@ This is a set of components for tabs that are draggable across different lists a
 TODO:
 
 - [x] Add drag and drop from tabs-draggable
+- [ ] Track the tab being dragged and style it differently
+- [ ] Allow cancelling drag with Esc and prevent dropping from changing what is selected
 - [ ] Move on drag
+- [ ] Allow moving to other Tab List
 - [ ] Move context menu to example
 - [ ] Support dragging with one finger to move, and dragging with two fingers or mousewheel to scroll (with arrows)
 - [ ] Make it show an x on hover
