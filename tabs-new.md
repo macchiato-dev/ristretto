@@ -52,6 +52,8 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.mainEl.appendChild(this.nameEl)
+    // this.loopCounter = 1
+    // this.loopEventCounter = 1
   }
 
   connectedCallback() {
@@ -79,32 +81,20 @@ export class TabItem extends HTMLElement {
       }
     })
     this.mainEl.addEventListener('pointermove', e => {
-      if (!this.moved) {
-        this.moved = true
-        if (this.pointerDown) {
+      if (this.pointerDown) {
+        if (!this.moved) {
+          this.moved = true
           this.tabList.dragItem.name = this.name
           this.tabList.dragItem.selected = this.selected
           this.tabList.dragItem.classList.add('dragging')
         }
-      }
-      if (this.pointerDown) {
+        if (!this.moveLoopActive) {
+          this.moveLoop()
+        }
         this.tabList.dragItem.setDragPosition(
           e.clientX - this.offsetX, e.clientY - this.offsetY
         )
-        const hoverTab = [
-          ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
-        ].find(el => (
-          el !== this.tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
-        ))
-        if (this.hoverTab !== hoverTab) {
-          if (this.hoverTab) {
-            this.hoverTab.classList.remove('drag-hover')
-          }
-          if (hoverTab) {
-            hoverTab.classList.add('drag-hover')
-          }
-          this.hoverTab = hoverTab
-        }
+        this.pointerMoveEvent = e
       }
     })
     this.mainEl.addEventListener('pointerup', e => {
@@ -126,12 +116,55 @@ export class TabItem extends HTMLElement {
       this.pointerDown = false
     })
     this.mainEl.addEventListener('lostpointercapture', e => {
+      this.pointerMoveEvent = undefined
       this.tabList.dragItem.classList.remove('dragging')
       if (this.hoverTab) {
         this.hoverTab.classList.remove('drag-hover')
         this.hoverTab = undefined
       }
     })
+  }
+
+  async *pointerMoveEvents() {
+    if (this.pointerMoveEvent) {
+      const {pointerMoveEvent} = this
+      this.pointerMoveEvent = undefined
+      yield pointerMoveEvent
+    }
+    for (let i=0; i < 100000; i++) {
+      await this.constructor.delay(25)
+      if (this.pointerMoveEvent) {
+        const {pointerMoveEvent} = this
+        this.pointerMoveEvent = undefined
+        yield pointerMoveEvent
+      } else {
+        return
+      }
+    }
+  }
+
+  async moveLoop() {
+    this.moveLoopActive = true
+    for await (const e of this.pointerMoveEvents()) {
+      // this.loopEventCounter += 1
+      const hoverTab = [
+        ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+      ].find(el => (
+        el !== this.tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
+      ))
+      if (this.hoverTab !== hoverTab) {
+        if (this.hoverTab) {
+          this.hoverTab.classList.remove('drag-hover')
+        }
+        if (hoverTab) {
+          hoverTab.classList.add('drag-hover')
+        }
+        this.hoverTab = hoverTab
+      }
+    }
+    this.moveLoopActive = false
+    // this.loopCounter += 1
+    // console.log(`${this.name} loop counter: ${this.loopCounter} events: ${this.loopEventCounter}`)
   }
 
   set name(name) {
@@ -173,6 +206,12 @@ export class TabItem extends HTMLElement {
   setDragPosition(x, y) {
     this.style.setProperty('--drag-left', `${x}px`)
     this.style.setProperty('--drag-top', `${y}px`)
+  }
+
+  static delay(ms) {
+    return new Promise((resolve, _) => {
+      setTimeout(resolve, ms)
+    })
   }
 
   static get styles() {
