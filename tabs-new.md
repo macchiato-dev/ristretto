@@ -148,11 +148,8 @@ export class TabItem extends HTMLElement {
 
   findHoverTab(e) {
     for (const tabList of this.tabList.tabLists) {
-      const hoverTab = [
-        tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
-      ].find(el => (
-        el !== tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
-      ))
+      const tabsFromPoint = tabList.tabsFromPoint(e.clientX, e.clientY)
+      const hoverTab = tabsFromPoint.find(el => el !== this)
       if (hoverTab !== undefined) {
         return hoverTab
       }
@@ -402,6 +399,12 @@ export class TabList extends HTMLElement {
         contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
       }
     }
+  }
+
+  tabsFromPoint(x, y) {
+    return [...this.shadowRoot.elementsFromPoint(x, y)].filter(el => (
+      el !== this.dragItem && el.tagName === 'TAB-ITEM'
+    ))
   }
 
   get tabs() {
