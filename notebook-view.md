@@ -8,10 +8,16 @@ TODO:
 
 - [x] render links in Markdown
 - [x] render TODO list in Markdown (at least partially)
-- [ ] create new tab notebook
-- [ ] copy TabList.js and TabItem.js temporarily to this notebook until it supports editing across notebooks
-- [ ] make tabs open or switch upon clicking code block
-- [ ] make tabs draggable including scrolling on hover and draggable to other tab lists
+- [x] create a new notebook for the tab components
+- [x] make tabs open or switch upon clicking code block
+- [x] make tabs draggable including scrolling on hover and draggable to other tab lists
+- [ ] add tabs and code icon to sidebar pane
+- [ ] make code icon switch left side to notebook source
+- [ ] add tabs and editors to notebook source
+- [ ] add individual content panes to sidebar
+- [ ] make tabs draggable to a blank pane
+- [ ] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
+- [ ] add main, dev, test tab and code/download buttons to sidebar
 - [ ] make context menu open on right click
 - [ ] give tabs close buttons
 
@@ -19,10 +25,14 @@ TODO:
 
 ```json
 {
+  "bundleFiles": [
+    ["codemirror-bundle.md", "codemirror-bundle.js"]
+  ],
   "importFiles": [
     ["split-pane.md", "split-view.js"],
     ["tabs-new.md", "TabItem.js"],
-    ["tabs-new.md", "TabList.js"]
+    ["tabs-new.md", "TabList.js"],
+    ["code-edit-new.md", "CodeEdit.js"]
   ]
 }
 ```
@@ -234,6 +244,135 @@ export class MarkdownView extends HTMLElement {
 }
 ```
 
+`ContentView.js`
+
+```js
+export class ContentView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.split = document.createElement('split-view')
+    this.split.vertical = true
+    this.split.addEventListener('split-view-resize', e => {
+      const y = e.detail.offsetY - this.offsetTop
+      this.style.setProperty('--top-height', `${y}px`)
+    })
+    this.top = document.createElement('div')
+    this.top.classList.add('top')
+    this.topTabList = document.createElement('tab-list')
+    this.top.append(this.topTabList)
+    this.bottom = document.createElement('div')
+    this.bottom.classList.add('bottom')
+    this.bottomTabList = document.createElement('tab-list')
+    this.bottom.append(this.bottomTabList)
+    this.shadowRoot.append(main, this.split, this.notebookPane)
+    this.shadowRoot.append(this.top, this.split, this.bottom)
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          height: 100vh;
+          border: 3px solid #273737;
+          grid-template-columns: var(--main-width, 2fr) auto 1fr;
+          box-sizing: border-box;
+          color: #d7d7d7;
+        }
+        split-view {
+          background: #273737;
+        }
+        :host > split-view {
+          min-width: 3px;
+        }
+        main split-view {
+          min-height: 3px;
+        }
+        main {
+          display: grid;
+          grid-template-rows: var(--top-height, 1fr) auto 1fr;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+`NotebookSourceView.js`
+
+```js
+export class NotebookSourceView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+`SidebarView.js`
+
+```js
+export class SidebarView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.tabList = document.createElement('tab-list')
+    this.tabList.tabs = ['main', 'dev', 'test'].map(name => {
+      const el = document.createElement('tab-item')
+      el.name = name
+      return el
+    })
+    this.tabList.tabs[0].selected = true
+    this.notebookPane = document.createElement('markdown-view')
+    this.notebookPane.value = this.notebook
+    this.shadowRoot.append(this.tabList, this.notebookPane)
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-columns: 1fr min-content;
+          grid-template-rows: minmax(20px, max-content) 1fr;
+          box-sizing: border-box;
+          color: #d7d7d7;
+        }
+
+        tab-list {
+          padding: 3px;
+        }
+
+        markdown-view {
+          grid-row: 2;
+          grid-columns: 1 / 2;
+          overflow: auto;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+```
+
+This is the notebook view. It shows content tabs in the main area and has the rendered notebook in the sidebar. When the code icon in the sidebar with the rendered notebooks is clicked, it hides the content tabs and shows the source tabs for the markdown files. When these are closed, the content tabs will be updated, if it has changed. There will be a history tab that includes everything in the notebook set. It will be able to preview and restore any history item.
+
 `NotebookView.js`
 
 ```js
@@ -241,8 +380,8 @@ export class NotebookView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.notebookPane = document.createElement('markdown-view')
-    this.notebookPane.value = this.notebook
+    this.sidebarView = document.createElement('sidebar-view')
+    this.sidebarView.notebook = this.notebook
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
@@ -264,7 +403,7 @@ export class NotebookView extends HTMLElement {
     this.bottomTabList = document.createElement('tab-list')
     this.bottom.append(this.bottomTabList)
     main.append(this.top, this.mainSplit, this.bottom)
-    this.shadowRoot.append(main, this.split, this.notebookPane)
+    this.shadowRoot.append(main, this.split, this.sidebarView)
   }
 
   static get styles() {
@@ -273,11 +412,15 @@ export class NotebookView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          height: 100vh;
+          max-height: 100vh;
           border: 3px solid #273737;
           grid-template-columns: var(--main-width, 2fr) auto 1fr;
+          grid-template-rows: 1fr;
           box-sizing: border-box;
           color: #d7d7d7;
+        }
+        sidebar-view {
+          max-height: 100vh;
         }
         split-view {
           background: #273737;
@@ -349,8 +492,6 @@ export class ExampleView extends HTMLElement {
 }
 ```
 
-
-
 `app.js`
 
 ```js
@@ -358,6 +499,9 @@ import {SplitView} from '/split-pane/split-view.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
 import {MarkdownView, MarkdownCodeBlock} from '/MarkdownView.js'
+import {ContentView} from '/ContentView.js'
+import {NotebookSourceView} from '/NotebookSourceView.js'
+import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
 
@@ -366,9 +510,16 @@ customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
+customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
 customElements.define('example-view', ExampleView)
 
 const el = document.createElement('example-view')
 document.body.appendChild(el)
 ```
+
+## License
+
+Icon svg in `icons`: [google material-design-icons, Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE)
+
+Other content: [Apache 2.0](https://codeberg.org/macchiato/ristretto/src/branch/main/LICENSE)
