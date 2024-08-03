@@ -52,8 +52,6 @@ export class TabItem extends HTMLElement {
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
     this.mainEl.appendChild(this.nameEl)
-    // this.loopCounter = 1
-    // this.loopEventCounter = 1
   }
 
   connectedCallback() {
@@ -102,13 +100,24 @@ export class TabItem extends HTMLElement {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
-          // TODO when dragging from outside:
-          // if it's not in the first 15px or so of the last tab,
-          // make the new tab the last tab, also consider for the last n tabs (3?)
           const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
           const myIndex = [...this.parentElement.children].indexOf(this)
-          const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
-          this.hoverTab.insertAdjacentElement(position, this)
+          if (hoverIndex === -1) {
+            const hoverIndex = [...this.hoverTab.parentElement.children].indexOf(this.hoverTab)
+            const hoverTabCount = this.hoverTab.parentElement.children.length
+            const position = (hoverTabCount - hoverIndex <= Math.min(3, Math.floor(hoverTabCount * 0.4))) ? 'afterEnd' : 'beforeBegin'
+            if (this.selected) {
+              this.selected = false
+              const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
+              if (tabToSelect) {
+                tabToSelect.selected = true
+              }
+            }
+            this.hoverTab.insertAdjacentElement(position, this)
+          } else {
+            const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
+            this.hoverTab.insertAdjacentElement(position, this)
+          }
         }
       } else if (!this.tabList.dragging) {
         this.selected = true
@@ -172,13 +181,10 @@ export class TabItem extends HTMLElement {
       }
     }
     this.moveLoopActive = false
-    // this.loopCounter += 1
-    // console.log(`${this.name} loop counter: ${this.loopCounter} events: ${this.loopEventCounter}`)
   }
 
   set name(name) {
     this.nameEl.innerText = name
-    //this.setFileType(name)
   }
 
   get name() {
@@ -442,7 +448,7 @@ export class TabList extends HTMLElement {
       if (value) {
         this._dragging = true
       } else {
-        this._dragging = new Date(Date.now() + 50)
+        this._dragging = Date.now() + 50
       }
     }
   }
@@ -479,7 +485,7 @@ export class TabGroup {
     if (value) {
       this._dragging = true
     } else {
-      this._dragging = new Date(Date.now() + 50)
+      this._dragging = Date.now() + 50
     }
   }
 }
@@ -506,8 +512,8 @@ export class ExampleView extends HTMLElement {
     this.topTabList.tabGroup = this.tabGroup
     this.bottomTabList.tabGroup = this.tabGroup
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
-    notebookView.shadowRoot.querySelector('.top').append(this.topTabList)
-    notebookView.shadowRoot.querySelector('.bottom').append(this.bottomTabList)
+    notebookView.shadowRoot.querySelector('.top').replaceChildren(this.topTabList)
+    notebookView.shadowRoot.querySelector('.bottom').replaceChildren(this.bottomTabList)
   }
 
   createTabs(n) {
