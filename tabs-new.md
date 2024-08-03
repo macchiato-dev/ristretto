@@ -7,8 +7,9 @@ TODO:
 - [x] Add drag and drop from tabs-draggable
 - [ ] Track the tab being dragged and style it differently
 - [ ] Allow cancelling drag with Esc and prevent dropping from changing what is selected
-- [ ] Move on drag
+- [x] Move on drag
 - [ ] Allow moving to other Tab List
+- [x] Remove context menu
 - [ ] Move context menu to example
 - [ ] Support dragging with one finger to move, and dragging with two fingers or mousewheel to scroll (with arrows)
 - [ ] Make it show an x on hover
@@ -33,6 +34,10 @@ TODO:
   ]
 }
 ```
+
+This is an individual tab. It can be a tab that is used as a content container, or a tab that is being dragged. The tab that is being dragged has the `drag` class and doesn't handle events, but is just displayed while dragging.
+
+The dragging is done manually with [pointer capture](https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events), so the dragged tab is an HTML element instead of an image.
 
 `TabItem.js`
 
@@ -262,6 +267,8 @@ export class TabItem extends HTMLElement {
 }
 ```
 
+This is a sequential list of tabs, that appear next to each other.
+
 `TabList.js`
 
 ```js
@@ -346,11 +353,11 @@ export class TabList extends HTMLElement {
     }
   }
 
-  get items() {
+  get tabs() {
     return this.listEl.children
   }
 
-  set items(value) {
+  set tabs(value) {
     this.listEl.replaceChildren(...value)
   }
 
@@ -360,9 +367,31 @@ export class TabList extends HTMLElement {
 }
 ```
 
+This is a group of tab lists, which enables tabs to be dragged from one tab list to another.
+
+`TabGroup.js`
+
+```js
+export class TabGroup {
+  set tabLists(value) {
+    this._tabLists = value
+  }
+
+  get tabLists() {
+    return this._tabLists
+  }
+
+  get tabs() {
+    return this.tabLists.map(tabList => tabList.tabs).flat()
+  }
+}
+```
+
 `ExampleView.js`
 
 ```js
+import {TabGroup} from '/TabGroup.js'
+
 export class ExampleView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
@@ -375,13 +404,17 @@ export class ExampleView extends HTMLElement {
     this.shadowRoot.append(notebookView)
     this.topTabList = this.createTabs(10)
     this.bottomTabList = this.createTabs(2)
+    this.tabGroup = new TabGroup()
+    this.topTabList.tabGroup = this.tabGroup
+    this.bottomTabList.tabGroup = this.tabGroup
+    this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
     notebookView.shadowRoot.querySelector('.top').append(this.topTabList)
     notebookView.shadowRoot.querySelector('.bottom').append(this.bottomTabList)
   }
 
   createTabs(n) {
     const tabList = document.createElement('tab-list')
-    const tabItems = Array(n).fill('').map((_, i) => {
+    const tabs = Array(n).fill('').map((_, i) => {
       const el = document.createElement('tab-item')
       el.name = `Tab ${i}`
       if (i === 0) {
@@ -389,7 +422,7 @@ export class ExampleView extends HTMLElement {
       }
       return el
     })
-    tabList.items = tabItems
+    tabList.tabs = tabs
     return tabList
   }
 
