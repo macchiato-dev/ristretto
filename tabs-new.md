@@ -84,6 +84,7 @@ export class TabItem extends HTMLElement {
       if (this.pointerDown) {
         if (!this.moved) {
           this.moved = true
+          this.tabList.dragging = true
           this.tabList.dragItem.name = this.name
           this.tabList.dragItem.selected = this.selected
           this.tabList.dragItem.classList.add('dragging')
@@ -109,11 +110,12 @@ export class TabItem extends HTMLElement {
           const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
           this.hoverTab.insertAdjacentElement(position, this)
         }
-      } else {
+      } else if (!this.tabList.dragging) {
         this.selected = true
       }
       this.moved = false
       this.pointerDown = false
+      this.tabList.dragging = false
     })
     this.mainEl.addEventListener('lostpointercapture', e => {
       this.pointerMoveEvent = undefined
@@ -122,6 +124,7 @@ export class TabItem extends HTMLElement {
         this.hoverTab.classList.remove('drag-hover')
         this.hoverTab = undefined
       }
+      this.tabList.dragging = false
     })
   }
 
@@ -403,6 +406,30 @@ export class TabList extends HTMLElement {
   get selectedItem() {
     return this.listEl.querySelector('[selected]')
   }
+
+  get dragging() {
+    if (this.tabGroup) {
+      return this.tabGroup.dragging
+    } else {
+      if (typeof this._dragging === 'number') {
+        return Date.now() < this._dragging
+      } else {
+        return Boolean(this._dragging)
+      }
+    }
+  }
+
+  set dragging(value) {
+    if (this.tabGroup) {
+      this.tabGroup.dragging = value
+    } else {
+      if (value) {
+        this._dragging = true
+      } else {
+        this._dragging = new Date(Date.now() + 50)
+      }
+    }
+  }
 }
 ```
 
@@ -422,6 +449,22 @@ export class TabGroup {
 
   get tabs() {
     return this.tabLists.map(tabList => tabList.tabs).flat()
+  }
+
+  get dragging() {
+    if (typeof this._dragging === 'number') {
+      return Date.now() < this._dragging
+    } else {
+      return Boolean(this._dragging)
+    }
+  }
+
+  set dragging(value) {
+    if (value) {
+      this._dragging = true
+    } else {
+      this._dragging = new Date(Date.now() + 50)
+    }
   }
 }
 ```
