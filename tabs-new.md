@@ -40,22 +40,13 @@ TODO:
 export class TabItem extends HTMLElement {
   constructor() {
     super()
-    this.language = navigator.language
     this.attachShadow({mode: 'open'})
-    this.headerEl = document.createElement('div')
-    this.headerEl.classList.add('header')
-    this.shadowRoot.appendChild(this.headerEl)
+    this.mainEl = document.createElement('div')
+    this.mainEl.classList.add('main')
+    this.shadowRoot.appendChild(this.mainEl)
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
-    this.nameEl.setAttribute('spellcheck', 'false')
-    this.headerEl.appendChild(this.nameEl)
-    this.menuBtn = document.createElement('button')
-    this.menuBtn.innerHTML = this.icons.menu
-    this.headerEl.appendChild(this.menuBtn)
-    this.menu = document.createElement(
-      'm-menu-dropdown'
-    )
-    this.shadowRoot.appendChild(this.menu)
+    this.mainEl.appendChild(this.nameEl)
   }
 
   connectedCallback() {
@@ -71,49 +62,18 @@ export class TabItem extends HTMLElement {
         this.contentEl.name = this.nameEl.innerText
       }
     })
-    this.nameEl.addEventListener('blur', () => {
-      this.nameEl.removeAttribute('contenteditable')
-      if (this.isNew) {
-        this.selected = true
-        this.isNew = false
-      }
-    })
-    this.nameEl.addEventListener('keydown', e => {
-      if (e.which === 13) {
-        e.preventDefault()
-        const isNew = this.isNew
-        this.nameEl.blur()
-        if (isNew) {
-          this.dispatchEvent(new CustomEvent(
-            'ready-to-edit', {bubbles: true}
-          ))
-        }
-        return false
-      }
-    })
-
-    this.nameEl.addEventListener('mousedown', e => {
-      if (e.detail > 1) {
-        e.preventDefault()
-      }
-    })
-    this.nameEl.addEventListener('dblclick', e => {
-      this.rename()
-      e.preventDefault()
-    })
-    this.headerEl.addEventListener('pointerdown', e => {
-      if (e.isPrimary && this.nameEl.contentEditable !== 'true' && !this.menu.contains(e.target)) {
-        this.headerEl.setPointerCapture(e.pointerId)
+    this.mainEl.addEventListener('pointerdown', e => {
+      if (e.isPrimary) {
+        this.mainEl.setPointerCapture(e.pointerId)
         e.preventDefault()
         this.pointerDown = true
-        this.pointerOnMenu = this.menuBtn.contains(e.target)
         this.moved = false
         const rect = this.getBoundingClientRect()
         this.offsetX = e.clientX - rect.left
         this.offsetY = e.clientY - rect.top
       }
     })
-    this.headerEl.addEventListener('pointermove', e => {
+    this.mainEl.addEventListener('pointermove', e => {
       if (!this.moved) {
         this.moved = true
         if (this.pointerDown) {
@@ -142,7 +102,7 @@ export class TabItem extends HTMLElement {
         }
       }
     })
-    this.headerEl.addEventListener('pointerup', e => {
+    this.mainEl.addEventListener('pointerup', e => {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
@@ -155,77 +115,18 @@ export class TabItem extends HTMLElement {
           this.hoverTab.insertAdjacentElement(position, this)
         }
       } else {
-        if (this.pointerOnMenu) {
-          this.openMenu()
-        } else {
-          this.selected = true
-        }
+        this.selected = true
       }
       this.moved = false
       this.pointerDown = false
     })
-    this.headerEl.addEventListener('lostpointercapture', e => {
+    this.mainEl.addEventListener('lostpointercapture', e => {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.hoverTab) {
         this.hoverTab.classList.remove('drag-hover')
         this.hoverTab = undefined
       }
     })
-    this.menuBtn.addEventListener('click', e => {
-      this.openMenu()
-    })
-  }
-
-  openMenu() {
-    this.menu.clear()
-    this.menu.add(this.text.addLeft, () => {
-      this.dispatchEvent(new CustomEvent(
-        'click-add', {bubbles: true, detail: {direction: 'left'}}
-      ))
-    })
-    this.menu.add(this.text.addRight, () => {
-      this.dispatchEvent(new CustomEvent(
-        'click-add', {bubbles: true, detail: {direction: 'right'}}
-      ))
-    })
-    if (this.previousElementSibling) {
-      this.menu.add(this.text.moveLeft, () => {
-        this.dispatchEvent(new CustomEvent(
-          'click-move', {bubbles: true, detail: {direction: 'left'}}
-        ))
-      })
-    }
-    if (this.nextElementSibling) {
-      this.menu.add(this.text.moveRight, () => {
-        this.dispatchEvent(new CustomEvent(
-          'click-move', {bubbles: true, detail: {direction: 'right'}}
-        ))
-      })
-    }
-    if (this.nextElementSibling || this.previousElementSibling) {
-      this.menu.add(this.text.delete, () => {
-        (this.previousElementSibling ?? this.nextElementSibling).selected = true
-        if (this.contentEl !== undefined) {
-          this.contentEl.remove()
-        }
-        this.remove()
-      })
-    }
-    this.menu.add(this.text.rename, () => {
-      this.rename()
-    })
-    this.menu.open(this.menuBtn)
-  }
-
-  rename() {
-    this.nameEl.setAttribute('contenteditable', '')
-    const range = document.createRange()
-    const sel = window.getSelection()
-    range.setStart(this.nameEl, this.nameEl.childNodes.length)
-    range.collapse(true)
-    sel.removeAllRanges()
-    sel.addRange(range)
-    this.nameEl.focus()
   }
 
   set name(name) {
@@ -261,53 +162,12 @@ export class TabItem extends HTMLElement {
   }
 
   get tabList() {
-    return this.parentElement.parentNode.host
+    return this.getRootNode().host
   }
 
   setDragPosition(x, y) {
     this.style.setProperty('--drag-left', `${x}px`)
     this.style.setProperty('--drag-top', `${y}px`)
-  }
-
-  icons = {
-    menu: `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 14 24">
-        <path fill="currentColor" d="M12 16a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0
-        0 1 2-2m0-6a2 2 0 0 1 2 2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2m0-6a2 2 0 0 1 2
-        2a2 2 0 0 1-2 2a2 2 0 0 1-2-2a2 2 0 0 1 2-2"/>
-      </svg>
-    `,
-  }
-
-  textEn = {
-    addLeft: 'Add left',
-    addRight: 'Add right',
-    moveLeft: 'Move left',
-    moveRight: 'Move right',
-    rename: 'Rename',
-    delete: 'Delete',
-  }
-
-  textEs = {
-    addLeft: 'Añadir izquierda',
-    addRight: 'Añadir derecha',
-    moveLeft: 'Mover izquierda',
-    moveRight: 'Mover derecha',
-    rename: 'Cambiar nombre',
-    delete: 'Borrar',
-  }
-
-  get language() {
-    return this._language
-  }
-
-  set language(language) {
-    this._language = language
-    this.text = this.langEs ? this.textEs : this.textEn
-  }
-
-  get langEs() {
-    return /^es\b/.test(this.language)
   }
 
   static get styles() {
@@ -319,29 +179,29 @@ export class TabItem extends HTMLElement {
           flex-direction: column;
           align-items: stretch;
         }
-        div.header {
+        div.main {
           display: flex;
           flex-direction: row;
           align-items: stretch;
-          padding-left: 3px 0;
+          padding: 3px 4px;
           border-radius: var(--radius, 5px);
           color: var(--fg, #b9b9bc);
           background-color: var(--bg, #484850);
           align-items: center;
         }
-        :host(.selected) div.header {
+        :host(.selected) div.main {
           background-color: var(--bg-selected, #0e544f);
           color: var(--fg-selected, #e7e7e7);
         }
-        :host(:hover) div.header {
+        :host(:hover) div.main {
           background-color: var(--bg-hover, #52525b);
           color: var(--fg-hover, #c7c7c7);
         }
-        :host(.selected:hover) div.header {
+        :host(.selected:hover) div.main {
           background-color: var(--bg-selected-hover, #0c6860);
           color: var(--fg-selected-hover, #f7f7f7);
         }
-        :host(.drag-hover) div.header {
+        :host(.drag-hover) div.main {
           background-color: var(--bg-drag-hover, #64646d);
           color: var(--fg, #c7c7c7);
           pointer-events: none;
@@ -354,8 +214,9 @@ export class TabItem extends HTMLElement {
           Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
           outline: none;
           white-space: nowrap;
+          user-select: none;
         }
-        div.header button svg {
+        div.main button svg {
           margin-bottom: -3px;
         }
         div.content {
@@ -371,7 +232,7 @@ export class TabItem extends HTMLElement {
           padding: 0;
           margin: 0;
         }
-        div.header > button {
+        div.main > button {
           all: unset;
           padding: 0 4px 0 2px;
           border-radius: 5px;
