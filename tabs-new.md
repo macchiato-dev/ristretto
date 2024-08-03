@@ -146,15 +146,24 @@ export class TabItem extends HTMLElement {
     }
   }
 
+  findHoverTab(e) {
+    for (const tabList of this.tabList.tabLists) {
+      const hoverTab = [
+        tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
+      ].find(el => (
+        el !== tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
+      ))
+      if (hoverTab !== undefined) {
+        return hoverTab
+      }
+    }
+  }
+
   async moveLoop() {
     this.moveLoopActive = true
     for await (const e of this.pointerMoveEvents()) {
       // this.loopEventCounter += 1
-      const hoverTab = [
-        ...this.tabList.shadowRoot.elementsFromPoint(e.clientX, e.clientY)
-      ].find(el => (
-        el !== this.tabList.dragItem && el !== this && el.tagName === 'TAB-ITEM'
-      ))
+      const hoverTab = this.findHoverTab(e)
       if (this.hoverTab !== hoverTab) {
         if (this.hoverTab) {
           this.hoverTab.classList.remove('drag-hover')
@@ -401,6 +410,10 @@ export class TabList extends HTMLElement {
 
   set tabs(value) {
     this.listEl.replaceChildren(...value)
+  }
+
+  get tabLists() {
+    return this.tabGroup?.tabLists ?? [this]
   }
 
   get selectedItem() {
