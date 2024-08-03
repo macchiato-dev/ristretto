@@ -20,7 +20,9 @@ TODO:
 ```json
 {
   "importFiles": [
-    ["split-pane.md", "split-view.js"]
+    ["split-pane.md", "split-view.js"],
+    ["tabs-new.md", "TabItem.js"],
+    ["tabs-new.md", "TabList.js"]
   ]
 }
 ```
@@ -36,6 +38,44 @@ The inner reader reads inline content. This will use regexes to skip over the in
 `MarkdownView.js`
 
 ```js
+export class MarkdownCodeBlock extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.el = document.createElement('div')
+    this.shadowRoot.append(this.el)
+  }
+
+  connectedCallback() {
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+  }
+
+  get name() {
+    return this.el.innerText
+  }
+
+  set name(value) {
+    this.el.innerText = value
+  }
+
+  static get styles() {
+    let s; return s ?? (v => { s = new CSSStyleSheet(); s.replaceSync(v); return s })(this.stylesCss)
+  }
+
+  static stylesCss = `
+    :host {
+      overflow-y: auto;
+      color: #eee;
+    }
+    div {
+      padding: 5px 10px;
+      cursor: pointer;
+      border: 2px solid #ccc4;
+      border-radius: 5px;
+    }
+  `
+}
+
 export class MarkdownView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
@@ -57,8 +97,21 @@ export class MarkdownView extends HTMLElement {
         }))
         return el
       } else {
-        const el = document.createElement('p')
-        el.innerText = `Code block: ${block.name}`
+        const el = document.createElement('markdown-code-block')
+        el.name = block.name
+        el.addEventListener('click', () => {
+          const notebookView = this.getRootNode().host
+          const allTabs = notebookView.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+          const tab = allTabs.find(tab => tab.name === el.name)
+          if (tab !== undefined) {
+            tab.selected = true
+          } else {
+            const tab = document.createElement('tab-item')
+            tab.name = el.name
+            notebookView.topTabList.tabs = [...(notebookView.topTabList.tabs ?? []), tab]
+            tab.selected = true
+          }
+        })
         return el
       }
     }))
@@ -202,11 +255,15 @@ export class NotebookView extends HTMLElement {
       const y = e.detail.offsetY - this.offsetTop
       this.style.setProperty('--top-height', `${y}px`)
     })
-    const top = document.createElement('div')
-    top.classList.add('top')
-    const bottom = document.createElement('div')
-    bottom.classList.add('bottom')
-    main.append(top, this.mainSplit, bottom)
+    this.top = document.createElement('div')
+    this.top.classList.add('top')
+    this.topTabList = document.createElement('tab-list')
+    this.top.append(this.topTabList)
+    this.bottom = document.createElement('div')
+    this.bottom.classList.add('bottom')
+    this.bottomTabList = document.createElement('tab-list')
+    this.bottom.append(this.bottomTabList)
+    main.append(this.top, this.mainSplit, this.bottom)
     this.shadowRoot.append(main, this.split, this.notebookPane)
   }
 
@@ -298,12 +355,17 @@ export class ExampleView extends HTMLElement {
 
 ```js
 import {SplitView} from '/split-pane/split-view.js'
-import {MarkdownView} from '/MarkdownView.js'
+import {TabItem} from '/tabs-new/TabItem.js'
+import {TabList} from '/tabs-new/TabList.js'
+import {MarkdownView, MarkdownCodeBlock} from '/MarkdownView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
 
 customElements.define('split-view', SplitView)
+customElements.define('tab-item', TabItem)
+customElements.define('tab-list', TabList)
 customElements.define('markdown-view', MarkdownView)
+customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('notebook-view', NotebookView)
 customElements.define('example-view', ExampleView)
 
