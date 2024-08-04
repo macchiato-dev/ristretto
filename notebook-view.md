@@ -261,6 +261,18 @@ export class ContentView extends HTMLElement {
     this.bottom.classList.add('bottom')
     this.bottomTabList = document.createElement('tab-list')
     this.bottom.append(this.bottomTabList)
+    this.addEventListener('fileClick', ({detail: {name}}) => {
+      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+      const tab = allTabs.find(tab => tab.name === name)
+      if (tab !== undefined) {
+        tab.selected = true
+      } else {
+        const tab = document.createElement('tab-item')
+        tab.name = name
+        this.topTabList.tabs = [...(this.topTabList.tabs ?? []), tab]
+        tab.selected = true
+      }
+    })
     this.shadowRoot.append(this.top, this.split, this.bottom)
   }
 
@@ -327,8 +339,8 @@ export class SidebarView extends HTMLElement {
     this.tabList.tabs[0].selected = true
     this.notebookPane = document.createElement('markdown-view')
     this.notebookPane.value = this.notebook
-    this.shadowRoot.addEventListener('fileClick', e => {
-      this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...e.detail}}))
+    this.shadowRoot.addEventListener('fileClick', ({detail}) => {
+      this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...detail}}))
     })
     this.shadowRoot.append(this.tabList, this.notebookPane)
   }
@@ -382,17 +394,8 @@ export class NotebookView extends HTMLElement {
       this.style.setProperty('--main-width', `${x}px`)
     })
     this.contentView = document.createElement('content-view')
-    this.shadowRoot.addEventListener('fileClick', ({detail: {name}}) => {
-      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-      const tab = allTabs.find(tab => tab.name === name)
-      if (tab !== undefined) {
-        tab.selected = true
-      } else {
-        const tab = document.createElement('tab-item')
-        tab.name = name
-        this.topTabList.tabs = [...(this.topTabList.tabs ?? []), tab]
-        tab.selected = true
-      }
+    this.shadowRoot.addEventListener('fileClick', ({detail}) => {
+      this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail: {...detail}}))
     })
     this.shadowRoot.append(this.contentView, this.split, this.sidebarView)
   }
