@@ -287,6 +287,9 @@ export class ContentView extends HTMLElement {
           box-sizing: border-box;
           color: #d7d7d7;
         }
+        tab-list {
+          padding: 3px;
+        }
         split-view {
           background: #273737;
         }
@@ -308,7 +311,28 @@ export class NotebookSourceView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.tabList = document.createElement('tab-list')
-    this.append(this.topTabList)
+    this.tabList.tabs = this.notebooks.map(({name}) => {
+      const el = document.createElement('tab-item')
+      el.name = name
+      return el
+    })
+    this.tabList.tabs[0].selected = true
+    this.tabList.addEventListener('select-item', () => {
+      const selectedTab = this.tabList.shadowRoot.querySelector('.selected')
+      const selectedView = Object.values(this.codeViews).find(el => el.classList.contains('selected'))
+      selectedView.classList.remove('selected')
+      this.codeViews[selectedTab.name].classList.add('selected')
+    })
+    this.codeViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
+      const el = document.createElement('code-edit')
+      el.fileType = 'md'
+      el.lineWrapping = true
+      el.dark = true
+      el.value = content
+      return [name, el]
+    }))
+    this.codeViews[this.notebooks[0].name].classList.add('selected')
+    this.shadowRoot.append(this.tabList, ...Object.values(this.codeViews))
   }
 
   static get styles() {
@@ -319,6 +343,15 @@ export class NotebookSourceView extends HTMLElement {
           display: grid;
           grid-template-rows: min-content 1fr;
           grid-template-columns: 1fr;
+        }
+        tab-list {
+          padding: 3px;
+        }
+        code-edit {
+          overflow: auto;
+        }
+        code-edit:not(.selected) {
+          display: none;
         }
       `)
     }
@@ -430,10 +463,10 @@ export class SidebarView extends HTMLElement {
         }
         .icon-container button.on {
           background: #ccc7;
-          color: #c7c7c7;
+          color: #d7d7d7;
         }
         .icon-container button.on:hover {
-          background: #ccc7;
+          background: #ccc8;
           color: #f7f7f7;
         }
         .icon-container svg {
@@ -466,10 +499,12 @@ export class NotebookView extends HTMLElement {
       this.style.setProperty('--main-width', `${x}px`)
     })
     this.contentView = document.createElement('content-view')
+    this.notebookSourceView = document.createElement('notebook-source-view')
+    this.notebookSourceView.notebooks = this.notebooks
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail: {...detail}}))
     })
-    this.shadowRoot.append(this.contentView, this.split, this.sidebarView)
+    this.shadowRoot.append(this.contentView, this.notebookSourceView, this.split, this.sidebarView)
   }
 
   static get styles() {
@@ -544,7 +579,7 @@ export class ExampleView extends HTMLElement {
     notebookView.notebooks = [
       {
         name: 'main',
-        content: __source.split('---\n\n**notebook**')[1],
+        content: __source.split('---\n\n**notebook**')[1].trim(),
       },
       {
         name: 'dev',
@@ -613,13 +648,16 @@ import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
+import {CodeEdit} from "/code-edit-new/CodeEdit.js"
 
 customElements.define('split-view', SplitView)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
+customElements.define('code-edit', CodeEdit)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('content-view', ContentView)
+customElements.define('notebook-source-view', NotebookSourceView)
 customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
 customElements.define('example-view', ExampleView)
