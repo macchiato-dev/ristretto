@@ -40,6 +40,7 @@ export class CodeEdit extends HTMLElement {
   constructor() {
     super()
     this.lineWrapping = false
+    this.lineNumbers = true
     this.dark = false
   }
 
@@ -67,6 +68,82 @@ export class CodeEdit extends HTMLElement {
       `)
     }
     return this._styleSheet
+  }
+
+  initEditor() {
+    this.gutterCompartment = new Compartment()
+    this.languageCompartment = new Compartment()
+    this.themeCompartment = new Compartment()
+    const gutterPlugins = this.gutterPlugins
+    const langPlugins = this.langPlugins
+    const themePlugins = this.themePlugins
+    const basicSetup = [
+      highlightActiveLineGutter(),
+      highlightSpecialChars(),
+      history(),
+      foldGutter(),
+      drawSelection(),
+      dropCursor(),
+      EditorState.allowMultipleSelections.of(true),
+      indentOnInput(),
+      syntaxHighlighting(
+        defaultHighlightStyle, {fallback: true}
+      ),
+      bracketMatching(),
+      closeBrackets(),
+      autocompletion(),
+      rectangularSelection(),
+      crosshairCursor(),
+      highlightActiveLine(),
+      highlightSelectionMatches(),
+      keymap.of([
+        ...closeBracketsKeymap,
+        ...defaultKeymap,
+        ...searchKeymap,
+        ...historyKeymap,
+        ...foldKeymap,
+        ...completionKeymap,
+        ...lintKeymap,
+      ]),
+    ]
+    this.view = new EditorView({
+      doc: this._value ?? '',
+      extensions: [
+        this.gutterCompartment.of(gutterPlugins),
+        ...basicSetup,
+        this.languageCompartment.of(langPlugins),
+        this.themeCompartment.of(themePlugins),
+        EditorView.updateListener.of(e => {
+          if (e.docChanged) {
+            this.dispatchEvent(new CustomEvent('codeInput'))
+          }
+        }),
+      ],
+      root: this.shadowRoot,
+    })
+    this.shadowRoot.append(this.view.dom)
+  }
+
+  reconfigureLanguage() {
+    if (this.view) {
+      const {langPlugins} = this
+      this.view.dispatch({
+        effects: this.languageCompartment.reconfigure(langPlugins)
+      })
+    }
+  }
+
+  reconfigureTheme() {
+    if (this.view) {
+      const {themePlugins} = this
+      this.view.dispatch({
+        effects: this.themeCompartment.reconfigure(themePlugins)
+      })
+    }
+  }
+
+  focus() {
+    this.view.focus()
   }
 
   set value(value) {
@@ -122,22 +199,8 @@ export class CodeEdit extends HTMLElement {
     return this._lineWrapping
   }
 
-  reconfigureLanguage() {
-    if (this.view) {
-      const {langPlugins} = this
-      this.view.dispatch({
-        effects: this.languageCompartment.reconfigure(langPlugins)
-      })
-    }
-  }
-
-  reconfigureTheme() {
-    if (this.view) {
-      const {themePlugins} = this
-      this.view.dispatch({
-        effects: this.themeCompartment.reconfigure(themePlugins)
-      })
-    }
+  get gutterPlugins() {
+    return this.lineNumbers ? [lineNumbers()] : []
   }
 
   get langPlugins() {
@@ -196,64 +259,6 @@ export class CodeEdit extends HTMLElement {
 
   get themePlugins() {
     return this.dark ? [this.constructor.viewThemeDark, oneDark] : [this.constructor.viewTheme]
-  }
-
-  initEditor() {
-    this.languageCompartment = new Compartment()
-    this.themeCompartment = new Compartment()
-    const langPlugins = this.langPlugins
-    const themePlugins = this.themePlugins
-    const basicSetup = [
-      lineNumbers(),
-      highlightActiveLineGutter(),
-      highlightSpecialChars(),
-      history(),
-      foldGutter(),
-      drawSelection(),
-      dropCursor(),
-      EditorState.allowMultipleSelections.of(true),
-      indentOnInput(),
-      syntaxHighlighting(
-        defaultHighlightStyle, {fallback: true}
-      ),
-      bracketMatching(),
-      closeBrackets(),
-      autocompletion(),
-      rectangularSelection(),
-      crosshairCursor(),
-      highlightActiveLine(),
-      highlightSelectionMatches(),
-      keymap.of([
-        ...closeBracketsKeymap,
-        ...defaultKeymap,
-        ...searchKeymap,
-        ...historyKeymap,
-        ...foldKeymap,
-        ...completionKeymap,
-        ...lintKeymap,
-      ]),
-    ]
-    this.view = new EditorView({
-      doc: this._value ?? '',
-      extensions: [
-        ...basicSetup,
-        this.languageCompartment.of(langPlugins),
-        this.themeCompartment.of(themePlugins),
-        EditorView.updateListener.of(e => {
-          if (e.docChanged) {
-            this.dispatchEvent(new CustomEvent(
-              'code-input', {bubbles: true, composed: true}
-            ))
-          }
-        }),
-      ],
-      root: this.shadowRoot,
-    })
-    this.shadowRoot.append(this.view.dom)
-  }
-
-  focus() {
-    this.view.focus()
   }
 
   static get viewTheme() {
