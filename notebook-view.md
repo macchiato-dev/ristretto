@@ -32,6 +32,7 @@ TODO:
     ["split-pane.md", "split-view.js"],
     ["tabs-new.md", "TabItem.js"],
     ["tabs-new.md", "TabList.js"],
+    ["tabs-new.md", "TabGroup.js"],
     ["code-edit-new.md", "CodeEdit.js"]
   ]
 }
@@ -110,17 +111,7 @@ export class MarkdownView extends HTMLElement {
         const el = document.createElement('markdown-code-block')
         el.name = block.name
         el.addEventListener('click', () => {
-          const notebookView = this.getRootNode().host
-          const allTabs = notebookView.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-          const tab = allTabs.find(tab => tab.name === el.name)
-          if (tab !== undefined) {
-            tab.selected = true
-          } else {
-            const tab = document.createElement('tab-item')
-            tab.name = el.name
-            notebookView.topTabList.tabs = [...(notebookView.topTabList.tabs ?? []), tab]
-            tab.selected = true
-          }
+          this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {name: el.name}}))
         })
         return el
       }
@@ -340,6 +331,9 @@ export class SidebarView extends HTMLElement {
     this.tabList.tabs[0].selected = true
     this.notebookPane = document.createElement('markdown-view')
     this.notebookPane.value = this.notebook
+    this.shadowRoot.addEventListener('fileClick', e => {
+      this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...e.detail}}))
+    })
     this.shadowRoot.append(this.tabList, this.notebookPane)
   }
 
@@ -376,6 +370,8 @@ This is the notebook view. It shows content tabs in the main area and has the re
 `NotebookView.js`
 
 ```js
+import {TabGroup} from '/tabs-new/TabGroup.js'
+
 export class NotebookView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
@@ -396,6 +392,7 @@ export class NotebookView extends HTMLElement {
     })
     this.top = document.createElement('div')
     this.top.classList.add('top')
+    this.tabGroup = new TabGroup()
     this.topTabList = document.createElement('tab-list')
     this.top.append(this.topTabList)
     this.bottom = document.createElement('div')
@@ -403,6 +400,18 @@ export class NotebookView extends HTMLElement {
     this.bottomTabList = document.createElement('tab-list')
     this.bottom.append(this.bottomTabList)
     main.append(this.top, this.mainSplit, this.bottom)
+    this.shadowRoot.addEventListener('fileClick', ({detail: {name}}) => {
+      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+      const tab = allTabs.find(tab => tab.name === name)
+      if (tab !== undefined) {
+        tab.selected = true
+      } else {
+        const tab = document.createElement('tab-item')
+        tab.name = name
+        this.topTabList.tabs = [...(this.topTabList.tabs ?? []), tab]
+        tab.selected = true
+      }
+    })
     this.shadowRoot.append(main, this.split, this.sidebarView)
   }
 
