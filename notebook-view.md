@@ -75,8 +75,11 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   static stylesCss = `
     :host {
-      overflow-y: auto;
       color: #eee;
+      box-sizing: border-box;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
     }
     div {
       padding: 5px 10px;
@@ -214,7 +217,9 @@ export class MarkdownView extends HTMLElement {
   static stylesCss = `
     :host {
       padding: 5px 10px;
-      overflow-y: auto;
+      overflow: auto;
+      scrollbar-color: #49cff1 #0000;
+      scrollbar-width: thin;
       color: #eee;
     }
     a {
@@ -256,7 +261,6 @@ export class ContentView extends HTMLElement {
     this.bottom.classList.add('bottom')
     this.bottomTabList = document.createElement('tab-list')
     this.bottom.append(this.bottomTabList)
-    this.shadowRoot.append(main, this.split, this.notebookPane)
     this.shadowRoot.append(this.top, this.split, this.bottom)
   }
 
@@ -266,9 +270,8 @@ export class ContentView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          height: 100vh;
-          border: 3px solid #273737;
-          grid-template-columns: var(--main-width, 2fr) auto 1fr;
+          display: grid;
+          grid-template-rows: var(--top-height, 1fr) auto 1fr;
           box-sizing: border-box;
           color: #d7d7d7;
         }
@@ -276,14 +279,7 @@ export class ContentView extends HTMLElement {
           background: #273737;
         }
         :host > split-view {
-          min-width: 3px;
-        }
-        main split-view {
           min-height: 3px;
-        }
-        main {
-          display: grid;
-          grid-template-rows: var(--top-height, 1fr) auto 1fr;
         }
       `)
     }
@@ -344,11 +340,14 @@ export class SidebarView extends HTMLElement {
         :host {
           display: grid;
           grid-template-columns: 1fr min-content;
-          grid-template-rows: minmax(20px, max-content) 1fr;
+          grid-template-rows: minmax(20px, min-content) 1fr;
           box-sizing: border-box;
           color: #d7d7d7;
+          padding-bottom: 3px;
         }
-
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
         tab-list {
           padding: 3px;
         }
@@ -356,7 +355,6 @@ export class SidebarView extends HTMLElement {
         markdown-view {
           grid-row: 2;
           grid-columns: 1 / 2;
-          overflow: auto;
         }
       `)
     }
@@ -383,23 +381,7 @@ export class NotebookView extends HTMLElement {
       const x = e.detail.offsetX - this.offsetLeft
       this.style.setProperty('--main-width', `${x}px`)
     })
-    const main = document.createElement('main')
-    this.mainSplit = document.createElement('split-view')
-    this.mainSplit.vertical = true
-    this.mainSplit.addEventListener('split-view-resize', e => {
-      const y = e.detail.offsetY - this.offsetTop
-      this.style.setProperty('--top-height', `${y}px`)
-    })
-    this.top = document.createElement('div')
-    this.top.classList.add('top')
-    this.tabGroup = new TabGroup()
-    this.topTabList = document.createElement('tab-list')
-    this.top.append(this.topTabList)
-    this.bottom = document.createElement('div')
-    this.bottom.classList.add('bottom')
-    this.bottomTabList = document.createElement('tab-list')
-    this.bottom.append(this.bottomTabList)
-    main.append(this.top, this.mainSplit, this.bottom)
+    this.contentView = document.createElement('content-view')
     this.shadowRoot.addEventListener('fileClick', ({detail: {name}}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
       const tab = allTabs.find(tab => tab.name === name)
@@ -412,7 +394,7 @@ export class NotebookView extends HTMLElement {
         tab.selected = true
       }
     })
-    this.shadowRoot.append(main, this.split, this.sidebarView)
+    this.shadowRoot.append(this.contentView, this.split, this.sidebarView)
   }
 
   static get styles() {
@@ -421,15 +403,23 @@ export class NotebookView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          max-height: 100vh;
-          border: 3px solid #273737;
           grid-template-columns: var(--main-width, 2fr) auto 1fr;
           grid-template-rows: 1fr;
-          box-sizing: border-box;
           color: #d7d7d7;
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+        content-view {
+          max-height: 100vh;
+          border: 3px solid #273737;
+          border-right: none;
         }
         sidebar-view {
           max-height: 100vh;
+          border: 3px solid #273737;
+          border-left: none;
         }
         split-view {
           background: #273737;
@@ -472,9 +462,12 @@ export class ExampleView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          height: 100vh;
           grid-template-columns: 1fr;
           grid-template-rows: 1fr;
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
         }
       `)
     }
@@ -489,7 +482,12 @@ export class ExampleView extends HTMLElement {
           box-sizing: border-box;
         }
         body {
+          display: grid;
           margin: 0;
+          max-height: 100vh;
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr;
+          box-sizing: border-box;
         }
         *, *:before, *:after {
           box-sizing: inherit;
@@ -519,6 +517,7 @@ customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
+customElements.define('content-view', ContentView)
 customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
 customElements.define('example-view', ExampleView)
