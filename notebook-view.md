@@ -11,10 +11,12 @@ TODO:
 - [x] create a new notebook for the tab components
 - [x] make tabs open or switch upon clicking code block
 - [x] make tabs draggable including scrolling on hover and draggable to other tab lists
-- [ ] add tabs and code icon to sidebar pane
-- [ ] make code icon switch left side to notebook source
-- [ ] add tabs and editors to notebook source
-- [ ] add individual content panes to sidebar
+- [x] add tabs and code icon to sidebar pane
+- [x] make code icon switch left side to notebook source
+- [x] add tabs and editors to notebook source
+- [x] add individual content panes to sidebar
+- [ ] make files open, not just tabs, when clicking a file
+- [ ] make content files show according to selected tab
 - [ ] make tabs draggable to a blank pane
 - [ ] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
 - [ ] add main, dev, test tab and code/download buttons to sidebar
@@ -67,6 +69,14 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set name(value) {
     this.el.innerText = value
+  }
+
+  get content() {
+    return this._content
+  }
+
+  set content(value) {
+    this._content = value
   }
 
   static get styles() {
@@ -124,8 +134,9 @@ export class MarkdownView extends HTMLElement {
       } else {
         const el = document.createElement('markdown-code-block')
         el.name = block.name
+        el.content = block.value
         el.addEventListener('click', () => {
-          this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {name: el.name}}))
+          this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
         })
         return el
       }
@@ -155,14 +166,22 @@ export class MarkdownView extends HTMLElement {
   *readBlocks(input) {
     let s = this.constructor.trimBlankLines(input)
     for (let i=0; i < 100000; i++) {  // instead of while (true) to prevent it from crashing 💥
-      const codeBlockStart = s.match(/^(`{3,})([^\n]*)/s)
+      const codeBlockStart = s.match(/^(`{3,})([^\n]*)\n/s)
       if (codeBlockStart) {
-        const codeBlockEnd = s.slice(codeBlockStart[0].length).match(
+        const codeBlockEnd = s.slice(codeBlockStart.index + codeBlockStart[0].length).match(
           new RegExp(`\n${codeBlockStart[1]}`, 's')
         )
         if (codeBlockEnd) {
-          yield {type: 'code', value: s.slice(codeBlockStart.length + 1, codeBlockStart[0].length + codeBlockEnd.index)}
-          s = s.slice(codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length)
+          yield {
+            type: 'code',
+            value: s.slice(
+              codeBlockStart.index + codeBlockStart[0].length,
+              codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index
+            )
+          }
+          s = s.slice(
+            codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
+          )
         }
       } else if (s.match(/^- /)) {
         const match = s.match(/\n/)
@@ -259,6 +278,11 @@ export class MarkdownView extends HTMLElement {
 
 ```js
 export class ContentView extends HTMLElement {
+  constructor() {
+    super()
+    this.codeViews = {}
+  }
+
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
@@ -266,29 +290,49 @@ export class ContentView extends HTMLElement {
     this.split.vertical = true
     this.split.addEventListener('split-view-resize', e => {
       const y = e.detail.offsetY - this.offsetTop
-      this.style.setProperty('--top-height', `${y}px`)
+      this.style.setProperty('--top-area-height', `${y}px`)
     })
-    this.top = document.createElement('div')
-    this.top.classList.add('top')
+    this.topArea = document.createElement('div')
+    this.topArea.classList.add('top-area')
     this.topTabList = document.createElement('tab-list')
-    this.top.append(this.topTabList)
-    this.bottom = document.createElement('div')
-    this.bottom.classList.add('bottom')
+    this.topArea.append(this.topTabList)
+    this.bottomArea = document.createElement('div')
+    this.bottomArea.classList.add('bottom-area')
     this.bottomTabList = document.createElement('tab-list')
-    this.bottom.append(this.bottomTabList)
-    this.addEventListener('fileClick', ({detail: {name}}) => {
+    this.bottomArea.append(this.bottomTabList)
+    this.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-      const tab = allTabs.find(tab => tab.name === name)
+      let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
       if (tab !== undefined) {
         tab.selected = true
       } else {
-        const tab = document.createElement('tab-item')
-        tab.name = name
+        tab = document.createElement('tab-item')
+        tab.name = markdownCodeBlock.name
         this.topTabList.tabs = [...(this.topTabList.tabs ?? []), tab]
         tab.selected = true
       }
+      this.showTab(tab, markdownCodeBlock)
     })
-    this.shadowRoot.append(this.top, this.split, this.bottom)
+    this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
+  }
+
+  showTab(tab, markdownCodeBlock = undefined) {
+    const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
+    if (!(tab.name in this.codeViews)) {
+      const el = document.createElement('code-edit')
+      el.fileType = tab.name.match(/\.([^.]+)/)[1]
+      el.dark = true
+      el.value = markdownCodeBlock.content
+      el.addEventListener('codeInput', () => {
+        this.dispatchEvent(new CustomEvent('codeInput', {detail: {name}}))
+      })
+      this.codeViews[tab.name] = el
+      area.append(el)
+    }
+    tab.selected = true
+    for (const t of tab.tabList.tabs) {
+      this.codeViews[t.name].classList.toggle('selected', t === tab)
+    }
   }
 
   static get styles() {
@@ -297,8 +341,7 @@ export class ContentView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          display: grid;
-          grid-template-rows: var(--top-height, 1fr) auto 1fr;
+          grid-template-rows: var(--top-area-height, 50%) min-content 1fr;
           box-sizing: border-box;
           color: #d7d7d7;
         }
@@ -310,6 +353,17 @@ export class ContentView extends HTMLElement {
         }
         :host > split-view {
           min-height: 3px;
+        }
+        .top-area, .bottom-area {
+          display: grid;
+          grid-template-columns: 1fr;
+          grid-template-rows: min-content 1fr;
+        }
+        code-edit {
+          overflow: auto;
+        }
+        code-edit:not(.selected) {
+          display: none;
         }
       `)
     }
@@ -412,7 +466,7 @@ export class SidebarView extends HTMLElement {
     }))
     this.markdownViews[this.notebooks[0].name].classList.add('selected')
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
-      this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...detail}}))
+      this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail}))
     })
     this.notebookSourceView.addEventListener('codeInput', ({detail: {name}}) => {
       if (!(name in this.timeouts)) {
@@ -540,7 +594,7 @@ export class NotebookView extends HTMLElement {
     this.contentView.sidebarView = this.sidebarView
     this.notebookSourceView.sidebarView = this.sidebarView
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
-      this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail: {...detail}}))
+      this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail}))
     })
     this.shadowRoot.append(this.contentView, this.notebookSourceView, this.split, this.sidebarView)
   }
