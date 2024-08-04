@@ -327,6 +327,7 @@ export class NotebookSourceView extends HTMLElement {
       const el = document.createElement('code-edit')
       el.fileType = 'md'
       el.lineWrapping = true
+      el.lineNumbers = false
       el.dark = true
       el.value = content
       return [name, el]
