@@ -94,7 +94,18 @@ export class MarkdownView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.shadowRoot.append(...[...this.groupBlocks(this.readBlocks(this.value))].map(block => {
+    this.render()
+    this.shadowRoot.addEventListener('click', e => {
+      if (e.target.tagName === 'A') {
+        parent.postMessage(['link', e.target.href], '*')
+        e.preventDefault()
+        return false
+      }
+    })
+  }
+
+  render() {
+    this.shadowRoot.replaceChildren(...[...this.groupBlocks(this.readBlocks(this.value))].map(block => {
       if (typeof block === 'string') {
         const headerMatch = block.match(/^(#{1,6}) /)
         const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
@@ -119,13 +130,6 @@ export class MarkdownView extends HTMLElement {
         return el
       }
     }))
-    this.shadowRoot.addEventListener('click', e => {
-      if (e.target.tagName === 'A') {
-        parent.postMessage(['link', e.target.href], '*')
-        e.preventDefault()
-        return false
-      }
-    })
   }
 
   *groupBlocks(iter) {
@@ -200,6 +204,17 @@ export class MarkdownView extends HTMLElement {
         break;
       }
     }
+  }
+
+  set value(value) {
+    this._value = value
+    if (this.shadowRoot) {
+      this.render()
+    }
+  }
+
+  get value() {
+    return this._value
   }
 
   static trimBlankLines(s) {
@@ -330,6 +345,9 @@ export class NotebookSourceView extends HTMLElement {
       el.lineNumbers = false
       el.dark = true
       el.value = content
+      el.addEventListener('codeInput', () => {
+        this.dispatchEvent(new CustomEvent('codeInput', {detail: {name}}))
+      })
       return [name, el]
     }))
     this.codeViews[this.notebooks[0].name].classList.add('selected')
@@ -365,6 +383,11 @@ export class NotebookSourceView extends HTMLElement {
 
 ```js
 export class SidebarView extends HTMLElement {
+  constructor() {
+    super()
+    this.timeouts = {}
+  }
+
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
@@ -381,6 +404,7 @@ export class SidebarView extends HTMLElement {
       selectedView.classList.remove('selected')
       this.markdownViews[selectedTab.name].classList.add('selected')
     })
+    this.notebooksByName = Object.fromEntries(this.notebooks.map(notebook => [notebook.name, notebook]))
     this.markdownViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
       const el = document.createElement('markdown-view')
       el.value = content
@@ -389,6 +413,15 @@ export class SidebarView extends HTMLElement {
     this.markdownViews[this.notebooks[0].name].classList.add('selected')
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...detail}}))
+    })
+    this.notebookSourceView.addEventListener('codeInput', ({detail: {name}}) => {
+      if (!(name in this.timeouts)) {
+        this.timeouts[name] = setTimeout(() => {
+          delete this.timeouts[name]
+          this.notebooksByName[name].content = this.notebookSourceView.codeViews[name].value
+          this.markdownViews[name].value = this.notebooksByName[name].content
+        }, 125)
+      }
     })
     const iconContainer = document.createElement('div')
     const downloadBtn = document.createElement('button')
@@ -502,6 +535,10 @@ export class NotebookView extends HTMLElement {
     this.contentView = document.createElement('content-view')
     this.notebookSourceView = document.createElement('notebook-source-view')
     this.notebookSourceView.notebooks = this.notebooks
+    this.sidebarView.notebookSourceView = this.notebookSourceView
+    this.sidebarView.contentView = this.contentView
+    this.contentView.sidebarView = this.sidebarView
+    this.notebookSourceView.sidebarView = this.sidebarView
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail: {...detail}}))
     })
