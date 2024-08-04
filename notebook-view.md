@@ -307,6 +307,8 @@ export class NotebookSourceView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.tabList = document.createElement('tab-list')
+    this.append(this.topTabList)
   }
 
   static get styles() {
@@ -314,7 +316,9 @@ export class NotebookSourceView extends HTMLElement {
       this._styles = new CSSStyleSheet()
       this._styles.replaceSync(`
         :host {
-          
+          display: grid;
+          grid-template-rows: min-content 1fr;
+          grid-template-columns: 1fr;
         }
       `)
     }
@@ -331,18 +335,56 @@ export class SidebarView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.tabList = document.createElement('tab-list')
-    this.tabList.tabs = ['main', 'dev', 'test'].map(name => {
+    this.tabList.tabs = this.notebooks.map(({name}) => {
       const el = document.createElement('tab-item')
       el.name = name
       return el
     })
     this.tabList.tabs[0].selected = true
-    this.notebookPane = document.createElement('markdown-view')
-    this.notebookPane.value = this.notebook
+    this.tabList.addEventListener('select-item', () => {
+      const selectedTab = this.tabList.shadowRoot.querySelector('.selected')
+      const selectedView = Object.values(this.markdownViews).find(el => el.classList.contains('selected'))
+      selectedView.classList.remove('selected')
+      this.markdownViews[selectedTab.name].classList.add('selected')
+    })
+    this.markdownViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
+      const el = document.createElement('markdown-view')
+      el.value = content
+      return [name, el]
+    }))
+    this.markdownViews[this.notebooks[0].name].classList.add('selected')
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: {...detail}}))
     })
-    this.shadowRoot.append(this.tabList, this.notebookPane)
+    const iconContainer = document.createElement('div')
+    const downloadBtn = document.createElement('button')
+    downloadBtn.innerHTML = this.icons.download
+    downloadBtn.addEventListener('click', () => {
+      
+    })
+    const codeBtn = document.createElement('button')
+    codeBtn.innerHTML = this.icons.code
+    codeBtn.addEventListener('click', () => {
+      codeBtn.classList.toggle('on')
+      const parent = this.getRootNode().host
+      parent.classList.toggle('source')
+    })
+    iconContainer.append(downloadBtn, codeBtn)
+    iconContainer.classList.add('icon-container')
+    this.shadowRoot.append(this.tabList, iconContainer, ...Object.values(this.markdownViews))
+  }
+
+  icons = {
+    download: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M4 22v-2h16v2zm8-4L5 9h4V2h6v7h4z"/>
+      </svg>
+    `,
+    code: `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6l6 6zm5.2 0l4.6-4.6l-4.6-4.6L16 6l6 6l-6 6z" />
+      </svg>
+    `,
   }
 
   static get styles() {
@@ -363,10 +405,40 @@ export class SidebarView extends HTMLElement {
         tab-list {
           padding: 3px;
         }
-
         markdown-view {
           grid-row: 2;
-          grid-columns: 1 / 2;
+          grid-column: 1 / span 2;
+        }
+        markdown-view:not(.selected) {
+          display: none;
+        }
+        .icon-container {
+          display: flex;
+          gap: 2px;
+          padding: 2px 5px;
+        }
+        .icon-container button {
+          all: inherit;
+          padding: 3px 3px;
+          color: #a7a7a7;
+          border: none;
+          cursor: pointer;
+          border-radius: 5px;
+        }
+        .icon-container button:hover {
+          color: #d7d7d7;
+        }
+        .icon-container button.on {
+          background: #ccc7;
+          color: #c7c7c7;
+        }
+        .icon-container button.on:hover {
+          background: #ccc7;
+          color: #f7f7f7;
+        }
+        .icon-container svg {
+          height: 20px;
+          width: 20px;
         }
       `)
     }
@@ -387,7 +459,7 @@ export class NotebookView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.sidebarView = document.createElement('sidebar-view')
-    this.sidebarView.notebook = this.notebook
+    this.sidebarView.notebooks = this.notebooks
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
@@ -415,11 +487,25 @@ export class NotebookView extends HTMLElement {
           box-sizing: inherit;
         }
         content-view {
+          height: 100vh;
           max-height: 100vh;
           border: 3px solid #273737;
           border-right: none;
         }
+        :host(.source) content-view {
+          display: none;
+        }
+        notebook-source-view {
+          height: 100vh;
+          max-height: 100vh;
+          border: 3px solid #273737;
+          border-right: none;
+        }
+        :host(:not(.source)) notebook-source-view {
+          display: none;
+        }
         sidebar-view {
+          height: 100vh;
           max-height: 100vh;
           border: 3px solid #273737;
           border-left: none;
@@ -455,7 +541,20 @@ export class ExampleView extends HTMLElement {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
     const notebookView = document.createElement('notebook-view')
-    notebookView.notebook = __source.split('---\n\n**notebook**')[1]
+    notebookView.notebooks = [
+      {
+        name: 'main',
+        content: __source.split('---\n\n**notebook**')[1],
+      },
+      {
+        name: 'dev',
+        content: '',
+      },
+      {
+        name: 'test',
+        content: '',
+      },
+    ]
     this.shadowRoot.append(notebookView)
   }
 
