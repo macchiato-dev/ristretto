@@ -39,6 +39,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 export class CodeEdit extends HTMLElement {
   constructor() {
     super()
+    this.timeouts = {}
     this.lineWrapping = false
     this.lineNumbers = true
     this.dark = false
@@ -124,6 +125,15 @@ export class CodeEdit extends HTMLElement {
     this.shadowRoot.append(this.view.dom)
   }
 
+  reconfigureGutter() {
+    if (this.view) {
+      const {gutterPlugins} = this
+      this.view.dispatch({
+        effects: this.gutterCompartment.reconfigure(gutterPlugins)
+      })
+    }
+  }
+
   reconfigureLanguage() {
     if (this.view) {
       const {langPlugins} = this
@@ -139,6 +149,15 @@ export class CodeEdit extends HTMLElement {
       this.view.dispatch({
         effects: this.themeCompartment.reconfigure(themePlugins)
       })
+    }
+  }
+
+  scheduleReconfigure(methodName) {
+    if (!this.timeouts[methodName]) {
+      this.timeouts[methodName] = setTimeout(() => {
+        this[methodName].call(this)
+        this.timeouts[methodName] = undefined
+      }, 0)
     }
   }
 
@@ -170,7 +189,7 @@ export class CodeEdit extends HTMLElement {
     const previousFileType = this.fileType
     this._fileType = value
     if (this.fileType !== previousFileType) {
-      this.reconfigureLanguage()
+      this.scheduleReconfigure('reconfigureLanguage')
     }
   }
 
@@ -182,7 +201,7 @@ export class CodeEdit extends HTMLElement {
     const previousDark = this.dark
     this._dark = value
     if (this.dark !== previousDark) {
-      this.reconfigureTheme()
+      this.scheduleReconfigure('reconfigureTheme')
       this.classList.toggle('dark', Boolean(this.dark))
     }
   }
@@ -193,10 +212,20 @@ export class CodeEdit extends HTMLElement {
 
   set lineWrapping(value) {
     this._lineWrapping = value
+    this.scheduleReconfigure('reconfigureLanguage')
   }
 
   get lineWrapping() {
     return this._lineWrapping
+  }
+
+  set lineNumbers(value) {
+    this._lineNumbers = value
+    this.scheduleReconfigure('reconfigureGutter')
+  }
+
+  get lineNumbers() {
+    return this._lineNumbers
   }
 
   get gutterPlugins() {
