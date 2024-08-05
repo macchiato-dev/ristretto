@@ -100,6 +100,8 @@ export class MarkdownCodeBlock extends HTMLElement {
       cursor: pointer;
       border: 2px solid #ccc4;
       border-radius: 5px;
+      margin-top: 8px;
+      margin-bottom: 8px;
     }
   `
 }
@@ -206,44 +208,51 @@ export class MarkdownView extends HTMLElement {
   }
 
   *readBlocks(input) {
-    let s = this.constructor.trimBlankLines(input)
+    const {skipBlankLines} = this.constructor.patterns
+    let pos = input.match(skipBlankLines)?.[0]?.length ?? 0
     for (let i=0; i < 100000; i++) {  // instead of while (true) to prevent it from crashing 💥
-      const codeBlockStart = s.match(/^(`{3,})([^\n]*)\n/s)
+      const codeBlockStart = input.slice(pos).match(/^(`{3,})([^\n]*)\n/s)
       if (codeBlockStart) {
-        const codeBlockEnd = s.slice(codeBlockStart.index + codeBlockStart[0].length).match(
-          new RegExp(`\n${codeBlockStart[1]}`, 's')
+        const codeBlockEnd = input.slice(pos + codeBlockStart.index + codeBlockStart[0].length).match(
+          new RegExp(`\n${codeBlockStart[1]}[ \t]*(?:$|\n)`)
         )
         if (codeBlockEnd) {
           yield {
             type: 'code',
-            content: s.slice(
-              codeBlockStart.index + codeBlockStart[0].length,
-              codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index
+            content: input.slice(
+              pos + codeBlockStart.index + codeBlockStart[0].length,
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index
             )
           }
-          s = s.slice(
-            codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
-          )
-        }
-      } else if (s.match(/^- /)) {
-        const match = s.match(/\n/)
-        if (match) {
-          yield s.slice(0, match.index)
-        }
-        s = match ? this.constructor.trimBlankLines(s.slice(match.index)) : ''
-      } else {
-        const match = s.match(/\n[^\S\r\n]*\r?\n/)
-        if (match) {
-          yield this.constructor.removeExtraSpace(s.slice(0, match.index).trim())
-          s = this.constructor.trimBlankLines(s.slice(match.index))
-        } else {
-          const block = this.constructor.trimBlankLines(s).trimEnd()
-          if (block !== '') {
-            yield this.constructor.removeExtraSpace(block)
-          }
-          break
+          pos += codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
+          pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
+          continue
         }
       }
+
+      if (input.slice(pos).match(/^- /)) {
+        const match = input.slice(pos).match(/\n/)
+        if (match) {
+          yield input.slice(pos, pos + match.index)
+          pos += match.index
+          pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
+          continue
+        }
+      }
+
+      const match = input.slice(pos).match(/\n[^\S\r\n]*\r?\n/)
+      if (match) {
+        yield this.constructor.removeExtraSpace(input.slice(pos, pos + match.index).trim())
+        pos += match.index
+        pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
+        continue
+      }
+
+      const remaining = input.slice(pos).trimEnd()
+      if (remaining !== '') {
+        yield this.constructor.removeExtraSpace(remaining)
+      }
+      break
     }
   }
 
@@ -284,8 +293,8 @@ export class MarkdownView extends HTMLElement {
     return this._value
   }
 
-  static trimBlankLines(s) {
-    return s.replace(/^(?:[^\S\r\n]*\r?\n)*/, '')
+  static patterns = {
+    skipBlankLines: /^(?:[^\S\r\n]*\r?\n)*/,
   }
 
   static removeExtraSpace(s) {
