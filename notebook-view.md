@@ -59,8 +59,7 @@ export class MarkdownCodeBlock extends HTMLElement {
     this.attachShadow({mode: 'open'})
     const div = document.createElement('div')
     this.el = document.createElement('span')
-    this.counterEl = document.createElement('span')
-    div.append(this.el, this.counterEl)
+    div.append(this.el)
     this.shadowRoot.append(div)
   }
 
@@ -82,8 +81,6 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set content(value) {
     this._content = value
-    this.counter += 1
-    this.counterEl.innerText = `${this.counter}`
   }
 
   static get styles() {
