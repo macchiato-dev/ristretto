@@ -36,7 +36,8 @@ TODO:
     ["tabs-new.md", "TabList.js"],
     ["tabs-new.md", "TabGroup.js"],
     ["code-edit-new.md", "CodeEdit.js"]
-  ]
+  ],
+  "updateFrequency": 8000
 }
 ```
 
@@ -54,9 +55,13 @@ The inner reader reads inline content. This will use regexes to skip over the in
 export class MarkdownCodeBlock extends HTMLElement {
   constructor() {
     super()
+    this.counter = 0
     this.attachShadow({mode: 'open'})
-    this.el = document.createElement('div')
-    this.shadowRoot.append(this.el)
+    const div = document.createElement('div')
+    this.el = document.createElement('span')
+    this.counterEl = document.createElement('span')
+    div.append(this.el, this.counterEl)
+    this.shadowRoot.append(div)
   }
 
   connectedCallback() {
@@ -77,6 +82,8 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set content(value) {
     this._content = value
+    this.counter += 1
+    this.counterEl.innerText = `${this.counter}`
   }
 
   static get styles() {
@@ -101,6 +108,12 @@ export class MarkdownCodeBlock extends HTMLElement {
 }
 
 export class MarkdownView extends HTMLElement {
+  constructor() {
+    super()
+    this.codeBlockData = []
+    this.codeBlockViews = new WeakMap()
+  }
+
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
@@ -115,7 +128,8 @@ export class MarkdownView extends HTMLElement {
   }
 
   render() {
-    this.shadowRoot.replaceChildren(...[...this.groupBlocks(this.readBlocks(this.value))].map(block => {
+    const blocks = Array.from(this.updateCodeBlocks(this.groupBlocks(this.readBlocks(this.value))))
+    this.shadowRoot.replaceChildren(...blocks.map(block => {
       if (typeof block === 'string') {
         const headerMatch = block.match(/^(#{1,6}) /)
         const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
@@ -132,15 +146,46 @@ export class MarkdownView extends HTMLElement {
         }))
         return el
       } else {
-        const el = document.createElement('markdown-code-block')
-        el.name = block.name
-        el.content = block.value
-        el.addEventListener('click', () => {
-          this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
-        })
-        return el
+        const el = this.codeBlockViews.get(block)
+        if (el !== undefined) {
+          el.name = block.name
+          el.content = block.content
+          return el
+        } else {
+          const el = document.createElement('markdown-code-block')
+          el.name = block.name
+          el.content = block.content
+          el.addEventListener('click', () => {
+            this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
+          })
+          this.codeBlockViews.set(block, el)
+          return el
+        }
       }
     }))
+  }
+
+  *updateCodeBlocks() {
+    let codeBlockData = [...this.codeBlockData]
+    let updatedCodeBlocks = []
+    for (const block of this.groupBlocks(this.readBlocks(this.value))) {
+      if (block?.type === 'code' && block.name !== undefined) {
+        const codeBlock = codeBlockData.find(cb => cb.name === block.name) ?? codeBlockData.find(cb => cb.content === block.content)
+        if (codeBlock) {
+          codeBlock.name = block.name
+          codeBlock.content = block.content
+          yield codeBlock
+          codeBlockData.splice(codeBlockData.indexOf(codeBlock), 1)
+          updatedCodeBlocks.push(codeBlock)
+        } else {
+          yield block
+          updatedCodeBlocks.push(block)
+        }
+      } else {
+        yield block
+      }
+    }
+    this.codeBlockData = [...updatedCodeBlocks, ...codeBlockData]
   }
 
   *groupBlocks(iter) {
@@ -174,7 +219,7 @@ export class MarkdownView extends HTMLElement {
         if (codeBlockEnd) {
           yield {
             type: 'code',
-            value: s.slice(
+            content: s.slice(
               codeBlockStart.index + codeBlockStart[0].length,
               codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index
             )
@@ -227,8 +272,14 @@ export class MarkdownView extends HTMLElement {
 
   set value(value) {
     this._value = value
+    Array.from(this.updateCodeBlocks())
     if (this.shadowRoot) {
-      this.render()
+      if (this.renderTimeout === undefined) {
+        this.renderTimeout = setTimeout(() => {
+          this.renderTimeout = undefined
+          this.render()
+        }, 1000)
+      }
     }
   }
 
@@ -469,13 +520,8 @@ export class SidebarView extends HTMLElement {
       this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail}))
     })
     this.notebookSourceView.addEventListener('codeInput', ({detail: {name}}) => {
-      if (!(name in this.timeouts)) {
-        this.timeouts[name] = setTimeout(() => {
-          delete this.timeouts[name]
-          this.notebooksByName[name].content = this.notebookSourceView.codeViews[name].value
-          this.markdownViews[name].value = this.notebooksByName[name].content
-        }, 125)
-      }
+      this.notebooksByName[name].content = this.notebookSourceView.codeViews[name].value
+      this.markdownViews[name].value = this.notebooksByName[name].content
     })
     const iconContainer = document.createElement('div')
     const downloadBtn = document.createElement('button')
