@@ -352,11 +352,15 @@ export class ContentView extends HTMLElement {
     this.topArea = document.createElement('div')
     this.topArea.classList.add('top-area')
     this.topTabList = document.createElement('tab-list')
-    this.topArea.append(this.topTabList)
+    this.topTabBlankArea = document.createElement('div')
+    this.topTabBlankArea.classList.add('drop')
+    this.topArea.append(this.topTabList, this.topTabBlankArea)
     this.bottomArea = document.createElement('div')
     this.bottomArea.classList.add('bottom-area')
     this.bottomTabList = document.createElement('tab-list')
-    this.bottomArea.append(this.bottomTabList)
+    this.bottomTabBlankArea = document.createElement('div')
+    this.bottomTabBlankArea.classList.add('drop')
+    this.bottomArea.append(this.bottomTabList, this.bottomTabBlankArea)
     this.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
       let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
@@ -413,11 +417,16 @@ export class ContentView extends HTMLElement {
         }
         .top-area, .bottom-area {
           display: grid;
-          grid-template-columns: 1fr;
+          grid-template-columns: max-content 1fr;
           grid-template-rows: min-content 1fr;
+        }
+        .drop {
+          min-height: 28px;
         }
         code-edit {
           overflow: auto;
+          grid-row: 2;
+          grid-column: 1 / span 2;
         }
         code-edit:not(.selected) {
           display: none;
