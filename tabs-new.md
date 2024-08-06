@@ -27,10 +27,7 @@ TODO:
     ["colors.json.md", "thumbnail.svg"]
   ],
   "importFiles": [
-    ["menu.md", "dropdown.js"],
-    ["split-pane.md", "split-view.js"],
-    ["notebook-view.md", "MarkdownView.js"],
-    ["notebook-view.md", "NotebookView.js"]
+    ["split-pane.md", "split-view.js"]
   ]
 }
 ```
@@ -452,6 +449,36 @@ export class TabList extends HTMLElement {
       }
     }
   }
+
+  static TabGroup = class {
+    set tabLists(value) {
+      this._tabLists = value
+    }
+  
+    get tabLists() {
+      return this._tabLists
+    }
+  
+    get tabs() {
+      return this.tabLists.map(tabList => tabList.tabs).flat()
+    }
+  
+    get dragging() {
+      if (typeof this._dragging === 'number') {
+        return Date.now() < this._dragging
+      } else {
+        return Boolean(this._dragging)
+      }
+    }
+  
+    set dragging(value) {
+      if (value) {
+        this._dragging = true
+      } else {
+        this._dragging = Date.now() + 50
+      }
+    }
+  }
 }
 ```
 
@@ -460,42 +487,12 @@ This is a group of tab lists, which enables tabs to be dragged from one tab list
 `TabGroup.js`
 
 ```js
-export class TabGroup {
-  set tabLists(value) {
-    this._tabLists = value
-  }
 
-  get tabLists() {
-    return this._tabLists
-  }
-
-  get tabs() {
-    return this.tabLists.map(tabList => tabList.tabs).flat()
-  }
-
-  get dragging() {
-    if (typeof this._dragging === 'number') {
-      return Date.now() < this._dragging
-    } else {
-      return Boolean(this._dragging)
-    }
-  }
-
-  set dragging(value) {
-    if (value) {
-      this._dragging = true
-    } else {
-      this._dragging = Date.now() + 50
-    }
-  }
-}
 ```
 
 `ExampleView.js`
 
 ```js
-import {TabGroup} from '/TabGroup.js'
-
 export class ExampleView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
@@ -503,17 +500,23 @@ export class ExampleView extends HTMLElement {
     if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
-    const notebookView = document.createElement('notebook-view')
-    notebookView.notebook = __source.split('---\n\n**notebook**')[1]
-    this.shadowRoot.append(notebookView)
-    this.topTabList = this.createTabs(10)
-    this.bottomTabList = this.createTabs(2)
+    const {TabGroup} = customElements.get('tab-list')
     this.tabGroup = new TabGroup()
+    this.topTabList = this.createTabs(10)
     this.topTabList.tabGroup = this.tabGroup
+    this.topArea = document.createElement('top-area')
+    this.topTabBlankArea = document.createElement('div')
+    this.topTabBlankArea.classList.add('drop')
+    this.topArea.append(this.topTabList, this.topTabBlankArea)
+    this.bottomTabList = this.createTabs(10)
+    this.bottomTabList.tabGroup = this.tabGroup
+    this.bottomArea = document.createElement('bottom-area')
+    this.bottomTabBlankArea = document.createElement('div')
+    this.bottomTabBlankArea.classList.add('drop')
+    this.bottomArea.append(this.bottomTabList, this.bottomTabBlankArea)
     this.bottomTabList.tabGroup = this.tabGroup
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
-    notebookView.shadowRoot.querySelector('.top').replaceChildren(this.topTabList)
-    notebookView.shadowRoot.querySelector('.bottom').replaceChildren(this.bottomTabList)
+    this.shadowRoot.append(this.topArea, this.bottomArea)
   }
 
   createTabs(n) {
@@ -536,9 +539,30 @@ export class ExampleView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          height: 100vh;
-          grid-template-columns: 1fr;
-          grid-template-rows: 1fr;
+          grid-template-rows: var(--top-area-height, 50%) min-content 1fr;
+          box-sizing: border-box;
+          color: #d7d7d7;
+          height: 80vh;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+        tab-list {
+          padding: 3px;
+        }
+        split-view {
+          background: #273737;
+        }
+        :host > split-view {
+          min-height: 3px;
+        }
+        .top-area, .bottom-area {
+          display: grid;
+          grid-template-columns: max-content 1fr;
+          grid-template-rows: min-content 1fr;
+        }
+        .drop {
+          min-height: 28px;
         }
       `)
     }
@@ -571,19 +595,13 @@ export class ExampleView extends HTMLElement {
 
 ```js
 import {SplitView} from '/split-pane/split-view.js'
-import {MarkdownView} from '/notebook-view/MarkdownView.js'
-import {NotebookView} from '/notebook-view/NotebookView.js'
-import {Dropdown} from "/menu/dropdown.js"
 import {TabItem} from '/TabItem.js'
 import {TabList} from '/TabList.js'
 import {ExampleView} from '/ExampleView.js'
 
 customElements.define('split-view', SplitView)
-customElements.define('markdown-view', MarkdownView)
-customElements.define('notebook-view', NotebookView)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
-customElements.define('m-menu-dropdown', Dropdown)
 customElements.define('example-view', ExampleView)
 
 async function setup() {
