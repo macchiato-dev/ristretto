@@ -97,23 +97,38 @@ export class TabItem extends HTMLElement {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
-          const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
-          const myIndex = [...this.parentElement.children].indexOf(this)
-          if (hoverIndex === -1) {
-            const hoverIndex = [...this.hoverTab.parentElement.children].indexOf(this.hoverTab)
-            const hoverTabCount = this.hoverTab.parentElement.children.length
-            const position = 'beforeBegin'
-            if (this.selected) {
-              this.selected = false
-              const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
-              if (tabToSelect) {
-                tabToSelect.selected = true
+          console.log(this.hoverTab)
+          if (this.hoverTab.tagName === 'TAB-ITEM') {
+            const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
+            const myIndex = [...this.parentElement.children].indexOf(this)
+            if (hoverIndex === -1) {
+              const hoverIndex = [...this.hoverTab.parentElement.children].indexOf(this.hoverTab)
+              const hoverTabCount = this.hoverTab.parentElement.children.length
+              const position = 'beforeBegin'
+              if (this.selected) {
+                this.selected = false
+                const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
+                if (tabToSelect) {
+                  tabToSelect.selected = true
+                }
+              }
+              this.hoverTab.insertAdjacentElement(position, this)
+            } else {
+              const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
+              this.hoverTab.insertAdjacentElement(position, this)
+            }
+          } else {
+            const tabList = this.tabList.tabLists.find(tl => tl.appendDropArea === this.hoverTab)
+            if (tabList !== this.tabList) {
+              if (this.selected) {
+                const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
+                if (tabToSelect) {
+                  tabToSelect.selected = true
+                }
+                tabList.listEl.querySelector('.selected').selected = false
               }
             }
-            this.hoverTab.insertAdjacentElement(position, this)
-          } else {
-            const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
-            this.hoverTab.insertAdjacentElement(position, this)
+            tabList.listEl.insertAdjacentElement('beforeEnd', this)
           }
         }
       } else if (!this.tabList.dragging) {
@@ -165,7 +180,6 @@ export class TabItem extends HTMLElement {
   async moveLoop() {
     this.moveLoopActive = true
     for await (const e of this.pointerMoveEvents()) {
-      // this.loopEventCounter += 1
       const hoverTab = this.findHoverTab(e)
       if (this.hoverTab !== hoverTab) {
         if (this.hoverTab) {
@@ -405,8 +419,11 @@ export class TabList extends HTMLElement {
   }
 
   tabsFromPoint(x, y) {
-    return [...this.shadowRoot.elementsFromPoint(x, y)].filter(el => (
-      el !== this.dragItem && el.tagName === 'TAB-ITEM'
+    return [
+      ...this.shadowRoot.elementsFromPoint(x, y),
+      ...(this.appendDropArea ? this.appendDropArea.getRootNode().elementsFromPoint(x, y) : [])
+    ].filter(el => (
+      (el !== this.dragItem && el.tagName === 'TAB-ITEM') || el === this.appendDropArea
     ))
   }
 
@@ -462,7 +479,7 @@ export class TabList extends HTMLElement {
     get tabs() {
       return this.tabLists.map(tabList => tabList.tabs).flat()
     }
-  
+
     get dragging() {
       if (typeof this._dragging === 'number') {
         return Date.now() < this._dragging
@@ -501,20 +518,20 @@ export class ExampleView extends HTMLElement {
     const {TabGroup} = customElements.get('tab-list')
     this.tabGroup = new TabGroup()
     this.topTabList = this.createTabs(10)
-    this.topTabList.appendDropArea = this.topTabBlankArea
-    this.topTabList.tabGroup = this.tabGroup
     this.topTabBlankArea = document.createElement('div')
     this.topTabBlankArea.classList.add('drop')
+    this.topTabList.appendDropArea = this.topTabBlankArea
+    this.topTabList.tabGroup = this.tabGroup
     this.topAreaHeader = document.createElement('div')
     this.topAreaHeader.classList.add('header')
     this.topAreaHeader.append(this.topTabList, this.topTabBlankArea)
     this.topArea = document.createElement('top-area')
     this.topArea.append(this.topAreaHeader)
-    this.bottomTabList = this.createTabs(10)
-    this.topTabList.appendDropArea = this.bottomTabBlankArea
-    this.bottomTabList.tabGroup = this.tabGroup
+    this.bottomTabList = this.createTabs(1)
     this.bottomTabBlankArea = document.createElement('div')
     this.bottomTabBlankArea.classList.add('drop')
+    this.bottomTabList.appendDropArea = this.bottomTabBlankArea
+    this.bottomTabList.tabGroup = this.tabGroup
     this.bottomAreaHeader = document.createElement('div')
     this.bottomAreaHeader.classList.add('header')
     this.bottomAreaHeader.append(this.bottomTabList, this.bottomTabBlankArea)
@@ -581,7 +598,7 @@ export class ExampleView extends HTMLElement {
           grid-column: 2;
           background-clip: content-box;
         }
-        .drop:hover {
+        .drop.drag-hover {
           background-color: #8889;
           border-radius: 8px;
         }
