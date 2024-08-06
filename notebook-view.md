@@ -34,7 +34,6 @@ TODO:
     ["split-pane.md", "split-view.js"],
     ["tabs-new.md", "TabItem.js"],
     ["tabs-new.md", "TabList.js"],
-    ["tabs-new.md", "TabGroup.js"],
     ["code-edit-new.md", "CodeEdit.js"]
   ],
   "updateFrequency": 8000
@@ -349,18 +348,23 @@ export class ContentView extends HTMLElement {
       const y = e.detail.offsetY - this.offsetTop
       this.style.setProperty('--top-area-height', `${y}px`)
     })
+    const {TabGroup} = customElements.get('tab-list')
+    this.tabGroup = new TabGroup()
     this.topArea = document.createElement('div')
     this.topArea.classList.add('top-area')
     this.topTabList = document.createElement('tab-list')
+    this.topTabList.tabGroup = this.tabGroup
     this.topTabBlankArea = document.createElement('div')
     this.topTabBlankArea.classList.add('drop')
     this.topArea.append(this.topTabList, this.topTabBlankArea)
     this.bottomArea = document.createElement('div')
     this.bottomArea.classList.add('bottom-area')
     this.bottomTabList = document.createElement('tab-list')
+    this.bottomTabList.tabGroup = this.tabGroup
     this.bottomTabBlankArea = document.createElement('div')
     this.bottomTabBlankArea.classList.add('drop')
     this.bottomArea.append(this.bottomTabList, this.bottomTabBlankArea)
+    this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
     this.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
       let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
@@ -634,8 +638,6 @@ This is the notebook view. It shows content tabs in the main area and has the re
 `NotebookView.js`
 
 ```js
-import {TabGroup} from '/tabs-new/TabGroup.js'
-
 export class NotebookView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
