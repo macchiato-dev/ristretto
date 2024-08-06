@@ -102,7 +102,7 @@ export class TabItem extends HTMLElement {
           if (hoverIndex === -1) {
             const hoverIndex = [...this.hoverTab.parentElement.children].indexOf(this.hoverTab)
             const hoverTabCount = this.hoverTab.parentElement.children.length
-            const position = (hoverTabCount - hoverIndex <= Math.min(3, Math.floor(hoverTabCount * 0.4))) ? 'afterEnd' : 'beforeBegin'
+            const position = 'beforeBegin'
             if (this.selected) {
               this.selected = false
               const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
@@ -318,7 +318,7 @@ export class TabItem extends HTMLElement {
 }
 ```
 
-This is a sequential list of tabs, that appear next to each other.
+This is a sequential list of tabs, that appear next to each other. It contains TabGroup, which enables tabs to be dragged from one tab list to another.
 
 `TabList.js`
 
@@ -482,14 +482,6 @@ export class TabList extends HTMLElement {
 }
 ```
 
-This is a group of tab lists, which enables tabs to be dragged from one tab list to another.
-
-`TabGroup.js`
-
-```js
-
-```
-
 `ExampleView.js`
 
 ```js
@@ -500,23 +492,37 @@ export class ExampleView extends HTMLElement {
     if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
+    this.split = document.createElement('split-view')
+    this.split.vertical = true
+    this.split.addEventListener('split-view-resize', e => {
+      const y = e.detail.offsetY - this.offsetTop
+      this.style.setProperty('--top-area-height', `${y}px`)
+    })
     const {TabGroup} = customElements.get('tab-list')
     this.tabGroup = new TabGroup()
     this.topTabList = this.createTabs(10)
+    this.topTabList.appendDropArea = this.topTabBlankArea
     this.topTabList.tabGroup = this.tabGroup
-    this.topArea = document.createElement('top-area')
     this.topTabBlankArea = document.createElement('div')
     this.topTabBlankArea.classList.add('drop')
-    this.topArea.append(this.topTabList, this.topTabBlankArea)
+    this.topAreaHeader = document.createElement('div')
+    this.topAreaHeader.classList.add('header')
+    this.topAreaHeader.append(this.topTabList, this.topTabBlankArea)
+    this.topArea = document.createElement('top-area')
+    this.topArea.append(this.topAreaHeader)
     this.bottomTabList = this.createTabs(10)
+    this.topTabList.appendDropArea = this.bottomTabBlankArea
     this.bottomTabList.tabGroup = this.tabGroup
-    this.bottomArea = document.createElement('bottom-area')
     this.bottomTabBlankArea = document.createElement('div')
     this.bottomTabBlankArea.classList.add('drop')
-    this.bottomArea.append(this.bottomTabList, this.bottomTabBlankArea)
+    this.bottomAreaHeader = document.createElement('div')
+    this.bottomAreaHeader.classList.add('header')
+    this.bottomAreaHeader.append(this.bottomTabList, this.bottomTabBlankArea)
+    this.bottomArea = document.createElement('bottom-area')
+    this.bottomArea.append(this.bottomAreaHeader)
     this.bottomTabList.tabGroup = this.tabGroup
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
-    this.shadowRoot.append(this.topArea, this.bottomArea)
+    this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
   }
 
   createTabs(n) {
@@ -548,7 +554,10 @@ export class ExampleView extends HTMLElement {
           box-sizing: inherit;
         }
         tab-list {
+          grid-row: 1;
+          grid-column: 1;
           padding: 3px;
+          padding-right: 0;
         }
         split-view {
           background: #273737;
@@ -558,11 +567,23 @@ export class ExampleView extends HTMLElement {
         }
         .top-area, .bottom-area {
           display: grid;
-          grid-template-columns: max-content 1fr;
+          grid-template-columns: max-content;
           grid-template-rows: min-content 1fr;
         }
+        .header {
+          display: grid;
+          grid-template-columns: max-content 1fr;
+        }
         .drop {
-          min-height: 28px;
+          min-height: 20px;
+          padding: 3px;
+          grid-row: 1;
+          grid-column: 2;
+          background-clip: content-box;
+        }
+        .drop:hover {
+          background-color: #8889;
+          border-radius: 8px;
         }
       `)
     }
