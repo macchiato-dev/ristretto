@@ -101,6 +101,8 @@ export class TabItem extends HTMLElement {
             const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
             const myIndex = [...this.parentElement.children].indexOf(this)
             if (hoverIndex === -1) {
+              const sourceTabList = this.tabList
+              const destTabList = this.tabList.tabLists.find(tl => tl.appendDropArea === this.hoverTab)
               const changeSelected = this.selected
               const otherTabToSelect = changeSelected ? (this.previousElementSibling ?? this.nextElementSibling) : undefined
               if (otherTabToSelect) {
@@ -110,6 +112,9 @@ export class TabItem extends HTMLElement {
               if (changeSelected) {
                 this.selected = true
               }
+              if (sourceTabList !== destTabList && sourceTabList.listEl.children.length === 0) {
+                sourceTabList.dispatchEvent(new CustomEvent('tabSelect', {bubbles: true, composed: true}))
+              }
             } else {
               const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
               this.hoverTab.insertAdjacentElement(position, this)
@@ -118,6 +123,7 @@ export class TabItem extends HTMLElement {
             const sourceTabList = this.tabList
             const destTabList = this.tabList.tabLists.find(tl => tl.appendDropArea === this.hoverTab)
             const changeSelected = this.selected && (destTabList !== sourceTabList)
+            const moveToEmpty = destTabList !== sourceTabList && destTabList.listEl.children.length === 0
             const otherTabToSelect = changeSelected ? (this.previousElementSibling ?? this.nextElementSibling) : undefined
             destTabList.listEl.insertAdjacentElement('beforeEnd', this)
             if (changeSelected) {
@@ -125,6 +131,14 @@ export class TabItem extends HTMLElement {
               if (otherTabToSelect) {
                 otherTabToSelect.selected = true
               }
+            } else if (moveToEmpty) {
+              this.selected = true
+            }
+            if (sourceTabList !== destTabList && sourceTabList.listEl.children.length === 0) {
+              sourceTabList.dispatchEvent(new CustomEvent('tabSelect', {bubbles: true, composed: true}))
+            }
+            if (changeSelected && moveToEmpty) {
+              this.dispatchEvent(new CustomEvent('tabSelect', {bubbles: true, composed: true}))
             }
           }
         }
@@ -215,6 +229,9 @@ export class TabItem extends HTMLElement {
           }
         }
         this.setAttribute('selected', '')
+        if (!this.classList.contains('drag')) {
+          this.dispatchEvent(new CustomEvent('tabSelect', {bubbles: true, composed: true}))
+        }
       } else {
         this.removeAttribute('selected')
       }
@@ -323,6 +340,7 @@ export class TabItem extends HTMLElement {
         }
         :host(.drag.dragging) {
           display: block;
+          z-index: 1000;
         }
       `)
     }
@@ -358,6 +376,13 @@ export class TabList extends HTMLElement {
         gap: 3px;
         color: #111;
         overflow-x: auto;
+        padding: 3px;
+        padding-right: 0;
+      }
+      .list:empty {
+        padding-left: 0;
+        padding-right: 0;
+        min-height: 28px;
       }
     `
     this.shadowRoot.append(style)
@@ -518,8 +543,6 @@ export class ExampleView extends HTMLElement {
         tab-list {
           grid-row: 1;
           grid-column: 1;
-          padding: 3px;
-          padding-right: 0;
         }
         split-view {
           background: #273737;
@@ -529,7 +552,7 @@ export class ExampleView extends HTMLElement {
         }
         .top-area, .bottom-area {
           display: grid;
-          grid-template-columns: max-content;
+          grid-template-columns: 1fr;
           grid-template-rows: min-content 1fr;
         }
         .header {
@@ -537,7 +560,6 @@ export class ExampleView extends HTMLElement {
           grid-template-columns: max-content 1fr;
         }
         .drop {
-          min-height: 20px;
           padding: 3px;
           grid-row: 1;
           grid-column: 2;

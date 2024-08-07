@@ -353,17 +353,25 @@ export class ContentView extends HTMLElement {
     this.topArea = document.createElement('div')
     this.topArea.classList.add('top-area')
     this.topTabList = document.createElement('tab-list')
-    this.topTabList.tabGroup = this.tabGroup
     this.topTabBlankArea = document.createElement('div')
     this.topTabBlankArea.classList.add('drop')
-    this.topArea.append(this.topTabList, this.topTabBlankArea)
+    this.topTabList.appendDropArea = this.topTabBlankArea
+    this.topTabList.tabGroup = this.tabGroup
+    this.topAreaHeader = document.createElement('div')
+    this.topAreaHeader.classList.add('header')
+    this.topAreaHeader.append(this.topTabList, this.topTabBlankArea)
+    this.topArea.append(this.topAreaHeader)
     this.bottomArea = document.createElement('div')
     this.bottomArea.classList.add('bottom-area')
     this.bottomTabList = document.createElement('tab-list')
-    this.bottomTabList.tabGroup = this.tabGroup
     this.bottomTabBlankArea = document.createElement('div')
     this.bottomTabBlankArea.classList.add('drop')
-    this.bottomArea.append(this.bottomTabList, this.bottomTabBlankArea)
+    this.bottomTabList.appendDropArea = this.bottomTabBlankArea
+    this.bottomTabList.tabGroup = this.tabGroup
+    this.bottomAreaHeader = document.createElement('div')
+    this.bottomAreaHeader.classList.add('header')
+    this.bottomAreaHeader.append(this.bottomTabList, this.bottomTabBlankArea)
+    this.bottomArea.append(this.bottomAreaHeader)
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
     this.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
@@ -410,9 +418,6 @@ export class ContentView extends HTMLElement {
           box-sizing: border-box;
           color: #d7d7d7;
         }
-        tab-list {
-          padding: 3px;
-        }
         split-view {
           background: #273737;
         }
@@ -421,11 +426,22 @@ export class ContentView extends HTMLElement {
         }
         .top-area, .bottom-area {
           display: grid;
-          grid-template-columns: max-content 1fr;
+          grid-template-columns: 1fr;
           grid-template-rows: min-content 1fr;
         }
+        .header {
+          display: grid;
+          grid-template-columns: max-content 1fr;
+        }
         .drop {
-          min-height: 28px;
+          padding: 3px;
+          grid-row: 1;
+          grid-column: 2;
+          background-clip: content-box;
+        }
+        .drop.drag-hover {
+          background-color: #8889;
+          border-radius: 8px;
         }
         code-edit {
           overflow: auto;
