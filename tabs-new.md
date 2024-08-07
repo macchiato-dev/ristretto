@@ -48,7 +48,10 @@ export class TabItem extends HTMLElement {
     this.shadowRoot.appendChild(this.mainEl)
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
-    this.mainEl.appendChild(this.nameEl)
+    const closeButton = document.createElement('button')
+    closeButton.innerText = '✕'
+    closeButton.classList.add('close')
+    this.mainEl.append(this.nameEl, closeButton)
   }
 
   connectedCallback() {
@@ -274,6 +277,23 @@ export class TabItem extends HTMLElement {
           color: var(--fg, #b9b9bc);
           background-color: var(--bg, #484850);
           align-items: center;
+          min-width: 50px;
+        }
+        div.main button.close {
+          unset: all;
+          font-size: 11px;
+          margin-bottom: -2px;
+          padding: 4px;
+          color: #bbb;
+          font-weight: bold;
+        }
+        div.main button.close:hover {
+          color: color-mix(in hsl, red 70%, magenta);
+        }
+        @media (hover: hover) {
+          div.main button.close {
+            display: none;
+          }
         }
         :host([selected]) div.main {
           background-color: var(--bg-selected, #0e544f);
@@ -282,6 +302,15 @@ export class TabItem extends HTMLElement {
         :host(:hover) div.main {
           background-color: var(--bg-hover, #52525b);
           color: var(--fg-hover, #c7c7c7);
+          position: relative;
+        }
+        :host(:hover) div.main .name {
+          mask-image: linear-gradient(to left, transparent 12px, var(--fg-hover, #c7c7c7) 30px);
+        }
+        :host(:hover) div.main button.close {
+          position: absolute;
+          right: 4px;
+          display: block;
         }
         :host([selected]:hover) div.main {
           background-color: var(--bg-selected-hover, #0c6860);
