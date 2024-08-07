@@ -51,6 +51,9 @@ export class TabItem extends HTMLElement {
     const closeButton = document.createElement('button')
     closeButton.innerText = '✕'
     closeButton.classList.add('close')
+    closeButton.addEventListener('click', () => {
+      this.dispatchEvent(new CustomEvent('tabClose', {composed: true}))
+    })
     this.mainEl.append(this.nameEl, closeButton)
   }
 
@@ -288,7 +291,7 @@ export class TabItem extends HTMLElement {
           font-weight: bold;
         }
         div.main button.close:hover {
-          color: color-mix(in hsl, red 70%, magenta);
+          color: white;
         }
         @media (hover: hover) {
           div.main button.close {
