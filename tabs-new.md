@@ -85,6 +85,7 @@ export class TabItem extends HTMLElement {
       if (this.pointerDown) {
         if (!this.moved) {
           this.moved = true
+          this.classList.add('drag-source')
           this.tabList.dragging = true
           this.tabList.dragItem.name = this.name
           this.tabList.dragItem.selected = this.selected
@@ -100,6 +101,7 @@ export class TabItem extends HTMLElement {
       }
     })
     this.mainEl.addEventListener('pointerup', e => {
+      this.classList.remove('drag-source')
       this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
@@ -307,10 +309,10 @@ export class TabItem extends HTMLElement {
           color: var(--fg-hover, #c7c7c7);
           position: relative;
         }
-        :host(:hover) div.main .name {
+        :host(:hover:not(.drag-source)) div.main .name {
           mask-image: linear-gradient(to left, transparent 12px, var(--fg-hover, #c7c7c7) 30px);
         }
-        :host(:hover) div.main button.close {
+        :host(:hover:not(.drag-source)) div.main button.close {
           position: absolute;
           right: 4px;
           display: block;
