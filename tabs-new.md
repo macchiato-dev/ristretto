@@ -97,38 +97,35 @@ export class TabItem extends HTMLElement {
       this.tabList.dragItem.classList.remove('dragging')
       if (this.moved) {
         if (this.hoverTab) {
-          console.log(this.hoverTab)
           if (this.hoverTab.tagName === 'TAB-ITEM') {
             const hoverIndex = [...this.parentElement.children].indexOf(this.hoverTab)
             const myIndex = [...this.parentElement.children].indexOf(this)
             if (hoverIndex === -1) {
-              const hoverIndex = [...this.hoverTab.parentElement.children].indexOf(this.hoverTab)
-              const hoverTabCount = this.hoverTab.parentElement.children.length
-              const position = 'beforeBegin'
-              if (this.selected) {
-                this.selected = false
-                const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
-                if (tabToSelect) {
-                  tabToSelect.selected = true
-                }
+              const changeSelected = this.selected
+              const otherTabToSelect = changeSelected ? (this.previousElementSibling ?? this.nextElementSibling) : undefined
+              if (otherTabToSelect) {
+                otherTabToSelect.selected = true
               }
-              this.hoverTab.insertAdjacentElement(position, this)
+              this.hoverTab.insertAdjacentElement('beforebegin', this)
+              if (changeSelected) {
+                this.selected = true
+              }
             } else {
               const position = (hoverIndex > myIndex) ? 'afterEnd' : 'beforeBegin'
               this.hoverTab.insertAdjacentElement(position, this)
             }
           } else {
-            const tabList = this.tabList.tabLists.find(tl => tl.appendDropArea === this.hoverTab)
-            if (tabList !== this.tabList) {
-              if (this.selected) {
-                const tabToSelect = this.previousElementSibling ?? this.nextElementSibling
-                if (tabToSelect) {
-                  tabToSelect.selected = true
-                }
-                tabList.listEl.querySelector('.selected').selected = false
+            const sourceTabList = this.tabList
+            const destTabList = this.tabList.tabLists.find(tl => tl.appendDropArea === this.hoverTab)
+            const changeSelected = this.selected && (destTabList !== sourceTabList)
+            const otherTabToSelect = changeSelected ? (this.previousElementSibling ?? this.nextElementSibling) : undefined
+            destTabList.listEl.insertAdjacentElement('beforeEnd', this)
+            if (changeSelected) {
+              this.selected = true
+              if (otherTabToSelect) {
+                otherTabToSelect.selected = true
               }
             }
-            tabList.listEl.insertAdjacentElement('beforeEnd', this)
           }
         }
       } else if (!this.tabList.dragging) {
@@ -203,24 +200,26 @@ export class TabItem extends HTMLElement {
   }
 
   get selected() {
-    return this.classList.contains('selected')
+    return this.hasAttribute('selected')
   }
 
   set selected(value) {
-    if (value) {      
-      this.classList.add('selected')
-      if (this.contentEl !== undefined) {
-        this.contentEl.selected = true
+    const selectedTabs = (
+      this.tabList !== undefined ? [...this.tabList.listEl.querySelectorAll(':scope > tab-item[selected]')] : []
+    ).filter(el => el !== this)
+    if (value !== this.selected || (value === true && selectedTabs.length > 0)) {
+      if (value === true) {
+        if (!this.classList.contains('drag')) {
+          for (const tab of selectedTabs) {
+            tab.selected = false
+          }
+        }
+        this.setAttribute('selected', '')
+      } else {
+        this.removeAttribute('selected')
       }
-    } else {
-      this.classList.remove('selected')
       if (this.contentEl !== undefined) {
-        this.contentEl.selected = false
-      }
-    }
-    if (value === true) {
-      for (const el of [...(this.parentElement?.children ?? [])].filter(el => el !== this)) {
-        el.selected = false
+        this.contentEl.selected = value
       }
     }
   }
@@ -259,7 +258,7 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg, #484850);
           align-items: center;
         }
-        :host(.selected) div.main {
+        :host([selected]) div.main {
           background-color: var(--bg-selected, #0e544f);
           color: var(--fg-selected, #e7e7e7);
         }
@@ -267,7 +266,7 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg-hover, #52525b);
           color: var(--fg-hover, #c7c7c7);
         }
-        :host(.selected:hover) div.main {
+        :host([selected]:hover) div.main {
           background-color: var(--bg-selected-hover, #0c6860);
           color: var(--fg-selected-hover, #f7f7f7);
         }
@@ -313,7 +312,7 @@ export class TabItem extends HTMLElement {
           margin-right: -3px;
           opacity: 50%;
         }
-        :host(.selected) svg {
+        :host([selected]) svg {
           opacity: 75%;
         }
         :host(.drag) {
@@ -343,7 +342,6 @@ export class TabList extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.listEl = document.createElement('div')
     this.listEl.classList.add('list')
-    this.listEl.addEventListener('click', e => this.childClicked(e))
     this.listEl.addEventListener('click-add', e => { this.handleAdd(e) })
     this.listEl.addEventListener('click-move', e => { this.handleMove(e) })
     this.dragItem = document.createElement('tab-item')
@@ -363,59 +361,6 @@ export class TabList extends HTMLElement {
       }
     `
     this.shadowRoot.append(style)
-  }
-
-  childClicked(e) {
-    if (e.target !== this.listEl && !e.target.hasAttribute('selected')) {
-      this.listEl.querySelectorAll('[selected]')?.forEach?.(el => {
-        el.removeAttribute('selected')
-      })
-      e.target.setAttribute('selected', '')
-      this.dispatchEvent(new CustomEvent('select-item'), {bubbles: true})
-    }
-  }
-
-  handleAdd(e) {
-    const direction = e.detail.direction
-    const tabEl = document.createElement('tab-item')
-    if (this.createContentEl !== undefined) {
-      tabEl.contentEl = this.createContentEl(tabEl)
-      tabEl.contentEl.codeMirror = this.codeMirror
-    }
-    const position = direction == 'left' ? 'beforebegin' : 'afterend'
-    e.target.insertAdjacentElement(position, tabEl)
-    if (tabEl.contentEl !== undefined && e.target.contentEl !== undefined) {
-      e.target.contentEl.insertAdjacentElement(position, tabEl.contentEl)
-    }
-    setTimeout(() => {
-      tabEl.isNew = true
-      tabEl.nameEl.setAttribute('contenteditable', '')
-      tabEl.nameEl.focus()
-    }, 50)
-  }
-
-  handleMove(e) {
-    const direction = e.detail.direction
-    const siblingEl = (
-      direction == 'left' ?
-      e.target.previousElementSibling :
-      e.target.nextElementSibling
-    )
-    if (siblingEl) {
-      const position = direction == 'left' ? 'beforebegin' : 'afterend'
-      siblingEl.insertAdjacentElement(position, e.target)
-    }
-    if (e.target.contentEl !== undefined) {
-      const contentSiblingEl = (
-        direction == 'left' ?
-        e.target.contentEl.previousElementSibling :
-        e.target.contentEl.nextElementSibling
-      )
-      if (contentSiblingEl) {
-        const position = direction == 'left' ? 'beforebegin' : 'afterend'
-        contentSiblingEl.insertAdjacentElement(position, e.target.contentEl)
-      }
-    }
   }
 
   tabsFromPoint(x, y) {
