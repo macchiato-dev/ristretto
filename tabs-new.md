@@ -42,19 +42,14 @@ The dragging is done manually with [pointer capture](https://developer.mozilla.o
 export class TabItem extends HTMLElement {
   constructor() {
     super()
+    this.closable = true
     this.attachShadow({mode: 'open'})
     this.mainEl = document.createElement('div')
     this.mainEl.classList.add('main')
     this.shadowRoot.appendChild(this.mainEl)
     this.nameEl = document.createElement('label')
     this.nameEl.classList.add('name')
-    const closeButton = document.createElement('button')
-    closeButton.innerText = '✕'
-    closeButton.classList.add('close')
-    closeButton.addEventListener('click', () => {
-      this.dispatchEvent(new CustomEvent('tabClose', {composed: true}))
-    })
-    this.mainEl.append(this.nameEl, closeButton)
+    this.mainEl.append(this.nameEl)
   }
 
   connectedCallback() {
@@ -62,11 +57,20 @@ export class TabItem extends HTMLElement {
     if (!this.classList.contains('drag')) {
       this.initEvents()
     }
+    if (this.closable) {
+      const closeButton = document.createElement('button')
+      closeButton.innerText = '✕'
+      closeButton.classList.add('close')
+      closeButton.addEventListener('click', () => {
+        this.dispatchEvent(new CustomEvent('tabClose', {composed: true}))
+      })
+      this.mainEl.append(closeButton)
+    }
   }
 
   initEvents() {
     this.mainEl.addEventListener('pointerdown', e => {
-      if (e.isPrimary) {
+      if (e.isPrimary && !e.target.classList.contains('close')) {
         this.mainEl.setPointerCapture(e.pointerId)
         e.preventDefault()
         this.pointerDown = true
@@ -275,6 +279,7 @@ export class TabItem extends HTMLElement {
           background-color: var(--bg, #484850);
           align-items: center;
           min-width: 50px;
+          text-align: center;
         }
         div.main button.close {
           unset: all;
@@ -301,7 +306,7 @@ export class TabItem extends HTMLElement {
           color: var(--fg-hover, #c7c7c7);
           position: relative;
         }
-        :host(:hover:not(.drag-source)) div.main .name {
+        :host(:hover:not(.drag-source)) div.main:has(button.close) .name {
           mask-image: linear-gradient(to left, transparent 12px, var(--fg-hover, #c7c7c7) 30px);
         }
         :host(:hover:not(.drag-source)) div.main button.close {
@@ -513,7 +518,7 @@ export class ExampleView extends HTMLElement {
     })
     const {TabGroup} = customElements.get('tab-list')
     this.tabGroup = new TabGroup()
-    this.topTabList = this.createTabs(10)
+    this.topTabList = this.createTabs(5, 'A')
     this.topTabBlankArea = document.createElement('div')
     this.topTabBlankArea.classList.add('drop')
     this.topTabList.appendDropArea = this.topTabBlankArea
@@ -523,7 +528,7 @@ export class ExampleView extends HTMLElement {
     this.topAreaHeader.append(this.topTabList, this.topTabBlankArea)
     this.topArea = document.createElement('top-area')
     this.topArea.append(this.topAreaHeader)
-    this.bottomTabList = this.createTabs(1)
+    this.bottomTabList = this.createTabs(5, 'B')
     this.bottomTabBlankArea = document.createElement('div')
     this.bottomTabBlankArea.classList.add('drop')
     this.bottomTabList.appendDropArea = this.bottomTabBlankArea
@@ -536,15 +541,26 @@ export class ExampleView extends HTMLElement {
     this.bottomTabList.tabGroup = this.tabGroup
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
+    this.addEventListener('tabClose', e => {
+      const tab = e.composedPath()[0]
+      const toSelect = tab.selected ? (tab.previousElementSibling ?? tab.nextElementSibling ?? undefined) : undefined
+      e.composedPath()[0].remove()
+      if (toSelect !== undefined) {
+        toSelect.selected = true
+      }
+    })
   }
 
-  createTabs(n) {
+  createTabs(n, prefix) {
     const tabList = document.createElement('tab-list')
     const tabs = Array(n).fill('').map((_, i) => {
       const el = document.createElement('tab-item')
-      el.name = `Tab ${i}`
+      el.name = `Tab ${prefix}${i + 1}`
       if (i === 0) {
         el.selected = true
+      }
+      if (i % 2 === 1) {
+        el.closable = false
       }
       return el
     })
