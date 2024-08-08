@@ -380,31 +380,43 @@ export class ContentView extends HTMLElement {
         tab.selected = true
       } else {
         tab = document.createElement('tab-item')
-        tab.name = markdownCodeBlock.name
-        this.topTabList.tabs = [...(this.topTabList.tabs ?? []), tab]
+        tab.codeBlock = markdownCodeBlock
+        tab.name = tab.codeBlock.name
+        this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
         tab.selected = true
       }
-      this.showTab(tab, markdownCodeBlock)
+    })
+    this.addEventListener('tabSelect', e => {
+      const el = e.composedPath()[0]
+      if (el.tagName === 'TAB-ITEM') {
+        this.showTab(el)
+      }
     })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
   }
 
-  showTab(tab, markdownCodeBlock = undefined) {
+  showTab(tab) {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
-    if (!(tab.name in this.codeViews)) {
-      const el = document.createElement('code-edit')
-      el.fileType = tab.name.match(/\.([^.]+)/)[1]
-      el.dark = true
-      el.value = markdownCodeBlock.content
-      el.addEventListener('codeInput', () => {
-        this.dispatchEvent(new CustomEvent('codeInput', {detail: {name}}))
+    if (tab.codeEdit === undefined) {
+      tab.codeEdit = document.createElement('code-edit')
+      tab.codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
+      tab.codeEdit.dark = true
+      tab.codeEdit.value = tab.codeBlock.content
+      tab.codeEdit.addEventListener('codeInput', () => {
+        tab.dispatchEvent(new CustomEvent('codeInput', {detail: {name}, bubbles: true, composed: true}))
       })
-      this.codeViews[tab.name] = el
-      area.append(el)
     }
-    tab.selected = true
-    for (const t of tab.tabList.tabs) {
-      this.codeViews[t.name].classList.toggle('selected', t === tab)
+    if (tab.codeEdit.parent !== area) {
+      area.append(tab.codeEdit)
+    }
+    for (const tabInList of tab.tabList.tabs) {
+      if (tabInList.codeEdit) {
+        if (tabInList === tab) {
+          tabInList.codeEdit.setAttribute('selected', '')
+        } else {
+          tabInList.codeEdit.removeAttribute('selected')
+        }
+      }
     }
   }
 
@@ -435,8 +447,6 @@ export class ContentView extends HTMLElement {
         }
         .drop {
           padding: 3px;
-          grid-row: 1;
-          grid-column: 2;
           background-clip: content-box;
         }
         .drop.drag-hover {
@@ -446,9 +456,8 @@ export class ContentView extends HTMLElement {
         code-edit {
           overflow: auto;
           grid-row: 2;
-          grid-column: 1 / span 2;
         }
-        code-edit:not(.selected) {
+        code-edit:not([selected]) {
           display: none;
         }
       `)
@@ -718,16 +727,7 @@ export class NotebookView extends HTMLElement {
         }
         split-view {
           background: #273737;
-        }
-        :host > split-view {
           min-width: 3px;
-        }
-        main split-view {
-          min-height: 3px;
-        }
-        main {
-          display: grid;
-          grid-template-rows: var(--top-height, 1fr) auto 1fr;
         }
       `)
     }

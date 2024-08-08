@@ -65,11 +65,6 @@ export class TabItem extends HTMLElement {
   }
 
   initEvents() {
-    this.nameEl.addEventListener('input', e => {
-      if (this.contentEl !== undefined) {
-        this.contentEl.name = this.nameEl.innerText
-      }
-    })
     this.mainEl.addEventListener('pointerdown', e => {
       if (e.isPrimary) {
         this.mainEl.setPointerCapture(e.pointerId)
@@ -242,9 +237,6 @@ export class TabItem extends HTMLElement {
         }
       } else {
         this.removeAttribute('selected')
-      }
-      if (this.contentEl !== undefined) {
-        this.contentEl.selected = value
       }
     }
   }

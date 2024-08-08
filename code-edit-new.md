@@ -39,6 +39,7 @@ import { oneDark } from '@codemirror/theme-one-dark'
 export class CodeEdit extends HTMLElement {
   constructor() {
     super()
+    this.attachShadow({mode: 'open'})
     this.timeouts = {}
     this.lineWrapping = false
     this.lineNumbers = true
@@ -46,9 +47,10 @@ export class CodeEdit extends HTMLElement {
   }
 
   connectedCallback() {
-    this.attachShadow({mode: 'open'})
-    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
-    this.initEditor()
+    if (!this.view) {
+      this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+      this.initEditor()
+    }
   }
 
   static get styles() {
