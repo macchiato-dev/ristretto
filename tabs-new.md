@@ -289,6 +289,9 @@ export class TabItem extends HTMLElement {
           color: #bbb;
           font-weight: bold;
         }
+        :host(:not([selected])) button.close {
+          display: none;
+        }
         div.main button.close:hover {
           color: white;
         }
@@ -306,10 +309,10 @@ export class TabItem extends HTMLElement {
           color: var(--fg-hover, #c7c7c7);
           position: relative;
         }
-        :host(:hover:not(.drag-source)) div.main:has(button.close) .name {
+        :host(:hover:not(.drag-source)[selected]) div.main:has(button.close) .name {
           mask-image: linear-gradient(to left, transparent 12px, var(--fg-hover, #c7c7c7) 30px);
         }
-        :host(:hover:not(.drag-source)) div.main button.close {
+        :host(:hover:not(.drag-source)[selected]) div.main button.close {
           position: absolute;
           right: 4px;
           display: block;
