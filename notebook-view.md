@@ -478,14 +478,15 @@ export class NotebookSourceView extends HTMLElement {
     this.tabList.tabs = this.notebooks.map(({name}) => {
       const el = document.createElement('tab-item')
       el.name = name
+      el.closable = false
       return el
     })
     this.tabList.tabs[0].selected = true
-    this.tabList.addEventListener('select-item', () => {
-      const selectedTab = this.tabList.shadowRoot.querySelector('.selected')
-      const selectedView = Object.values(this.codeViews).find(el => el.classList.contains('selected'))
-      selectedView.classList.remove('selected')
-      this.codeViews[selectedTab.name].classList.add('selected')
+    this.tabList.addEventListener('tabSelect', e => {
+      const selectedTab = e.composedPath()[0]
+      const selectedView = Object.values(this.codeViews).find(el => el.hasAttribute('selected'))
+      selectedView.removeAttribute('selected')
+      this.codeViews[selectedTab.name].setAttribute('selected', '')
     })
     this.codeViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
       const el = document.createElement('code-edit')
@@ -499,7 +500,7 @@ export class NotebookSourceView extends HTMLElement {
       })
       return [name, el]
     }))
-    this.codeViews[this.notebooks[0].name].classList.add('selected')
+    this.codeViews[this.notebooks[0].name].setAttribute('selected', '')
     this.shadowRoot.append(this.tabList, ...Object.values(this.codeViews))
   }
 
@@ -518,7 +519,7 @@ export class NotebookSourceView extends HTMLElement {
         code-edit {
           overflow: auto;
         }
-        code-edit:not(.selected) {
+        code-edit:not([selected]) {
           display: none;
         }
       `)
@@ -544,14 +545,15 @@ export class SidebarView extends HTMLElement {
     this.tabList.tabs = this.notebooks.map(({name}) => {
       const el = document.createElement('tab-item')
       el.name = name
+      el.closable = false
       return el
     })
     this.tabList.tabs[0].selected = true
-    this.tabList.addEventListener('select-item', () => {
-      const selectedTab = this.tabList.shadowRoot.querySelector('.selected')
-      const selectedView = Object.values(this.markdownViews).find(el => el.classList.contains('selected'))
-      selectedView.classList.remove('selected')
-      this.markdownViews[selectedTab.name].classList.add('selected')
+    this.tabList.addEventListener('tabSelect', e => {
+      const selectedTab = e.composedPath()[0]
+      const selectedView = Object.values(this.markdownViews).find(el => el.hasAttribute('selected'))
+      selectedView.removeAttribute('selected')
+      this.markdownViews[selectedTab.name].setAttribute('selected', '')
     })
     this.notebooksByName = Object.fromEntries(this.notebooks.map(notebook => [notebook.name, notebook]))
     this.markdownViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
@@ -559,7 +561,7 @@ export class SidebarView extends HTMLElement {
       el.value = content
       return [name, el]
     }))
-    this.markdownViews[this.notebooks[0].name].classList.add('selected')
+    this.markdownViews[this.notebooks[0].name].setAttribute('selected', '')
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail}))
     })
@@ -620,7 +622,7 @@ export class SidebarView extends HTMLElement {
           grid-row: 2;
           grid-column: 1 / span 2;
         }
-        markdown-view:not(.selected) {
+        markdown-view:not([selected]) {
           display: none;
         }
         .icon-container {
@@ -630,7 +632,8 @@ export class SidebarView extends HTMLElement {
         }
         .icon-container button {
           all: inherit;
-          padding: 3px 3px;
+          height: 25px;
+          padding: 3px;
           color: #a7a7a7;
           border: none;
           cursor: pointer;
