@@ -128,10 +128,10 @@ export class MarkdownView extends HTMLElement {
   render() {
     const blocks = Array.from(this.updateCodeBlocks(this.groupBlocks(this.readBlocks(this.value))))
     this.shadowRoot.replaceChildren(...blocks.map(block => {
-      if (typeof block === 'string') {
-        const headerMatch = block.match(/^(#{1,6}) /)
+      if (block.type === 'text') {
+        const headerMatch = block.content.match(/^(#{1,6}) /)
         const el = document.createElement(headerMatch ? `h${headerMatch[1].length}` : 'p')
-        const content = block.slice(headerMatch?.[0]?.length ?? 0)
+        const content = block.content.slice(headerMatch?.[0]?.length ?? 0)
         el.append(...[...this.readInline(content)].map(block => {
           if (block.type === 'link') {
             const el = document.createElement('a')
@@ -149,13 +149,14 @@ export class MarkdownView extends HTMLElement {
           el.name = block.name
           el.content = block.content
           return el
-        } else {
+        } else if (block.type === 'code') {
           const el = document.createElement('markdown-code-block')
           el.name = block.name
           el.content = block.content
           el.addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
           })
+          console.log({block, el})
           this.codeBlockViews.set(block, el)
           return el
         }
@@ -168,7 +169,10 @@ export class MarkdownView extends HTMLElement {
     let updatedCodeBlocks = []
     for (const block of this.groupBlocks(this.readBlocks(this.value))) {
       if (block?.type === 'code' && block.name !== undefined) {
-        const codeBlock = codeBlockData.find(cb => cb.name === block.name) ?? codeBlockData.find(cb => cb.content === block.content)
+        const codeBlock = (
+          codeBlockData.find(cb => cb.name === block.name) ??
+          codeBlockData.find(cb => cb.content === block.content)
+        )
         if (codeBlock) {
           codeBlock.name = block.name
           codeBlock.content = block.content
@@ -189,10 +193,11 @@ export class MarkdownView extends HTMLElement {
   *groupBlocks(iter) {
     let prevBlock = undefined
     for (const block of iter) {
-      if (typeof block !== 'string' && block.type === 'code') {
-        const match = prevBlock.match?.(/^`([^`]+)`\s*$/)
+      if (block.type === 'code' && prevBlock?.type === 'text') {
+        const match = prevBlock.content.match?.(/^`([^`]+)`\s*$/)
         if (match) {
           block.name = match[1]
+          block.nameBlock = prevBlock
           prevBlock = undefined
         }
       }
@@ -220,8 +225,17 @@ export class MarkdownView extends HTMLElement {
             type: 'code',
             content: input.slice(
               pos + codeBlockStart.index + codeBlockStart[0].length,
-              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index
-            )
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
+            ),
+            contentRange: [
+              pos + codeBlockStart.index + codeBlockStart[0].length,
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
+            ],
+            range: [
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length,
+            ],
+            info: codeBlockStart[1],
           }
           pos += codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
           pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
@@ -232,24 +246,34 @@ export class MarkdownView extends HTMLElement {
       if (input.slice(pos).match(/^- /)) {
         const match = input.slice(pos).match(/\n/)
         if (match) {
-          yield input.slice(pos, pos + match.index)
-          pos += match.index
-          pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
+          yield {
+            type: 'text',
+            content: input.slice(pos, pos + match.index),
+            range: [pos, pos + match.index],
+          }
+          pos += match.index + (input.slice(pos + match.index).match(skipBlankLines)?.[0]?.length ?? 0)
           continue
         }
       }
 
       const match = input.slice(pos).match(/\n[^\S\r\n]*\r?\n/)
       if (match) {
-        yield this.constructor.removeExtraSpace(input.slice(pos, pos + match.index).trim())
-        pos += match.index
-        pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
+        yield {
+          type: 'text',
+          content: this.constructor.removeExtraSpace(input.slice(pos, pos + match.index).trim()),
+          range: [pos, pos + match.index],
+        }
+        pos += match.index + (input.slice(pos + match.index).match(skipBlankLines)?.[0]?.length ?? 0)
         continue
       }
 
       const remaining = input.slice(pos).trimEnd()
       if (remaining !== '') {
-        yield this.constructor.removeExtraSpace(remaining)
+        yield {
+          type: 'text',
+          content: this.constructor.removeExtraSpace(remaining),
+          range: [pos, input.length],
+        }
       }
       break
     }
