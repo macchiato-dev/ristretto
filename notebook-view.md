@@ -392,6 +392,17 @@ export class ContentView extends HTMLElement {
         this.showTab(el)
       }
     })
+    this.addEventListener('tabClose', e => {
+      const tab = e.composedPath()[0]
+      const toSelect = tab.selected ? (tab.previousElementSibling ?? tab.nextElementSibling ?? undefined) : undefined
+      tab.codeBlock.content = tab.codeEdit.value
+      e.composedPath()[0].remove()
+      if (toSelect !== undefined) {
+        toSelect.selected = true
+      }
+      tab.codeEdit.remove()
+      tab.codeEdit = undefined
+    })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
   }
 
