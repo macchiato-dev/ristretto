@@ -867,10 +867,18 @@ export class ExampleView extends HTMLElement {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
     const notebookView = document.createElement('notebook-view')
+    const dataSource = (
+      __source.includes('\n---\n\n**begin data**\n') ?
+      __source.split('\n---\n\n**begin notebook**\n')[0].split('\n---\n\n**begin data**\n').at(-1) : ''
+    )
+    console.log({dataSource})
+    const notebook = Array.from(readBlocksWithNames(dataSource)).filter(
+      ({name}) => name?.endsWith?.('.md')
+    ).map(({contentRange}) => dataSource.slice(...contentRange)).find(_ => true)
     notebookView.notebooks = [
       {
         name: 'main',
-        content: __source.split('---\n\n**notebook**')[1].trim(),
+        content: notebook ?? __source.split('---\n\n**notebook**')[1].trim(),
       },
       {
         name: 'dev',
@@ -962,3 +970,9 @@ document.body.appendChild(el)
 Icon svg in `icons`: [google material-design-icons, Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE)
 
 Other content: [Apache 2.0](https://codeberg.org/macchiato/ristretto/src/branch/main/LICENSE)
+
+`thumbnail.svg`
+
+```svg
+<svg width="256" xmlns="http://www.w3.org/2000/svg" height="256" fill="none"><g data-testid="Board"><defs><clipPath id="a" class="frame-clip frame-clip-def"><rect rx="0" ry="0" width="256" height="256"/></clipPath></defs><g clip-path="url(#a)"><g class="fills"><rect width="256" height="256" class="frame-background" style="fill: rgb(43, 23, 42); fill-opacity: 1;" ry="0" rx="0"/></g><g class="frame-children"><rect rx="0" ry="0" x="11" y="12" transform="rotate(.14 30.498 19.505)" width="39" height="15" style="fill: rgb(14, 84, 79); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="61.02" y="12.051" transform="rotate(.14 80.518 19.564)" width="39" height="15" style="fill: rgb(72, 72, 80); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="111.02" y="12.051" transform="rotate(.14 130.519 19.571)" width="39" height="15" style="fill: rgb(72, 72, 80); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="61.02" y="128.051" transform="rotate(.14 80.5 135.566)" width="39" height="15" style="fill: rgb(72, 72, 80); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="11.02" y="128.051" transform="rotate(.14 30.5 135.558)" width="39" height="15" style="fill: rgb(14, 84, 79); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="172.02" y="12.051" transform="rotate(.14 191.52 19.581)" width="39" height="15" style="fill: rgb(14, 84, 79); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="156" y="-12" width="4" height="280" style="fill: rgb(38, 55, 55); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="25" y="171" width="115" height="62" style="fill: rgb(71, 41, 194); fill-opacity: 0.62;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="44" width="71" height="12" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="68" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="15" y="44" width="131" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="15" y="57" width="131" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="15" y="71" width="131" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="15" y="84" width="131" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="15" y="97" width="131" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="81" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="94" width="34" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="115" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="128" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="179" y="162" width="55" height="4" style="fill: rgb(167, 167, 227); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="179" y="175" width="55" height="4" style="fill: rgb(167, 167, 227); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="179" y="188" width="55" height="4" style="fill: rgb(167, 167, 227); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="173" y="141" width="34" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="172" y="207" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="172" y="220" width="71" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/><rect rx="0" ry="0" x="172" y="233" width="34" height="5" style="fill: rgb(128, 128, 129); fill-opacity: 1;" class="fills" data-testid="Rectangle"/></g></g></g></svg>
+```

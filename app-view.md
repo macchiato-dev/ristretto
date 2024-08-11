@@ -419,6 +419,7 @@ ${runEntry}
       'example-notebook.md': [
         'tabbed.md',
         'list.md',
+        'notebook-view.md',
         // 'overlay.md',  # TODO
       ],
       'planets.csv': [
