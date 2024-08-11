@@ -156,7 +156,6 @@ export class MarkdownView extends HTMLElement {
           el.addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
           })
-          console.log({block, el})
           this.codeBlockViews.set(block, el)
           return el
         }
@@ -397,7 +396,7 @@ export class ContentView extends HTMLElement {
     this.bottomAreaHeader.append(this.bottomTabList, this.bottomTabBlankArea)
     this.bottomArea.append(this.bottomAreaHeader)
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
-    this.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
+    this.sidebarView.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
       const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
       let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
       if (tab !== undefined) {
@@ -419,37 +418,36 @@ export class ContentView extends HTMLElement {
     this.addEventListener('tabClose', e => {
       const tab = e.composedPath()[0]
       const toSelect = tab.selected ? (tab.previousElementSibling ?? tab.nextElementSibling ?? undefined) : undefined
-      tab.codeBlock.content = tab.codeEdit.value
       e.composedPath()[0].remove()
       if (toSelect !== undefined) {
         toSelect.selected = true
       }
-      tab.codeEdit.remove()
-      tab.codeEdit = undefined
+      tab.codeBlock.codeEdit.remove()
     })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
   }
 
   showTab(tab) {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
-    if (tab.codeEdit === undefined) {
-      tab.codeEdit = document.createElement('code-edit')
-      tab.codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
-      tab.codeEdit.dark = true
-      tab.codeEdit.value = tab.codeBlock.content
-      tab.codeEdit.addEventListener('codeInput', () => {
-        tab.dispatchEvent(new CustomEvent('codeInput', {detail: {name}, bubbles: true, composed: true}))
+    if (tab.codeBlock.codeEdit === undefined) {
+      tab.codeBlock.codeEdit = document.createElement('code-edit')
+      const codeEdit = tab.codeBlock.codeEdit
+      codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
+      codeEdit.dark = true
+      codeEdit.value = tab.codeBlock.content
+      codeEdit.addEventListener('codeInput', () => {
+        tab.dispatchEvent(new CustomEvent('codeInput', {detail: tab.codeBlock, bubbles: true, composed: true}))
       })
     }
-    if (tab.codeEdit.parent !== area) {
-      area.append(tab.codeEdit)
+    if (tab.codeBlock.codeEdit.parent !== area) {
+      area.append(tab.codeBlock.codeEdit)
     }
     for (const tabInList of tab.tabList.tabs) {
-      if (tabInList.codeEdit) {
+      if (tabInList.codeBlock.codeEdit) {
         if (tabInList === tab) {
-          tabInList.codeEdit.setAttribute('selected', '')
+          tabInList.codeBlock.codeEdit.setAttribute('selected', '')
         } else {
-          tabInList.codeEdit.removeAttribute('selected')
+          tabInList.codeBlock.codeEdit.removeAttribute('selected')
         }
       }
     }
@@ -570,6 +568,8 @@ export class NotebookSourceView extends HTMLElement {
 export class SidebarView extends HTMLElement {
   constructor() {
     super()
+    this.codeBtn = document.createElement('button')
+    this.codeBtn.innerHTML = this.icons.code
     this.timeouts = {}
   }
 
@@ -610,14 +610,7 @@ export class SidebarView extends HTMLElement {
     downloadBtn.addEventListener('click', () => {
       
     })
-    const codeBtn = document.createElement('button')
-    codeBtn.innerHTML = this.icons.code
-    codeBtn.addEventListener('click', () => {
-      codeBtn.classList.toggle('on')
-      const parent = this.getRootNode().host
-      parent.classList.toggle('source')
-    })
-    iconContainer.append(downloadBtn, codeBtn)
+    iconContainer.append(downloadBtn, this.codeBtn)
     iconContainer.classList.add('icon-container')
     this.shadowRoot.append(this.tabList, iconContainer, ...Object.values(this.markdownViews))
   }
@@ -662,6 +655,7 @@ export class SidebarView extends HTMLElement {
         }
         .icon-container {
           display: flex;
+          align-items: center;
           gap: 2px;
           padding: 2px 5px;
         }
@@ -719,8 +713,10 @@ export class NotebookView extends HTMLElement {
     this.sidebarView.contentView = this.contentView
     this.contentView.sidebarView = this.sidebarView
     this.notebookSourceView.sidebarView = this.sidebarView
-    this.shadowRoot.addEventListener('fileClick', ({detail}) => {
-      this.contentView.dispatchEvent(new CustomEvent('fileClick', {detail}))
+    this.sidebarView.codeBtn.addEventListener('click', () => {
+      const enabled = !this.classList.contains('source')
+      this.sidebarView.codeBtn.classList.toggle('on', enabled)
+      this.classList.toggle('source', enabled)
     })
     this.shadowRoot.append(this.contentView, this.notebookSourceView, this.split, this.sidebarView)
   }
