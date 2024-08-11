@@ -148,11 +148,17 @@ export class MarkdownView extends HTMLElement {
         if (el !== undefined) {
           el.name = block.name
           el.content = block.content
+          el.contentRange = block.contentRange
+          el.blockRange = block.blockRange
+          el.info = block.info
           return el
         } else if (block.type === 'code') {
           const el = document.createElement('markdown-code-block')
           el.name = block.name
           el.content = block.content
+          el.contentRange = block.contentRange
+          el.blockRange = block.blockRange
+          el.info = block.info
           el.addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
           })
@@ -175,6 +181,9 @@ export class MarkdownView extends HTMLElement {
         if (codeBlock) {
           codeBlock.name = block.name
           codeBlock.content = block.content
+          codeBlock.contentRange = block.contentRange
+          codeBlock.blockRange = block.blockRange
+          codeBlock.info = block.info
           yield codeBlock
           codeBlockData.splice(codeBlockData.indexOf(codeBlock), 1)
           updatedCodeBlocks.push(codeBlock)
@@ -294,6 +303,46 @@ export class MarkdownView extends HTMLElement {
           yield s
         }
         break;
+      }
+    }
+  }
+
+  updateFromContentViews() {
+    const codeBlocks = [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK').toReversed()
+    let updated = this.value
+    let updateCount = 0
+    console.log(codeBlocks)
+    for (const codeBlock of codeBlocks) {
+      const currentValue = this.value.slice(...codeBlock.contentRange)
+      if (codeBlock.codeEdit) {
+        const newValue = codeBlock.codeEdit.value
+        if (currentValue !== newValue) {
+          // TODO: fence code block (allowing change in number of backquotes)
+          // TODO: partial codemirror update
+          updated = updated.slice(0, codeBlock.contentRange[0]) + newValue + updated.slice(codeBlock.contentRange[1])
+          updateCount += 1
+        }
+      }
+    }
+    if (updateCount > 0) {
+      console.log(`Making ${updateCount} updates to ${this.name} notebook`)
+    }
+    this.codeEdit.value = updated
+  }
+
+  updateContentViews(foundTabs) {
+    const codeBlocks = [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK')
+    for (const codeBlock of codeBlocks) {
+      if (codeBlock.tab) {
+        foundTabs.add(codeBlock.tab)
+        if (codeBlock.tab.name !== codeBlock.name) {
+          codeBlock.tab.name = codeBlock.name
+        }
+      }
+      if (codeBlock.codeEdit) {
+        if (codeBlock.codeEdit.value !== codeBlock.content) {
+          codeBlock.codeEdit.value = codeBlock.content
+        }
       }
     }
   }
@@ -433,6 +482,7 @@ export class ContentView extends HTMLElement {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
     if (tab.codeBlock.codeEdit === undefined) {
       tab.codeBlock.codeEdit = document.createElement('code-edit')
+      tab.codeBlock.tab = tab
       const codeEdit = tab.codeBlock.codeEdit
       codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
       codeEdit.dark = true
@@ -451,6 +501,15 @@ export class ContentView extends HTMLElement {
         } else {
           tabInList.codeBlock.codeEdit.removeAttribute('selected')
         }
+      }
+    }
+  }
+
+  markDeletedTabs(foundTabs) {
+    for (const tab of [...this.topTabList.tabs, ...this.bottomTabList.tabs]) {
+      const deleted = !foundTabs.has(tab)
+      if (tab.deleted !== deleted) {
+        tab.deleted = deleted
       }
     }
   }
@@ -524,21 +583,20 @@ export class NotebookSourceView extends HTMLElement {
       codeEdit.addEventListener('codeInput', () => {
         markdownView.value = codeEdit.value
       })
-      el.codeEdit = codeEdit
+      markdownView.codeEdit = codeEdit
       return el
     })
     this.tabList.tabs[0].selected = true
     this.tabList.addEventListener('tabSelect', e => {
       const selectedTab = e.composedPath()[0]
       const selectedCodeEdit = this.shadowRoot.querySelector('code-edit[selected]')
-      console.log(selectedCodeEdit)
       if (selectedCodeEdit) {
         selectedCodeEdit.removeAttribute('selected')
       }
-      selectedTab.codeEdit.setAttribute('selected', '')
+      selectedTab.markdownView.codeEdit.setAttribute('selected', '')
     })
-    this.tabList.tabs[0].codeEdit.setAttribute('selected', '')
-    this.shadowRoot.append(this.tabList, ...([...this.tabList.tabs]).map(tab => tab.codeEdit))
+    this.tabList.tabs[0].markdownView.codeEdit.setAttribute('selected', '')
+    this.shadowRoot.append(this.tabList, ...([...this.tabList.tabs]).map(tab => tab.markdownView.codeEdit))
   }
 
   static get styles() {
@@ -607,6 +665,20 @@ export class SidebarView extends HTMLElement {
     iconContainer.append(downloadBtn, this.codeBtn)
     iconContainer.classList.add('icon-container')
     this.shadowRoot.append(this.tabList, iconContainer, ...Object.values(this.markdownViews))
+  }
+
+  updateNotebooksFromContentViews() {
+    for (const markdownView of Object.values(this.markdownViews)) {
+      markdownView.updateFromContentViews()
+    }
+  }
+
+  updateContentViewsFromNotebooks() {
+    const foundTabs = new WeakSet()
+    for (const markdownView of Object.values(this.markdownViews)) {
+      markdownView.updateContentViews(foundTabs)
+    }
+    return foundTabs
   }
 
   get notebooks() {
@@ -723,6 +795,12 @@ export class NotebookView extends HTMLElement {
     this.notebookSourceView.sidebarView = this.sidebarView
     this.sidebarView.codeBtn.addEventListener('click', () => {
       const enabled = !this.classList.contains('source')
+      if (enabled) {
+        this.sidebarView.updateNotebooksFromContentViews()
+      } else {
+        const foundTabs = this.sidebarView.updateContentViewsFromNotebooks()
+        this.contentView.markDeletedTabs(foundTabs)
+      }
       this.sidebarView.codeBtn.classList.toggle('on', enabled)
       this.classList.toggle('source', enabled)
     })
