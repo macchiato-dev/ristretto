@@ -56,10 +56,11 @@ export class MarkdownCodeBlock extends HTMLElement {
     super()
     this.counter = 0
     this.attachShadow({mode: 'open'})
-    const div = document.createElement('div')
-    this.el = document.createElement('span')
-    div.append(this.el)
-    this.shadowRoot.append(div)
+    this.div = document.createElement('div')
+    this.nameEl = document.createElement('button')
+    this.nameEl.classList.add('name')
+    this.div.append(this.nameEl)
+    this.shadowRoot.append(this.div)
   }
 
   connectedCallback() {
@@ -67,11 +68,24 @@ export class MarkdownCodeBlock extends HTMLElement {
   }
 
   get name() {
-    return this.el.innerText
+    return this.nameEl.innerText
   }
 
   set name(value) {
-    this.el.innerText = value
+    this.nameEl.innerText = value
+    if (this.name === 'app.js') {
+      if (!this.viewButton) {
+        this.viewButton = document.createElement('button')
+        this.viewButton.innerText = '👁️'
+        this.viewButton.classList.add('view')
+        this.div.append(this.viewButton)
+      }
+    } else {
+      if (this.viewButton) {
+        this.viewButton.remove()
+        this.viewButton = undefined
+      }
+    }
   }
 
   get content() {
@@ -95,12 +109,20 @@ export class MarkdownCodeBlock extends HTMLElement {
       box-sizing: inherit;
     }
     div {
+      display: flex;
+      flex-direction: row;
       padding: 5px 10px;
       cursor: pointer;
       border: 2px solid #ccc4;
       border-radius: 5px;
       margin-top: 8px;
       margin-bottom: 8px;
+    }
+    button {
+      all: unset;
+    }
+    .name {
+      flex-grow: 1;
     }
   `
 }
@@ -552,6 +574,12 @@ export class ContentView extends HTMLElement {
           grid-row: 2;
         }
         code-edit:not([selected]) {
+          display: none;
+        }
+        output-view {
+          grid-row: 2;
+        }
+        output-view:not([selected]) {
           display: none;
         }
       `)
