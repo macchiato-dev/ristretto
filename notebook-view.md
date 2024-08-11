@@ -461,7 +461,7 @@ export class ContentView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-rows: var(--top-area-height, 50%) min-content 1fr;
+          grid-template-rows: var(--top-area-height, 50%) min-content calc(100% - var(--top-area-height, 50%));
           box-sizing: border-box;
           color: #d7d7d7;
         }
