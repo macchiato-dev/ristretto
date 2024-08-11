@@ -397,16 +397,18 @@ export class ContentView extends HTMLElement {
     this.bottomArea.append(this.bottomAreaHeader)
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
     this.sidebarView.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
-      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-      let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
-      if (tab !== undefined) {
-        tab.selected = true
-      } else {
-        tab = document.createElement('tab-item')
-        tab.codeBlock = markdownCodeBlock
-        tab.name = tab.codeBlock.name
-        this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
-        tab.selected = true
+      if (!this.getRootNode().host.classList.contains('source')) {
+        const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+        let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
+        if (tab !== undefined) {
+          tab.selected = true
+        } else {
+          tab = document.createElement('tab-item')
+          tab.codeBlock = markdownCodeBlock
+          tab.name = tab.codeBlock.name
+          this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
+          tab.selected = true
+        }
       }
     })
     this.addEventListener('tabSelect', e => {
@@ -508,33 +510,35 @@ export class NotebookSourceView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.tabList = document.createElement('tab-list')
-    this.tabList.tabs = this.notebooks.map(({name}) => {
+    this.tabList.tabs = Object.values(this.sidebarView.markdownViews).map(markdownView => {
       const el = document.createElement('tab-item')
-      el.name = name
+      el.name = markdownView.name
+      el.markdownView = markdownView
       el.closable = false
+      const codeEdit = document.createElement('code-edit')
+      codeEdit.fileType = 'md'
+      codeEdit.lineWrapping = true
+      codeEdit.lineNumbers = false
+      codeEdit.dark = true
+      codeEdit.value = markdownView.value
+      codeEdit.addEventListener('codeInput', () => {
+        markdownView.value = codeEdit.value
+      })
+      el.codeEdit = codeEdit
       return el
     })
     this.tabList.tabs[0].selected = true
     this.tabList.addEventListener('tabSelect', e => {
       const selectedTab = e.composedPath()[0]
-      const selectedView = Object.values(this.codeViews).find(el => el.hasAttribute('selected'))
-      selectedView.removeAttribute('selected')
-      this.codeViews[selectedTab.name].setAttribute('selected', '')
+      const selectedCodeEdit = this.shadowRoot.querySelector('code-edit[selected]')
+      console.log(selectedCodeEdit)
+      if (selectedCodeEdit) {
+        selectedCodeEdit.removeAttribute('selected')
+      }
+      selectedTab.codeEdit.setAttribute('selected', '')
     })
-    this.codeViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
-      const el = document.createElement('code-edit')
-      el.fileType = 'md'
-      el.lineWrapping = true
-      el.lineNumbers = false
-      el.dark = true
-      el.value = content
-      el.addEventListener('codeInput', () => {
-        this.dispatchEvent(new CustomEvent('codeInput', {detail: {name}}))
-      })
-      return [name, el]
-    }))
-    this.codeViews[this.notebooks[0].name].setAttribute('selected', '')
-    this.shadowRoot.append(this.tabList, ...Object.values(this.codeViews))
+    this.tabList.tabs[0].codeEdit.setAttribute('selected', '')
+    this.shadowRoot.append(this.tabList, ...([...this.tabList.tabs]).map(tab => tab.codeEdit))
   }
 
   static get styles() {
@@ -590,19 +594,9 @@ export class SidebarView extends HTMLElement {
       selectedView.removeAttribute('selected')
       this.markdownViews[selectedTab.name].setAttribute('selected', '')
     })
-    this.notebooksByName = Object.fromEntries(this.notebooks.map(notebook => [notebook.name, notebook]))
-    this.markdownViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
-      const el = document.createElement('markdown-view')
-      el.value = content
-      return [name, el]
-    }))
     this.markdownViews[this.notebooks[0].name].setAttribute('selected', '')
     this.shadowRoot.addEventListener('fileClick', ({detail}) => {
       this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail}))
-    })
-    this.notebookSourceView.addEventListener('codeInput', ({detail: {name}}) => {
-      this.notebooksByName[name].content = this.notebookSourceView.codeViews[name].value
-      this.markdownViews[name].value = this.notebooksByName[name].content
     })
     const iconContainer = document.createElement('div')
     const downloadBtn = document.createElement('button')
@@ -613,6 +607,20 @@ export class SidebarView extends HTMLElement {
     iconContainer.append(downloadBtn, this.codeBtn)
     iconContainer.classList.add('icon-container')
     this.shadowRoot.append(this.tabList, iconContainer, ...Object.values(this.markdownViews))
+  }
+
+  get notebooks() {
+    return this._notebooks
+  }
+
+  set notebooks(value) {
+    this._notebooks = value
+    this.markdownViews = Object.fromEntries(this.notebooks.map(({name, content}) => {
+      const el = document.createElement('markdown-view')
+      el.name = name
+      el.value = content
+      return [name, el]
+    }))
   }
 
   icons = {
@@ -708,7 +716,7 @@ export class NotebookView extends HTMLElement {
     })
     this.contentView = document.createElement('content-view')
     this.notebookSourceView = document.createElement('notebook-source-view')
-    this.notebookSourceView.notebooks = this.notebooks
+    this.notebookSourceView.sidebarView = this.sidebarView
     this.sidebarView.notebookSourceView = this.notebookSourceView
     this.sidebarView.contentView = this.contentView
     this.contentView.sidebarView = this.sidebarView
