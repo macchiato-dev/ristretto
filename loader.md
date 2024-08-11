@@ -1,5 +1,64 @@
 # Loader
 
+This loads a notebook into an iFrame so it can be run. The imports and exports of modules are replaced with use of `Macchiato.modules`.
+
+There are three parts:
+
+- `builder.js`: This is run inside of an outer frame with access to all the source needed and finds the requested source and puts it in a smaller Markdown file to be sent to the inner frame.
+- `loader.js`: This takes the notebook and deps code from the Markdown file and rewrites the imports and exports to be run inside an iframe. They are changed to load and store modules using `Macchiato.modules`.
+- `entry.js`: This sets functions for reading the Markdown blocks, and then uses them to read and run `loader.js`, which in turn uses `loader.js` to load and run the code.
+
+## Builder
+
+This is given the source and the source of the parent page. It reads the config from `notebook.json` which contains the deps, and it gets them from the parentSource and generates a markdown file with them.
+
+`builder.js`
+
+```js
+export class Builder {
+  constructor({src, parentSrc}) {
+    this.src = src
+    this.parentSrc = parentSrc
+  }
+
+  getConfig() {
+    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
+    for (const block of readBlocksWithNames(this.src)) {
+      if (block.name === 'notebook.json') {
+        return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
+      }
+    }
+    return defaultConfig
+  }
+
+  getDeps() {
+    let result = ''
+    let entry = ''
+    let loader = ''
+    const config = this.getConfig()
+    const deps = [...config.bundleFiles, ...config.importFiles, ...config.dataFiles].map(a => a[0])
+    for (const block of readBlocksWithNames(this.parentSrc)) {
+      if (block.name === 'loader.md') {
+        loader = `\n\n` + this.parentSrc.slice(...block.blockRange)
+        const blockContent = this.parentSrc.slice(...block.contentRange)
+        for (const subBlock of readBlocksWithNames(blockContent)) {
+          if (subBlock.name === 'entry.js') {
+            entry = `\n\n` + blockContent.slice(...subBlock.blockRange)
+          }
+        }
+      } else if (deps.includes(block.name)) {
+        result += `\n\n` + this.parentSrc.slice(...block.blockRange)
+      }
+    }
+    return entry + loader + result
+  }
+}
+```
+
+## Loader
+
+The Loader takes the sources and transforms them to run inside an iframe, by making the imports and exports use Macchiato.modules.
+
 `loader.js`
 
 ```js
@@ -65,24 +124,42 @@ export class Loader {
         const blockBundleFiles = bundleFiles.map(a => a[0] === block.name).map(a => a[1])
         const blockImportFiles = importFiles.map(a => a[0] === block.name).map(a => a[1])
         for (const subBlock of readBlocksWithNames(blockSource)) {
-          const bundleIndex = bundleFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
-          const importIndex = importFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
-          const dataIndex = dataFiles.findIndex(a => a[0] === block.name && a[1] === subBlock.name)
+          const bundleIndex = bundleFiles.findIndex(
+            a => a[0] === block.name && a[1] === subBlock.name
+          )
+          const importIndex = importFiles.findIndex(
+            a => a[0] === block.name && a[1] === subBlock.name
+          )
+          const dataIndex = dataFiles.findIndex(
+            a => a[0] === block.name && a[1] === subBlock.name
+          )
           if (bundleIndex !== -1) {
-            bundleFileData[bundleIndex] = {path: bundleFiles[bundleIndex], content: blockSource.slice(...subBlock.contentRange)}
+            bundleFileData[bundleIndex] = {
+              path: bundleFiles[bundleIndex],
+              content: blockSource.slice(...subBlock.contentRange)}
           }
           if (importIndex !== -1) {
-            importFileData[importIndex] = {name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)}
+            importFileData[importIndex] = {
+              name: `${parent}/${subBlock.name}`,
+              data: blockSource.slice(...subBlock.contentRange)
+            }
           }
           if (dataIndex !== -1) {
-            dataFileData[dataIndex] = {name: `${parent}/${subBlock.name}`, data: blockSource.slice(...subBlock.contentRange)}
+            dataFileData[dataIndex] = {
+              name: `${parent}/${subBlock.name}`,
+              data: blockSource.slice(...subBlock.contentRange)
+            }
           }
         }
       }
     }
     this.bundles = bundleFileData.filter(v => v !== undefined)
     const depFiles = importFileData.filter(v => v !== undefined)
-    this.files = [...depFiles, ...files.filter(({name}) => name !== 'app.js'), ...files.filter(({name}) => name === 'app.js')]
+    this.files = [
+      ...depFiles,
+      ...files.filter(({name}) => name !== 'app.js'),
+      ...files.filter(({name}) => name === 'app.js')
+    ]
     this.dataFiles = dataFileData.filter(v => v !== undefined)
   }
 
@@ -217,48 +294,11 @@ export class Loader {
 }
 ```
 
-`builder.js`
+## Entry
 
-```js
-export class Builder {
-  constructor({src, parentSrc}) {
-    this.src = src
-    this.parentSrc = parentSrc
-  }
+This sets the functions for reading code blocks from Markdown, and then reads the code block for the loader, and runs the loader, which in turn loads and runs the notebook with its dependencies.
 
-  getConfig() {
-    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
-    for (const block of readBlocksWithNames(this.src)) {
-      if (block.name === 'notebook.json') {
-        return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
-      }
-    }
-    return defaultConfig
-  }
-
-  getDeps() {
-    let result = ''
-    let entry = ''
-    let loader = ''
-    const config = this.getConfig()
-    const deps = [...config.bundleFiles, ...config.importFiles, ...config.dataFiles].map(a => a[0])
-    for (const block of readBlocksWithNames(this.parentSrc)) {
-      if (block.name === 'loader.md') {
-        loader = `\n\n` + this.parentSrc.slice(...block.blockRange)
-        const blockContent = this.parentSrc.slice(...block.contentRange)
-        for (const subBlock of readBlocksWithNames(blockContent)) {
-          if (subBlock.name === 'entry.js') {
-            entry = `\n\n` + blockContent.slice(...subBlock.blockRange)
-          }
-        }
-      } else if (deps.includes(block.name)) {
-        result += `\n\n` + this.parentSrc.slice(...block.blockRange)
-      }
-    }
-    return entry + loader + result
-  }
-}
-```
+TODO: set `readBlocks`, `readBlocksWithNames`, and `__source` on the global Macchiato object, and update all the references to it.
 
 `entry.js`
 
@@ -318,6 +358,10 @@ async function run(src) {
 
 run(__source)
 ```
+
+## Tests
+
+This runs tests inside the notebook, displaying the results in a table.
 
 `TestView.js`
 
