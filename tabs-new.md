@@ -245,6 +245,14 @@ export class TabItem extends HTMLElement {
     }
   }
 
+  get deleted() {
+    return this.classList.contains('deleted')
+  }
+
+  set deleted(value) {
+    this.classList.toggle('deleted', value)
+  }
+
   get tabList() {
     return this.getRootNode().host
   }
@@ -375,6 +383,14 @@ export class TabItem extends HTMLElement {
         :host(.drag.dragging) {
           display: block;
           z-index: 1000;
+        }
+        :host(.deleted) {
+          text-decoration: line-through;
+          text-decoration-thickness: 15%;
+          text-decoration-color: var(--fg, #b9b9bc);
+        }
+        :host(.deleted) .name::before, :host(.deleted) .name::after {
+          content: "\\00a0";
         }
       `)
     }
@@ -552,6 +568,7 @@ export class ExampleView extends HTMLElement {
         toSelect.selected = true
       }
     })
+    this.topTabList.tabs[0].deleted = true
   }
 
   createTabs(n, prefix) {
