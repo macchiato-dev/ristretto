@@ -15,13 +15,13 @@ TODO:
 - [x] make code icon switch left side to notebook source
 - [x] add tabs and editors to notebook source
 - [x] add individual content panes to sidebar
-- [ ] make files open, not just tabs, when clicking a file
-- [ ] make content files show according to selected tab
-- [ ] make tabs draggable to a blank pane
+- [x] make files open, not just tabs, when clicking a file
+- [x] make content files show according to selected tab
+- [x] make tabs draggable to a blank pane
 - [ ] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
-- [ ] add main, dev, test tab and code/download buttons to sidebar
-- [ ] make context menu open on right click
-- [ ] give tabs close buttons
+- [x] add main, dev, test tab and code/download buttons to sidebar
+- [x] give tabs close buttons
+- [ ] save tab state in notebook.json
 
 `notebook.json`
 
