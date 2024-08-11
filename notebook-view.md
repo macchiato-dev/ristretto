@@ -454,6 +454,7 @@ export class ContentView extends HTMLElement {
         } else {
           tab = document.createElement('tab-item')
           tab.codeBlock = markdownCodeBlock
+          tab.codeBlock.tab = tab
           tab.name = tab.codeBlock.name
           this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
           tab.selected = true
@@ -482,7 +483,6 @@ export class ContentView extends HTMLElement {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
     if (tab.codeBlock.codeEdit === undefined) {
       tab.codeBlock.codeEdit = document.createElement('code-edit')
-      tab.codeBlock.tab = tab
       const codeEdit = tab.codeBlock.codeEdit
       codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
       codeEdit.dark = true
