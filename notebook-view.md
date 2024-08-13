@@ -477,7 +477,7 @@ export class ContentView extends HTMLElement {
             tab.codeBlock = markdownCodeBlock
             tab.codeBlock.tab = tab
             tab.name = tab.codeBlock.name
-            tab.suffix = tab.isPreview ? '👁️' : ''
+            tab.suffix = tab.isPreview ? ' (output)' : ''
             this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
             tab.selected = true
           }
@@ -504,27 +504,31 @@ export class ContentView extends HTMLElement {
 
   showTab(tab) {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
-    if (tab.codeBlock.codeEdit === undefined) {
-      tab.codeBlock.codeEdit = document.createElement('code-edit')
-      const codeEdit = tab.codeBlock.codeEdit
-      codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
-      codeEdit.dark = true
-      codeEdit.value = tab.codeBlock.content
-      codeEdit.addEventListener('codeInput', () => {
-        tab.dispatchEvent(new CustomEvent('codeInput', {detail: tab.codeBlock, bubbles: true, composed: true}))
-      })
-    }
-    if (tab.codeBlock.codeEdit.parent !== area) {
-      area.append(tab.codeBlock.codeEdit)
-    }
-    for (const tabInList of tab.tabList.tabs) {
-      if (tabInList.codeBlock.codeEdit) {
-        if (tabInList === tab) {
-          tabInList.codeBlock.codeEdit.setAttribute('selected', '')
-        } else {
-          tabInList.codeBlock.codeEdit.removeAttribute('selected')
-        }
+    let contentView = tab.isPreview ? tab.codeBlock.outputView : tab.codeBlock.codeEdit
+    if (tab.isPreview) {
+      const outputView = document.createElement('output-view')
+      tab.codeBlock.outputView = outputView
+      contentView = outputView
+    } else {
+      if (contentView === undefined) {
+        const codeEdit = document.createElement('code-edit')
+        codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
+        codeEdit.dark = true
+        codeEdit.value = tab.codeBlock.content
+        codeEdit.addEventListener('codeInput', () => {
+          tab.dispatchEvent(new CustomEvent('codeInput', {detail: tab.codeBlock, bubbles: true, composed: true}))
+        })
+        tab.codeBlock.codeEdit = codeEdit
+        contentView = codeEdit
       }
+    }
+    if (contentView.parent !== area) {
+      area.append(contentView)
+    }
+    contentView?.setAttribute('selected', '')
+    for (const t of [...tab.tabList.tabs].filter(t => t !== tab)) {
+      const contentView = t.isPreview ? t.codeBlock.outputView : t.codeBlock.codeEdit
+      contentView?.removeAttribute?.('selected')
     }
     tab.codeBlock.scrollIntoView({block: 'nearest'})
   }
@@ -558,6 +562,7 @@ export class ContentView extends HTMLElement {
           display: grid;
           grid-template-columns: 1fr;
           grid-template-rows: min-content 1fr;
+          overflow-x: auto;
         }
         .header {
           display: grid;
@@ -843,7 +848,7 @@ export class NotebookView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-columns: var(--main-width, 2fr) auto 1fr;
+          grid-template-columns: var(--main-width, 65%) auto calc(100% - var(--main-width, 65%) - 3px);
           grid-template-rows: 1fr;
           color: #d7d7d7;
           box-sizing: border-box;
