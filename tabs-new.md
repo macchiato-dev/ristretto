@@ -212,12 +212,22 @@ export class TabItem extends HTMLElement {
     this.moveLoopActive = false
   }
 
-  set name(name) {
-    this.nameEl.innerText = name
+  set name(value) {
+    this._name = value
+    this.nameEl.innerText = this.name + (this.suffix ?? '')
   }
 
   get name() {
-    return this.nameEl.innerText
+    return this._name
+  }
+
+  set suffix(value) {
+    this._suffix = value
+    this.nameEl.innerText = this.name + (this.suffix ?? '')
+  }
+
+  get suffix() {
+    return this._suffix
   }
 
   get selected() {
