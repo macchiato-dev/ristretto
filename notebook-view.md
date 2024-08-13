@@ -181,9 +181,6 @@ export class MarkdownView extends HTMLElement {
           el.contentRange = block.contentRange
           el.blockRange = block.blockRange
           el.info = block.info
-          el.addEventListener('click', () => {
-            this.dispatchEvent(new CustomEvent('fileClick', {bubbles: true, detail: el}))
-          })
           this.codeBlockViews.set(block, el)
           return el
         }
@@ -333,7 +330,6 @@ export class MarkdownView extends HTMLElement {
     const codeBlocks = [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK').toReversed()
     let updated = this.value
     let updateCount = 0
-    console.log(codeBlocks)
     for (const codeBlock of codeBlocks) {
       const currentValue = this.value.slice(...codeBlock.contentRange)
       if (codeBlock.codeEdit) {
@@ -345,9 +341,6 @@ export class MarkdownView extends HTMLElement {
           updateCount += 1
         }
       }
-    }
-    if (updateCount > 0) {
-      console.log(`Making ${updateCount} updates to ${this.name} notebook`)
     }
     this.codeEdit.value = updated
   }
@@ -468,19 +461,26 @@ export class ContentView extends HTMLElement {
     this.bottomAreaHeader.append(this.bottomTabList, this.bottomTabBlankArea)
     this.bottomArea.append(this.bottomAreaHeader)
     this.tabGroup.tabLists = [this.topTabList, this.bottomTabList]
-    this.sidebarView.addEventListener('fileClick', ({detail: markdownCodeBlock}) => {
-      if (!this.getRootNode().host.classList.contains('source')) {
-        const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-        let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name)
-        if (tab !== undefined) {
-          tab.selected = true
-        } else {
-          tab = document.createElement('tab-item')
-          tab.codeBlock = markdownCodeBlock
-          tab.codeBlock.tab = tab
-          tab.name = tab.codeBlock.name
-          this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
-          tab.selected = true
+    this.sidebarView.addEventListener('click', (e) => {
+      const target = e.composedPath()[0]
+      const markdownCodeBlock = target.getRootNode().host
+      if (markdownCodeBlock?.tagName === 'MARKDOWN-CODE-BLOCK') {
+        const isPreview = Boolean(target.closest('button.view'))
+        if (!this.getRootNode().host.classList.contains('source')) {
+          const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+          let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name && tab.isPreview === isPreview)
+          if (tab !== undefined) {
+            tab.selected = true
+          } else {
+            tab = document.createElement('tab-item')
+            tab.isPreview = isPreview
+            tab.codeBlock = markdownCodeBlock
+            tab.codeBlock.tab = tab
+            tab.name = tab.codeBlock.name
+            tab.suffix = tab.isPreview ? '👁️' : ''
+            this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
+            tab.selected = true
+          }
         }
       }
     })
@@ -901,7 +901,6 @@ export class ExampleView extends HTMLElement {
       __source.includes('\n---\n\n**begin data**\n') ?
       __source.split('\n---\n\n**begin notebook**\n')[0].split('\n---\n\n**begin data**\n').at(-1) : ''
     )
-    console.log({dataSource})
     const notebook = Array.from(readBlocksWithNames(dataSource)).filter(
       ({name}) => name?.endsWith?.('.md')
     ).map(({contentRange}) => dataSource.slice(...contentRange)).find(_ => true)
