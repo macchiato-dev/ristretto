@@ -405,6 +405,7 @@ export class MarkdownView extends HTMLElement {
       scrollbar-color: #49cff1 #0000;
       scrollbar-width: thin;
       color: #eee;
+      scroll-behavior: smooth;
     }
     a {
       color: #aae;
@@ -525,6 +526,7 @@ export class ContentView extends HTMLElement {
         }
       }
     }
+    tab.codeBlock.scrollIntoView({block: 'nearest'})
   }
 
   markDeletedTabs(foundTabs) {
