@@ -64,121 +64,10 @@ export class AppView extends HTMLElement {
   }
 
   connectedCallback() {
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-        background-color: #55391b;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: grid;
-        grid-template-columns: var(--sidebar-width, 280px) auto 1.8fr;
-        grid-template-rows: 1fr;
-        height: 100vh;
-        margin: 0;
-        padding: 0;
-        color: #bfcfcd;
-      }
-      :host(.explore) {
-        grid-template-columns: var(--explore-sidebar-width, 1fr) auto 1.8fr;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-      split-view {
-        min-width: 5px;
-      }
-      div.select {
-        display: flex;
-        flex-direction: column;
-        padding: 10px;
-        padding-right: 0px;
-        scrollbar-color: #0000004d #0000;
-        align-items: stretch;
-        height: 100vh;
-      }
-      div.select::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      div.select::-webkit-scrollbar-thumb {
-        background-color: #0000004d;
-        border-radius: 4px;
-      }
-      div.explore, div.files {
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-        padding-right: 8px;
-      }
-      div.select-tabs {
-        display: flex;
-        flex-direction: row;
-        gap: 5px;
-        padding: 5px;
-      }
-      div.select-tabs a {
-        flex-grow: 1;
-        text-align: center;
-        font-family: sans-serif;
-        font-size: 14px;
-        padding: 5px;
-        cursor: pointer;
-      }
-      div.select-tabs a.active {
-        color: #d1cf3b;
-        background: #00000040;
-      }
-      div.select .tab-content {
-        display: none;
-      }
-      div.select .tab-content.active {
-        display: flex;
-      }
-      div.view-pane {
-        display: flex;
-        flex-direction: column;
-        padding: 10px;
-        padding-left: 0px;
-      }
-      div.view-pane iframe {
-        flex-grow: 1;
-        border: none;
-        padding: 10px;
-        border-radius: 10px;
-        background-color: #2b172a;
-      }
-      @media (max-width: 600px) {
-        :host {
-          height: auto;
-          grid-template-columns: 1fr;
-          grid-template-rows: auto 100vh;
-          gap: 12px;
-        }
-        split-view {
-          display: none;
-        }
-        div.select {
-          padding-right: 10px;
-        }
-        div.view-pane {
-          padding-left: 10px;
-          padding-bottom: 100px;
-        }
-      }
-    `
-    this.shadowRoot.append(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
+    }
     addEventListener('message', async e => {
       if (e.source === this.viewFrame?.contentWindow) {
         const [cmd, ...args] = e.data
@@ -303,8 +192,10 @@ ${runEntry}
     this.viewFrame.addEventListener('load', () => {
       const src = __source
       let dataSrc = '', notebookSrc = ''
-      const notebookFile = this.mode === 'explore' ? this.notebookSelect.selectedItem?.name : 'tabbed.md'
-      const dataFile = this.mode === 'explore' ? this.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
+      const notebookFile = this.mode === 'explore' ?
+        this.notebookSelect.selectedItem?.name : 'tabbed.md'
+      const dataFile = this.mode === 'explore' ?
+        this.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -316,13 +207,16 @@ ${runEntry}
       for (const block of readBlocksWithNames(src)) {
         if (block.name === dataFile) {
           if (this.mode === 'explore') {
-            dataSrc += `\n\n\`${block.name}\`\n\n` + src.slice(...block.contentRange)
+            dataSrc += `\n\n\`${block.name}\`\n\n` +
+              src.slice(...block.contentRange)
           } else {
-            dataSrc += `\n\n\`notebook.md\`\n\n` + this.fence(src.slice(...block.contentRange), 'md')
+            dataSrc += `\n\n\`notebook.md\`\n\n` +
+              this.fence(src.slice(...block.contentRange), 'md')
           }
         }
       }
-      const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
+      const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n` +
+        `**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
       this.viewFrame.contentWindow.postMessage(
         ['notebook', messageData],
@@ -473,6 +367,131 @@ ${runEntry}
     this.exploreView.append(this.dataSelect, this.notebookSelect)
     this.selectPane.append(this.exploreView)
   }
+
+  static get globalStyles() {
+    let s; return s ?? (
+      v => { s = new CSSStyleSheet(); s.replaceSync(v); return s }
+    )(this.globalStylesCss)
+  }
+
+  static get styles() {
+    let s; return s ?? (
+      v => { s = new CSSStyleSheet(); s.replaceSync(v); return s }
+    )(this.stylesCss)
+  }
+
+  static globalStylesCss = `
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #55391b;
+    }
+    html {
+      box-sizing: border-box;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+  `
+
+  static stylesCss = `
+    :host {
+      display: grid;
+      grid-template-columns: var(--sidebar-width, 280px) auto 1.8fr;
+      grid-template-rows: 1fr;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      color: #bfcfcd;
+    }
+    :host(.explore) {
+      grid-template-columns: var(--explore-sidebar-width, 1fr) auto 1.8fr;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+    split-view {
+      min-width: 5px;
+    }
+    div.select {
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      padding-right: 0px;
+      scrollbar-color: #0000004d #0000;
+      align-items: stretch;
+      height: 100vh;
+    }
+    div.select::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    div.select::-webkit-scrollbar-thumb {
+      background-color: #0000004d;
+      border-radius: 4px;
+    }
+    div.explore, div.files {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    div.select-tabs {
+      display: flex;
+      flex-direction: row;
+      gap: 5px;
+      padding: 5px;
+    }
+    div.select-tabs a {
+      flex-grow: 1;
+      text-align: center;
+      font-family: sans-serif;
+      font-size: 14px;
+      padding: 5px;
+      cursor: pointer;
+    }
+    div.select-tabs a.active {
+      color: #d1cf3b;
+      background: #00000040;
+    }
+    div.select .tab-content {
+      display: none;
+    }
+    div.select .tab-content.active {
+      display: flex;
+    }
+    div.view-pane {
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      padding-left: 0px;
+    }
+    div.view-pane iframe {
+      flex-grow: 1;
+      border: none;
+      padding: 10px;
+      border-radius: 10px;
+      background-color: #2b172a;
+    }
+    @media (max-width: 600px) {
+      :host {
+        height: auto;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 100vh;
+        gap: 12px;
+      }
+      split-view {
+        display: none;
+      }
+      div.select {
+        padding-right: 10px;
+      }
+      div.view-pane {
+        padding-left: 10px;
+        padding-bottom: 100px;
+      }
+    }
+  `
 }
 ```
 
