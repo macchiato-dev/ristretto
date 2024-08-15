@@ -5,6 +5,10 @@
 ````md
 # Example notebook
 
+This is an example notebook.
+
+First there is a task list, which is a simple custom HTML element, that takes a list of tasks, one per line, and renders ones starting with [x] in strikethrough.
+
 `task-list.js`
 
 ```js
@@ -75,15 +79,11 @@ export class TaskList extends HTMLElement {
   }
 
   set bg(bg) {
-    this.shadowRoot.host.style.setProperty(
-      '--bg', bg
-    )
+    this.shadowRoot.host.style.setProperty('--bg', bg)
   }
 
   set fg(fg) {
-    this.shadowRoot.host.style.setProperty(
-      '--fg', fg
-    )
+    this.shadowRoot.host.style.setProperty('--fg', fg)
   }
 
   set title(v) {
@@ -91,6 +91,8 @@ export class TaskList extends HTMLElement {
   }
 }
 ```
+
+Here is app.js, which renders a couple task lists.
 
 `app.js`
 

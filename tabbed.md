@@ -433,10 +433,10 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
     this.viewFrame.height = 30
     this.viewFrameWrap.append(this.viewFrame)
     this.shadowRoot.append(this.toolbar, this.editor, this.viewFrameWrap)
-    this.shadowRoot.addEventListener('code-input', (e) => {
+    this.shadowRoot.addEventListener('input', (e) => {
       this.handleInput()
     })
-    this.shadowRoot.addEventListener('input', (e) => {
+    this.shadowRoot.addEventListener('code-input', (e) => {
       this.handleInput()
     })
   }
@@ -448,6 +448,11 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
     }
     this.editor.load(this.readNotebookFiles(this.notebook))
     this.renderView()
+    addEventListener('message', e => {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*')
+      }
+    })
   }
 
   readNotebookFiles(notebook) {
@@ -463,12 +468,12 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
   }
 
   handleInput(e) {
-    // TODO: use notebook.json to control frequency, automaticness, and spinner of updates
     if (!this.inputTimeout) {
+      const updateFrequency = this.config.updateFrequency ?? 1500
       this.inputTimeout = setTimeout(() => {
         this.inputTimeout = undefined
         this.update()
-      }, 1500)
+      }, updateFrequency)
     }
   }
 
@@ -498,18 +503,23 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
     }
   }
 
-  async getDepsConfig(notebook) {
-    const defaultDeps = {bundleFiles: [], importFiles: []}
+  loadConfig(notebook) {
+    let config = {bundleFiles: [], importFiles: []}
     for (const block of readBlocksWithNames(notebook)) {
       if (block.name === 'notebook.json') {
-        return {...defaultDeps, ...JSON.parse(notebook.slice(...block.contentRange))}
+        try {
+          config = {...config, ...JSON.parse(notebook.slice(...block.contentRange))}
+        } catch (err) {
+          // do nothing
+        }
       }
     }
-    return defaultDeps
+    this.config = config
   }
 
   async getDeps(notebook) {
-    const newDepsConfig = await this.getDepsConfig(notebook)
+    this.loadConfig(notebook)
+    const newDepsConfig = {bundleFiles: this.config.bundleFiles, importFiles: this.config.importFiles}
     if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
       return this.deps
     } else {
@@ -803,3 +813,10 @@ new App().run()
   <rect x="5" y="112" width="5" height="10" class="text" />
 </svg>
 ```
+
+## License
+
+Icon svg in `icons`: [google material-design-icons, Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE)
+
+Other content: [Apache 2.0](https://codeberg.org/macchiato/ristretto/src/branch/main/LICENSE)
+

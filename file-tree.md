@@ -41,6 +41,10 @@ export class FileTree extends HTMLElement {
         list-style-type: none;
         padding-inline-start: 0;
       }
+      .item {
+        overflow-x: clip;
+        text-wrap: nowrap;
+      }
       li li .item {
         padding-left: 15px;
       }
@@ -76,6 +80,9 @@ export class FileTree extends HTMLElement {
       li.collapsed > ul {
         display: none;
       }
+      span.name {
+        text-wrap: nowrap;
+      }
     `
     this.shadowRoot.append(style)
     this.shadowRoot.addEventListener('click', e => {
@@ -106,6 +113,7 @@ export class FileTree extends HTMLElement {
       const expand = document.createElement('button')
       expand.innerHTML = parents.length >= 1 ? this.icons.expand : this.icons.collapse
       const name = document.createElement('span')
+      name.classList.add('name')
       item.classList.add('item')
       if (parents.length >= 1) {
         li.classList.add('collapsed')
@@ -157,10 +165,10 @@ export class FileTree extends HTMLElement {
 }
 ```
 
-`app-view.js`
+`example-view.js`
 
 ```js
-export class AppView extends HTMLElement {
+export class ExampleView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -170,26 +178,10 @@ export class AppView extends HTMLElement {
   }
 
   connectedCallback() {
-    const globalStyle = document.createElement('style')
-    globalStyle.textContent = `
-      body {
-        margin: 0;
-        padding: 0;
-        color: #ffffffbb;
-      }
-      html {
-        box-sizing: border-box;
-      }
-      *, *:before, *:after {
-        box-sizing: inherit;
-      }
-    `
-    document.head.append(globalStyle)
-
-    const style = document.createElement('style')
-    style.textContent = `
-    `
-    this.shadowRoot.append(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
+    }
   }
 
   get data() {
@@ -214,6 +206,39 @@ export class AppView extends HTMLElement {
     }
     return this._data
   }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-columns: 140px;
+        }
+      `)
+    }
+    return this._styles
+  }
+
+  static get globalStyles() {
+    if (!this._globalStyles) {
+      this._globalStyles = new CSSStyleSheet()
+      this._globalStyles.replaceSync(`
+        body {
+          margin: 0;
+          padding: 0;
+          color: #ffffffbb;
+        }
+        html {
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+      `)
+    }
+    return this._globalStyles
+  }
 }
 ```
 
@@ -221,14 +246,14 @@ export class AppView extends HTMLElement {
 
 ```js
 import {FileTree} from '/file-tree.js'
-import {AppView} from '/app-view.js'
+import {ExampleView} from '/example-view.js'
 
 customElements.define('file-tree', FileTree)
-customElements.define('app-view', AppView)
+customElements.define('example-view', ExampleView)
 
 async function setup() {
-  const appView = document.createElement('app-view')
-  document.body.append(appView)
+  const exampleView = document.createElement('example-view')
+  document.body.append(exampleView)
 }
 
 await setup()
@@ -281,3 +306,9 @@ await setup()
   </g>
 </svg>
 ```
+
+## License
+
+Icon svg in `icons`: [google material-design-icons, Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE)
+
+Other content: [Apache 2.0](https://codeberg.org/macchiato/ristretto/src/branch/main/LICENSE)

@@ -21,18 +21,21 @@ export class BlankPage extends HTMLElement {
       kbd,
       this.text.commandAfter,
     )
-    this.blankPage = document.createElement('div')
-    this.blankPage.classList.add('blank-page')
-    this.blankPage.classList.add('edited')
-    this.blankPage.contentEditable = true
-    this.blankPage.addEventListener('blur', () => {
-      if (this.blankPage.innerText.trim() === '') {
-        this.classList.remove('edited')
-      } else {
-        this.classList.add('edited')
-      }
-    })
-    this.blankPage.addEventListener('beforeinput', e => {
+    this.content = document.createElement('div')
+    this.content.classList.add('content', 'edited')
+    this.content.contentEditable = true
+    for (const key in this.contentEvents) {
+      this.contentEvents[key] = this.contentEvents[key].bind(this)
+      this.content.addEventListener(key.toLowerCase(), this.contentEvents[key])
+    }
+    this.contentWrap = document.createElement('div')
+    this.contentWrap.classList.add('content-wrap')
+    this.contentWrap.append(this.placeholder, this.content)
+    this.shadowRoot.append(this.contentWrap)
+  }
+
+  contentEvents = {
+    beforeInput(e) {
       if (e.inputType === 'historyUndo') {
         e.preventDefault()
         this.undo()
@@ -40,8 +43,8 @@ export class BlankPage extends HTMLElement {
         e.preventDefault()
         this.redo()
       }
-    })
-    this.blankPage.addEventListener('keydown', e => {
+    },
+    keyDown(e) {
       if ((e.code === 'KeyZ' && e.shiftKey && (e.metaKey || e.ctrlKey)) || (e.code === 'KeyY' && e.ctrlKey)) {
         e.preventDefault()
         this.redo()
@@ -49,20 +52,46 @@ export class BlankPage extends HTMLElement {
         e.preventDefault()
         this.undo()
       }
-    })
-    this.shadowRoot.append(this.placeholder, this.blankPage)
+    },
+    blur() {
+      this.classList.toggle('edited', this.content.innerText.trim() !== '')
+    },
+    dragEnter(e) {
+      this.content.classList.add('dragover')
+    },
+    dragLeave() {
+      this.content.classList.remove('dragover')
+    },
+    dragOver(e) {
+      e.preventDefault()
+    },
+    drop(e) {
+      e.preventDefault()
+      this.content.classList.remove('dragover')
+      for (const item of [...e.dataTransfer.items]) {
+        if (item.kind === 'file') {
+          const el = document.createElement('p')
+          const file = item.getAsFile()
+          el.innerText = file.name
+          this.contentWrap.insertAdjacentElement('beforebegin', el)
+        }
+      }
+    },
+    dragEnd() {
+      this.content.classList.remove('dragover')
+    },
   }
 
   undo() {
-    if (this.blankPage.innerText.trim() !== '') {
-      this.savedText = this.blankPage.innerText
+    if (this.content.innerText.trim() !== '') {
+      this.savedText = this.content.innerText
     }
-    this.blankPage.innerText = ''
+    this.content.innerText = ''
   }
 
   redo() {
-    if (this.blankPage.innerText.trim() === '' && this.savedText.trim() !== '') {
-      this.blankPage.innerText = this.savedText
+    if (this.content.innerText.trim() === '' && this.savedText.trim() !== '') {
+      this.content.innerText = this.savedText
       this.savedText = undefined
     }
   }
@@ -91,20 +120,36 @@ export class BlankPage extends HTMLElement {
         :host {
           display: grid;
           grid-template-columns: max-content;
-          padding: 10px;
           gap: 10px;
           justify-content: center;
           color: white;
+          padding: 5px;
+        }
+        .content-wrap {
+          display: grid;
+          grid-template-columns: max-content;
+          gap: 10px;
+          justify-content: center;
+          color: white;
+          padding: 5px;
         }
         .placeholder {
           grid-row: 1;
           grid-column: 1;
         }
-        .blank-page {
+        .content, .placeholder {
+          padding: 10px;
+        }
+        .content {
           min-width: calc(min(70vw, 800px));
           outline: none;
           grid-row: 1;
           grid-column: 1;
+          border: 2px dotted #0000;
+        }
+        :host(:not(.edited)) .content.dragover {
+          border-color: #bbba;
+          background: #9993;
         }
         :host(:focus-within) .placeholder, :host(.edited) .placeholder {
           display: none;
@@ -132,7 +177,7 @@ export class ExampleView extends HTMLElement {
     const sheets = [...document.adoptedStyleSheets].filter(v => v !== this.constructor.globalStyles)
     document.adoptedStyleSheets = [...sheets, this.constructor.globalStyles]
     this.blankPage = document.createElement('blank-page')
-    this.blankPage.lang = 'en'
+    // this.blankPage.lang = 'en'
     document.body.append(this.blankPage)
   }
 

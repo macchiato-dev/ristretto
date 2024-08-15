@@ -20,25 +20,7 @@ export class DataCards extends HTMLElement {
   }
 
   connectedCallback() {
-    const style = document.createElement('style')
-    style.textContent = `
-      :host {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 20px;
-        padding: 20px;
-      }
-      .card {
-        background-color: #bbb;
-        padding: 20px;
-        border-radius: 10px;
-      }
-      .card .title {
-        font-size: 20px;
-        font-weight: bold;
-      }
-    `
-    this.shadowRoot.append(style)
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
   }
 
   set data(data) {
@@ -56,6 +38,30 @@ export class DataCards extends HTMLElement {
       el.append(title, ...info)
       return el
     }))
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 20px;
+          padding: 20px;
+        }
+        .card {
+          background-color: #bbb;
+          padding: 20px;
+          border-radius: 10px;
+        }
+        .card .title {
+          font-size: 20px;
+          font-weight: bold;
+        }
+      `)
+    }
+    return this._styles
   }
 }
 ```

@@ -640,6 +640,11 @@ export class AppView extends HTMLElement {
     this.shadowRoot.addEventListener('input', (e) => {
       this.handleInput()
     })
+    addEventListener('message', e => {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*')
+      }
+    })
   }
 
   connectedCallback() {
@@ -973,3 +978,10 @@ new App().run()
   </g>
 </svg>
 ```
+
+## License
+
+Icon svg in `icons`: [google material-design-icons, Apache 2.0](https://github.com/google/material-design-icons/blob/master/LICENSE)
+
+Other content: [Apache 2.0](https://codeberg.org/macchiato/ristretto/src/branch/main/LICENSE)
+
