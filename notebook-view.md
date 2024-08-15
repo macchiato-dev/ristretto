@@ -31,6 +31,7 @@ TODO:
     ["codemirror-bundle.md", "codemirror-bundle.js"]
   ],
   "importFiles": [
+    ["loader.md", "builder.js"],
     ["split-pane.md", "split-view.js"],
     ["tabs-new.md", "TabItem.js"],
     ["tabs-new.md", "TabList.js"],
@@ -94,6 +95,14 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set content(value) {
     this._content = value
+  }
+
+  get currentContent() {
+    if (this.codeEdit) {
+      return this.codeEdit.value
+    } else {
+      return this.content
+    }
   }
 
   static get styles() {
@@ -181,6 +190,7 @@ export class MarkdownView extends HTMLElement {
           el.contentRange = block.contentRange
           el.blockRange = block.blockRange
           el.info = block.info
+          el.markdownView = this
           this.codeBlockViews.set(block, el)
           return el
         }
@@ -326,8 +336,12 @@ export class MarkdownView extends HTMLElement {
     }
   }
 
+  get codeBlocks() {
+    return [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK').toReversed()
+  }
+
   updateFromContentViews() {
-    const codeBlocks = [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK').toReversed()
+    const codeBlocks = this.codeBlocks
     let updated = this.value
     let updateCount = 0
     for (const codeBlock of codeBlocks) {
@@ -421,6 +435,186 @@ export class MarkdownView extends HTMLElement {
 `ContentView.js`
 
 ```js
+export class OutputView extends HTMLElement {
+  constructor() {
+    super()
+    this.attachShadow({mode: 'open'})
+    this.viewFrame = document.createElement('iframe')
+    this.viewFrame.sandbox = 'allow-scripts'
+    this.shadowRoot.append(this.viewFrame)
+    this.handleInput = this.handleInput.bind(this)
+  }
+
+  connectedCallback() {
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    this.loadConfig()
+    this.contentView.addEventListener('codeInput', this.handleInput)
+    this.update()
+  }
+
+  disconnectedCallback() {
+    this.contentView.removeEventListener('codeInput', this.handleInput)
+  }
+
+  loadConfig(data) {
+    let config = {bundleFiles: [], importFiles: []}
+    try {
+      config = {...config, ...JSON.parse(data)}
+    } catch (err) {
+      // do nothing
+    }
+    this.config = config
+  }
+
+  async getDeps() {
+    const codeBlocks = this.codeBlock.markdownView.codeBlocks
+    const codeBlock = codeBlocks.find(cb => cb.name === 'notebook.json')
+    this.loadConfig(codeBlock?.currentContent ?? '{}')
+    const newDepsConfig = {bundleFiles: this.config.bundleFiles, importFiles: this.config.importFiles}
+    if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
+      return this.deps
+    } else {
+      const channel = new MessageChannel()
+      let loaded = false
+      const remotePromise = new Promise((resolve, _) => {
+        channel.port1.onmessage = (message) => {
+          channel.port1.close()
+          loaded = true
+          resolve(message.data)
+        }
+        const depsJson = JSON.stringify(newDepsConfig, null, 2)
+        const depsCodeBlock = this.fence(depsJson, 'json')
+        const notebook = `\n\n${'`notebook.json`'}\n\n${depsCodeBlock}\n\n'}`
+        parent.postMessage(['getDeps', notebook], '*', [channel.port2])
+      })
+      const localPromise = new Promise((resolve, _reject) => {
+        setTimeout(() => {
+          if (loaded) {
+            resolve(undefined)
+          } else {
+            const builder = new this.constructor.Builder({src: '', parentSrc: __source})
+            const deps = builder.getDeps()
+            resolve(deps)
+          }
+        }, 500)
+      })
+      const deps = await Promise.race([remotePromise, localPromise])
+      this.depsConfig = newDepsConfig
+      this.deps = deps
+      return deps
+    }
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
+  }
+
+  async buildNotebook() {
+    const files = this.codeBlock.markdownView.codeBlocks.map(cb => ({
+      name: cb.name,
+      data: cb.currentContent,
+    }))
+    let result = ''
+    for (const file of files) {
+      const extMatch = (file.name ?? '').match(/\.([\w-]+)/)
+      const ext = extMatch ? extMatch[1] : undefined
+      result += `\n\n\`${file.name}\`\n${this.fence(file.data, ext ?? '')}`
+    }
+    return result
+  }
+
+  async displayNotebook() {
+    const dataSrc = ''
+    const notebookContent = await this.buildNotebook()
+    const deps = await this.getDeps()
+    const depsSection = '\n**' + 'deps' + '**' + '\n\n' + deps + '\n\n---\n'
+    const notebookSection = '\n**' + 'notebook' + '**\n\n' + notebookContent + '\n\n'
+    const notebookSrc = depsSection + notebookSection
+    const re = new RegExp(`(?:^|\n)\s*\n\`entry.js\`\n\s*\n${'`'.repeat(3)}.*?\n(.*?)${'`'.repeat(3)}\s*(?:\n|$)`, 's')
+    const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+    `.trim()
+    const src = `
+<!doctype html>
+<html>
+<head>
+  <title>preview</title>
+<script type="module">
+${runEntry}
+</script>
+</head>
+<body>
+</body>
+</html>
+`.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
+    this.viewFrame.addEventListener('load', () => {
+      const messageText = `\n\n${notebookSrc}\n\n`
+      const messageData = new TextEncoder().encode(messageText)
+      this.viewFrame.contentWindow.postMessage(
+        ['notebook', messageData],
+        '*',
+        [messageData.buffer]
+      )
+    }, {once: true})
+  }
+
+  update() {
+    this.renderView()
+  }
+
+  handleInput(e) {
+    if (!this.inputTimeout) {
+      const updateFrequency = this.config.updateFrequency ?? 1500
+      this.inputTimeout = setTimeout(() => {
+        this.inputTimeout = undefined
+        this.update()
+      }, updateFrequency)
+    }
+  }
+
+  renderView() {
+    const viewFrame = document.createElement('iframe')
+    viewFrame.sandbox = 'allow-scripts'
+    this.shadowRoot.appendChild(viewFrame)
+    this.viewFrame.remove()
+    this.viewFrame = viewFrame
+    this.displayNotebook()
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: grid;
+          grid-template-rows: 100%;
+          grid-template-columns: 100%;
+        }
+        iframe {
+          border: 0;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+        }
+      `)
+    }
+    return this._styles
+  }
+}
+
 export class ContentView extends HTMLElement {
   constructor() {
     super()
@@ -478,7 +672,8 @@ export class ContentView extends HTMLElement {
             tab.codeBlock.tab = tab
             tab.name = tab.codeBlock.name
             tab.suffix = tab.isPreview ? ' (output)' : ''
-            this.topTabList.listEl.insertAdjacentElement('beforeend', tab)
+            const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
+            tabList.listEl.insertAdjacentElement('beforeend', tab)
             tab.selected = true
           }
         }
@@ -497,7 +692,6 @@ export class ContentView extends HTMLElement {
       if (toSelect !== undefined) {
         toSelect.selected = true
       }
-      tab.codeBlock.codeEdit.remove()
     })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
   }
@@ -505,12 +699,14 @@ export class ContentView extends HTMLElement {
   showTab(tab) {
     const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
     let contentView = tab.isPreview ? tab.codeBlock.outputView : tab.codeBlock.codeEdit
-    if (tab.isPreview) {
-      const outputView = document.createElement('output-view')
-      tab.codeBlock.outputView = outputView
-      contentView = outputView
-    } else {
-      if (contentView === undefined) {
+    if (contentView === undefined) {
+      if (tab.isPreview) {
+        const outputView = document.createElement('output-view')
+        outputView.contentView = this
+        outputView.codeBlock = tab.codeBlock
+        tab.codeBlock.outputView = outputView
+        contentView = outputView
+      } else {
         const codeEdit = document.createElement('code-edit')
         codeEdit.fileType = tab.name.match(/\.([^.]+)/)[1]
         codeEdit.dark = true
@@ -976,12 +1172,15 @@ import {SplitView} from '/split-pane/split-view.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
 import {MarkdownView, MarkdownCodeBlock} from '/MarkdownView.js'
-import {ContentView} from '/ContentView.js'
+import {ContentView, OutputView} from '/ContentView.js'
 import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
 import {CodeEdit} from "/code-edit-new/CodeEdit.js"
+import {Builder} from '/loader/builder.js'
+
+OutputView.Builder = Builder
 
 customElements.define('split-view', SplitView)
 customElements.define('tab-item', TabItem)
@@ -990,6 +1189,7 @@ customElements.define('code-edit', CodeEdit)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('content-view', ContentView)
+customElements.define('output-view', OutputView)
 customElements.define('notebook-source-view', NotebookSourceView)
 customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
