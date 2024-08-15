@@ -18,9 +18,10 @@ TODO:
 - [x] make files open, not just tabs, when clicking a file
 - [x] make content files show according to selected tab
 - [x] make tabs draggable to a blank pane
-- [ ] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
+- [x] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
 - [x] add main, dev, test tab and code/download buttons to sidebar
 - [x] give tabs close buttons
+- [ ] implement download button
 - [ ] save tab state in notebook.json
 
 `notebook.json`
@@ -368,6 +369,12 @@ export class MarkdownView extends HTMLElement {
           codeBlock.tab.name = codeBlock.name
         }
       }
+      if (codeBlock.viewTab) {
+        foundTabs.add(codeBlock.viewTab)
+        if (codeBlock.viewTab.name !== codeBlock.name) {
+          codeBlock.viewTab.name = codeBlock.name
+        }
+      }
       if (codeBlock.codeEdit) {
         if (codeBlock.codeEdit.value !== codeBlock.content) {
           codeBlock.codeEdit.value = codeBlock.content
@@ -669,7 +676,11 @@ export class ContentView extends HTMLElement {
             tab = document.createElement('tab-item')
             tab.isPreview = isPreview
             tab.codeBlock = markdownCodeBlock
-            tab.codeBlock.tab = tab
+            if (tab.isPreview) {
+              tab.codeBlock.tab = tab
+            } else {
+              tab.codeBlock.viewTab = tab
+            }
             tab.name = tab.codeBlock.name
             tab.suffix = tab.isPreview ? ' (output)' : ''
             const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
@@ -893,7 +904,7 @@ export class SidebarView extends HTMLElement {
     downloadBtn.addEventListener('click', () => {
       
     })
-    iconContainer.append(downloadBtn, this.codeBtn)
+    iconContainer.append(this.codeBtn)  // TODO: add downloadBtn
     iconContainer.classList.add('icon-container')
     this.shadowRoot.append(this.tabList, iconContainer, ...Object.values(this.markdownViews))
   }
@@ -1177,7 +1188,7 @@ import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
-import {CodeEdit} from "/code-edit-new/CodeEdit.js"
+import {CodeEdit} from '/code-edit-new/CodeEdit.js'
 import {Builder} from '/loader/builder.js'
 
 OutputView.Builder = Builder
