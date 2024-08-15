@@ -75,7 +75,7 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set name(value) {
     this.nameEl.innerText = value
-    if (this.name === 'app.js') {
+    if (this.name.startsWith('app') && this.name.endsWith('.js')) {
       if (!this.viewButton) {
         this.viewButton = document.createElement('button')
         this.viewButton.innerText = '👁️'
@@ -338,11 +338,11 @@ export class MarkdownView extends HTMLElement {
   }
 
   get codeBlocks() {
-    return [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK').toReversed()
+    return [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK')
   }
 
   updateFromContentViews() {
-    const codeBlocks = this.codeBlocks
+    const codeBlocks = this.codeBlocks.toReversed()
     let updated = this.value
     let updateCount = 0
     for (const codeBlock of codeBlocks) {
@@ -523,7 +523,9 @@ export class OutputView extends HTMLElement {
     const files = this.codeBlock.markdownView.codeBlocks.map(cb => ({
       name: cb.name,
       data: cb.currentContent,
-    }))
+    })).filter(({name}) => (
+      (name === this.codeBlock.name) || !(name.startsWith('app') && name.endsWith('.js'))
+    ))
     let result = ''
     for (const file of files) {
       const extMatch = (file.name ?? '').match(/\.([\w-]+)/)
