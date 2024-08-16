@@ -1,6 +1,6 @@
 # App View
 
-This is the main view of the app. It has a sidebar and a content view.
+This is the main view of the app. It has a sidebar and a content view. Within the sidebar there is a list of files and an explore view.
 
 `notebook.json`
 
@@ -17,9 +17,155 @@ This is the main view of the app. It has a sidebar and a content view.
 }
 ```
 
-TODO: Add a page for the content of the notebook, perhaps called Project or Home.
+`ExploreView.js`
 
-TODO: Save the markdown for an instance in SessionStorage, and upon reloading, such as after a crash, give an option to download it, try running it again, or discard it (with confirmation).
+```js
+export class ExploreView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.init()
+  }
+
+  init() {
+    this.notebookTemplates = {
+      'intro.md': [
+        'app-content.md',
+      ],
+      'example-notebook.md': [
+        'tabbed.md',
+        'list.md',
+        'notebook-view.md',
+        // 'overlay.md',  # TODO
+      ],
+      'planets.csv': [
+        'table.md',
+        'data-cards.md',
+        'editable-data-table.md',
+      ],
+      'colors.json': [
+        'palette.md',
+        'shapes.md',
+      ],
+      'image.png': [
+        'image-filters.md',
+        'histogram.md',
+      ],
+      'font.woff2': [
+        'heading.md',
+      ],
+      'wiki-response.json': [
+        'json-tree.md',
+      ],
+      'files.json': [
+        'file-tree.md',
+        'json-tree.md',
+      ],
+    }
+    this.dataTemplates = Object.keys(this.notebookTemplates)
+    this.dataSelect = document.createElement('file-card-list')
+    this.dataSelect.name = 'Data'
+    this.dataSelect.items = this.dataTemplates.map((template, i) => {
+      const el = document.createElement('file-card')
+      el.name = template
+      if (i === 0) {
+        el.setAttribute('selected', true)
+      }
+      return el
+    })
+    this.dataSelect.addEventListener('select-item', e => {
+      this.updateNotebookItems()
+      this.dispatchEvent(new CustomEvent('selectNotebook'))
+    })
+    this.initImages(this.dataSelect.items)
+    this.notebookSelect = document.createElement('file-card-list')
+    this.notebookSelect.name = 'Notebook'
+    this.updateNotebookItems()
+    this.notebookSelect.addEventListener('select-item', e => {
+      this.dispatchEvent(new CustomEvent('selectNotebook'))
+    })
+    this.shadowRoot.append(this.dataSelect, this.notebookSelect)
+  }
+
+  initImages(items) {
+    const src = __source
+    const itemsByFile = Object.fromEntries(
+      [...items].map(item => {
+        return [item.filename, item]
+      })
+    )
+    for (const block of readBlocksWithNames(src)) {
+      const item = itemsByFile[block.name]
+      if (item !== undefined) {
+        const blockSrc = src.slice(...block.contentRange)
+        let thumbnail
+        for (const subBlock of readBlocksWithNames(blockSrc)) {
+          if (
+            thumbnail === undefined && (subBlock.name || '').match(/\.(png|jpe?g|svg|webm)/) ||
+            subBlock.name?.startsWith?.('thumbnail.')
+          ) {
+            thumbnail = subBlock
+          }
+        }
+        if (thumbnail !== undefined) {
+          const data = blockSrc.slice(...thumbnail.contentRange).replaceAll(
+            new RegExp(`\\$\\{image\\('([^']+)'\\)\\}`, 'g'),
+            (_, m) => {
+              const img = this.findImage(m)
+              return img ? this.dataUrl(...img) : m
+            }
+          )
+          item.image = this.dataUrl(thumbnail.name, data)
+        }
+      }
+    }
+  }
+
+  findImage(path) {
+    const parts = path.split('/')
+    for (const block of readBlocksWithNames(__source)) {
+      if (parts.at(0) === block.name) {
+        const blockSrc = __source.slice(...block.contentRange)
+        for (const innerBlock of readBlocksWithNames(blockSrc)) {
+          if (parts.at(1) === innerBlock.name) {
+            return [innerBlock.name, blockSrc.slice(...innerBlock.contentRange)]
+          }
+        }
+      }
+    }
+  }
+
+  updateNotebookItems() {
+    this.notebookSelect.items = this.notebookTemplates[
+      this.dataSelect.selectedItem.name
+    ].map((template, i) => {
+      const el = document.createElement('file-card')
+      el.name = template
+      if (i === 0) {
+        el.setAttribute('selected', true)
+      }
+      return el
+    })
+    this.initImages(this.notebookSelect.items)
+  }
+
+  dataUrl(name, data) {
+    const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
+    const mime = 'image/' + ({svg: 'svg+xml', jpg: 'jpeg'}[ext] ?? ext)
+    const urlData = ext === 'svg' ? btoa(data) : data.replaceAll(/\s+/g, '')
+    return `data:${mime};base64,${urlData}`
+  }
+
+  static get styles() {
+    let s; return s ?? (
+      v => { s = new CSSStyleSheet(); s.replaceSync(v); return s }
+    )(this.stylesCss)
+  }
+
+  static stylesCss = `
+    
+  `
+}
+```
 
 `AppView.js`
 
@@ -84,80 +230,11 @@ export class AppView extends HTMLElement {
     })
   }
 
-  dataUrl(name, data) {
-    const ext = name.match(/\.(\w+)$/).at(1) ?? 'png'
-    const mime = 'image/' + ({svg: 'svg+xml', jpg: 'jpeg'}[ext] ?? ext)
-    const urlData = ext === 'svg' ? btoa(data) : data.replaceAll(/\s+/g, '')
-    return `data:${mime};base64,${urlData}`
-  }
-
-  findImage(path) {
-    const parts = path.split('/')
-    for (const block of readBlocksWithNames(__source)) {
-      if (parts.at(0) === block.name) {
-        const blockSrc = __source.slice(...block.contentRange)
-        for (const innerBlock of readBlocksWithNames(blockSrc)) {
-          if (parts.at(1) === innerBlock.name) {
-            return [innerBlock.name, blockSrc.slice(...innerBlock.contentRange)]
-          }
-        }
-      }
-    }
-  }
-
-  initImages(items) {
-    const src = __source
-    const itemsByFile = Object.fromEntries(
-      [...items].map(item => {
-        return [item.filename, item]
-      })
-    )
-    for (const block of readBlocksWithNames(src)) {
-      const item = itemsByFile[block.name]
-      if (item !== undefined) {
-        const blockSrc = src.slice(...block.contentRange)
-        let thumbnail
-        for (const subBlock of readBlocksWithNames(blockSrc)) {
-          if (
-            thumbnail === undefined && (subBlock.name || '').match(/\.(png|jpe?g|svg|webm)/) ||
-            subBlock.name?.startsWith?.('thumbnail.')
-          ) {
-            thumbnail = subBlock
-          }
-        }
-        if (thumbnail !== undefined) {
-          const data = blockSrc.slice(...thumbnail.contentRange).replaceAll(
-            new RegExp(`\\$\\{image\\('([^']+)'\\)\\}`, 'g'),
-            (_, m) => {
-              const img = this.findImage(m)
-              return img ? this.dataUrl(...img) : m
-            }
-          )
-          item.image = this.dataUrl(thumbnail.name, data)
-        }
-      }
-    }
-  }
-
   fence(text, info = '') {
     const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
     const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
     const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
     return `\n${quotes}${info}\n${text}\n${quotes}\n`
-  }
-
-  updateNotebookItems() {
-    this.notebookSelect.items = this.notebookTemplates[
-      this.dataSelect.selectedItem.name
-    ].map((template, i) => {
-      const el = document.createElement('file-card')
-      el.name = template
-      if (i === 0) {
-        el.setAttribute('selected', true)
-      }
-      return el
-    })
-    this.initImages(this.notebookSelect.items)
   }
 
   displayNotebook() {
@@ -193,9 +270,9 @@ ${runEntry}
       const src = __source
       let dataSrc = '', notebookSrc = ''
       const notebookFile = this.mode === 'explore' ?
-        this.notebookSelect.selectedItem?.name : 'tabbed.md'
+        this.exploreView.notebookSelect.selectedItem?.name : 'tabbed.md'
       const dataFile = this.mode === 'explore' ?
-        this.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
+        this.exploreView.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
       for (const block of readBlocksWithNames(src)) {
         if (block.name === notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -262,9 +339,6 @@ ${runEntry}
 
   set mode(value) {
     this._mode = value
-    if (value === 'explore') {
-      this.showExplore()
-    }
   }
 
   async switchTab(name, el) {
@@ -275,7 +349,13 @@ ${runEntry}
     if (name === 'Files' && !this.filesView) {
       await this.initFiles()
     } else if (name === 'Explore' && !this.exploreView) {
-      await this.initExplore()
+      this.exploreView = document.createElement('explore-view')
+      this.exploreView.addEventListener('selectNotebook', () => {
+        this.displayNotebook()
+      })
+      this.selectPane.append(this.exploreView)
+      await this.exploreView.init()
+      this.exploreView.classList.add()
     }
     for (const [tabName, el] of [
       ['Files', this.filesView], ['Explore', this.exploreView]
@@ -303,69 +383,6 @@ ${runEntry}
     })
     this.filesView.append(this.fileTree)
     this.selectPane.append(this.filesView)
-  }
-
-  async initExplore() {
-    this.notebookTemplates = {
-      'intro.md': [
-        'app-content.md',
-      ],
-      'example-notebook.md': [
-        'tabbed.md',
-        'list.md',
-        'notebook-view.md',
-        // 'overlay.md',  # TODO
-      ],
-      'planets.csv': [
-        'table.md',
-        'data-cards.md',
-        'editable-data-table.md',
-      ],
-      'colors.json': [
-        'palette.md',
-        'shapes.md',
-      ],
-      'image.png': [
-        'image-filters.md',
-        'histogram.md',
-      ],
-      'font.woff2': [
-        'heading.md',
-      ],
-      'wiki-response.json': [
-        'json-tree.md',
-      ],
-      'files.json': [
-        'file-tree.md',
-        'json-tree.md',
-      ],
-    }
-    this.dataTemplates = Object.keys(this.notebookTemplates)
-    this.dataSelect = document.createElement('file-card-list')
-    this.dataSelect.name = 'Data'
-    this.dataSelect.items = this.dataTemplates.map((template, i) => {
-      const el = document.createElement('file-card')
-      el.name = template
-      if (i === 0) {
-        el.setAttribute('selected', true)
-      }
-      return el
-    })
-    this.dataSelect.addEventListener('select-item', e => {
-      this.updateNotebookItems()
-      this.displayNotebook()
-    })
-    this.initImages(this.dataSelect.items)
-    this.notebookSelect = document.createElement('file-card-list')
-    this.notebookSelect.name = 'Notebook'
-    this.updateNotebookItems()
-    this.notebookSelect.addEventListener('select-item', e => {
-      this.displayNotebook()
-    })
-    this.exploreView = document.createElement('div')
-    this.exploreView.classList.add('explore', 'tab-content')
-    this.exploreView.append(this.dataSelect, this.notebookSelect)
-    this.selectPane.append(this.exploreView)
   }
 
   static get globalStyles() {
@@ -430,7 +447,7 @@ ${runEntry}
       background-color: #0000004d;
       border-radius: 4px;
     }
-    div.explore, div.files {
+    explore-view, div.files {
       display: flex;
       flex-direction: column;
       overflow-y: auto;
@@ -504,12 +521,14 @@ import {FileCardList} from '/file-cards/FileCardList.js'
 import {FileTree} from '/file-tree/file-tree.js'
 import {Storage} from '/storage/storage.js'
 import {AppView} from '/AppView.js'
+import {ExploreView} from '/ExploreView.js'
 
 customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
 customElements.define('file-tree', FileTree)
 customElements.define('app-view', AppView)
+customElements.define('explore-view', ExploreView)
 
 async function setup() {
   const appView = document.createElement('app-view')
