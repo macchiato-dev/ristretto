@@ -23,7 +23,6 @@ This is the main view of the app. It has a sidebar and a content view. Within th
 export class ExploreView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
-    this.init()
   }
 
   init() {
