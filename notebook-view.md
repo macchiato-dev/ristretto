@@ -148,6 +148,9 @@ export class MarkdownView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.render()
+    setTimeout(() => {
+      this.openInitialViews()
+    }, 50)
     this.shadowRoot.addEventListener('click', e => {
       if (e.target.tagName === 'A') {
         parent.postMessage(['link', e.target.href], '*')
@@ -408,6 +411,12 @@ export class MarkdownView extends HTMLElement {
     return s.replaceAll(/\r?\n/g, ' ').replaceAll(/[ \t]+/g, ' ')
   }
 
+  openInitialViews() {
+    this.sidebarView.contentView.openTabs(this.codeBlocks.filter(codeBlock => (
+      !['notebook.json', 'thumbnail.svg'].includes(codeBlock.name)
+    )))
+  }
+
   static get styles() {
     let s; return s ?? (v => { s = new CSSStyleSheet(); s.replaceSync(v); return s })(this.stylesCss)
   }
@@ -464,7 +473,7 @@ export class OutputView extends HTMLElement {
   }
 
   loadConfig(data) {
-    let config = {bundleFiles: [], importFiles: []}
+    let config = {bundleFiles: [], importFiles: [], dataFiles: []}
     try {
       config = {...config, ...JSON.parse(data)}
     } catch (err) {
@@ -477,7 +486,11 @@ export class OutputView extends HTMLElement {
     const codeBlocks = this.codeBlock.markdownView.codeBlocks
     const codeBlock = codeBlocks.find(cb => cb.name === 'notebook.json')
     this.loadConfig(codeBlock?.currentContent ?? '{}')
-    const newDepsConfig = {bundleFiles: this.config.bundleFiles, importFiles: this.config.importFiles}
+    const newDepsConfig = {
+      bundleFiles: this.config.bundleFiles,
+      importFiles: this.config.importFiles,
+      dataFiles: this.config.dataFiles,
+    }
     if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
       return this.deps
     } else {
@@ -524,7 +537,8 @@ export class OutputView extends HTMLElement {
       name: cb.name,
       data: cb.currentContent,
     })).filter(({name}) => (
-      (name === this.codeBlock.name) || !(name.startsWith('app') && name.endsWith('.js'))
+      (name === this.codeBlock.name) ||
+      !(name.startsWith('app') && name.endsWith('.js') && !name.includes('view'))
     ))
     let result = ''
     for (const file of files) {
@@ -669,27 +683,7 @@ export class ContentView extends HTMLElement {
       const markdownCodeBlock = target.getRootNode().host
       if (markdownCodeBlock?.tagName === 'MARKDOWN-CODE-BLOCK') {
         const isPreview = Boolean(target.closest('button.view'))
-        if (!this.getRootNode().host.classList.contains('source')) {
-          const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-          let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name && tab.isPreview === isPreview)
-          if (tab !== undefined) {
-            tab.selected = true
-          } else {
-            tab = document.createElement('tab-item')
-            tab.isPreview = isPreview
-            tab.codeBlock = markdownCodeBlock
-            if (tab.isPreview) {
-              tab.codeBlock.tab = tab
-            } else {
-              tab.codeBlock.viewTab = tab
-            }
-            tab.name = tab.codeBlock.name
-            tab.suffix = tab.isPreview ? ' (output)' : ''
-            const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
-            tabList.listEl.insertAdjacentElement('beforeend', tab)
-            tab.selected = true
-          }
-        }
+        this.openCodeBlock(markdownCodeBlock, isPreview)
       }
     })
     this.addEventListener('tabSelect', e => {
@@ -707,6 +701,30 @@ export class ContentView extends HTMLElement {
       }
     })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
+  }
+
+  openCodeBlock(markdownCodeBlock, isPreview) {
+    if (!this.getRootNode().host.classList.contains('source')) {
+      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
+      let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name && tab.isPreview === isPreview)
+      if (tab !== undefined) {
+        tab.selected = true
+      } else {
+        tab = document.createElement('tab-item')
+        tab.isPreview = isPreview
+        tab.codeBlock = markdownCodeBlock
+        if (tab.isPreview) {
+          tab.codeBlock.tab = tab
+        } else {
+          tab.codeBlock.viewTab = tab
+        }
+        tab.name = tab.codeBlock.name
+        tab.suffix = tab.isPreview ? ' (output)' : ''
+        const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
+        tabList.listEl.insertAdjacentElement('beforeend', tab)
+        tab.selected = true
+      }
+    }
   }
 
   showTab(tab) {
@@ -731,7 +749,7 @@ export class ContentView extends HTMLElement {
         contentView = codeEdit
       }
     }
-    if (contentView.parent !== area) {
+    if (contentView.parentElement !== area) {
       area.append(contentView)
     }
     contentView?.setAttribute('selected', '')
@@ -748,6 +766,27 @@ export class ContentView extends HTMLElement {
       if (tab.deleted !== deleted) {
         tab.deleted = deleted
       }
+    }
+  }
+
+  openTabs(codeBlocks) {
+    let i = 0
+    for (const codeBlock of codeBlocks) {
+      if (i < 3) {
+        this.openCodeBlock(codeBlock, false)
+        i++
+      }
+      if (codeBlock.shadowRoot.querySelector('button.view')) {
+        this.openCodeBlock(codeBlock, true)
+      }
+    }
+    const topCodeBlock = this.topTabList.tabs[0]?.codeBlock
+    if (topCodeBlock) {
+      this.openCodeBlock(topCodeBlock, false)
+    }
+    const bottomCodeBlock = this.bottomTabList.tabs[0]?.codeBlock
+    if (bottomCodeBlock) {
+      this.openCodeBlock(bottomCodeBlock, true)
     }
   }
 
@@ -935,6 +974,7 @@ export class SidebarView extends HTMLElement {
       const el = document.createElement('markdown-view')
       el.name = name
       el.value = content
+      el.sidebarView = this
       return [name, el]
     }))
   }
@@ -1031,6 +1071,7 @@ export class NotebookView extends HTMLElement {
       this.style.setProperty('--main-width', `${x}px`)
     })
     this.contentView = document.createElement('content-view')
+    this.sidebarView.contentView = this.contentView
     this.notebookSourceView = document.createElement('notebook-source-view')
     this.notebookSourceView.sidebarView = this.sidebarView
     this.sidebarView.notebookSourceView = this.notebookSourceView

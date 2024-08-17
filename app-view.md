@@ -269,7 +269,7 @@ ${runEntry}
       const src = __source
       let dataSrc = '', notebookSrc = ''
       const notebookFile = this.mode === 'explore' ?
-        this.exploreView.notebookSelect.selectedItem?.name : 'tabbed.md'
+        this.exploreView.notebookSelect.selectedItem?.name : 'notebook-view.md'
       const dataFile = this.mode === 'explore' ?
         this.exploreView.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
       for (const block of readBlocksWithNames(src)) {
