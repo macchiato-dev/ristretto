@@ -21,6 +21,8 @@ TODO:
 - [x] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
 - [x] add main, dev, test tab and code/download buttons to sidebar
 - [x] give tabs close buttons
+- [x] open some tabs on load
+- [x] make it the view for files
 - [ ] implement download button
 - [ ] save tab state in notebook.json
 
@@ -459,17 +461,20 @@ export class OutputView extends HTMLElement {
     this.viewFrame.sandbox = 'allow-scripts'
     this.shadowRoot.append(this.viewFrame)
     this.handleInput = this.handleInput.bind(this)
+    this.handleMessage = this.handleMessage.bind(this)
   }
 
   connectedCallback() {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.loadConfig()
     this.contentView.addEventListener('codeInput', this.handleInput)
+    addEventListener('message', this.handleMessage)
     this.update()
   }
 
   disconnectedCallback() {
     this.contentView.removeEventListener('codeInput', this.handleInput)
+    removeEventListener('message', this.handleMessage)
   }
 
   loadConfig(data) {
@@ -619,6 +624,12 @@ ${runEntry}
     this.viewFrame.remove()
     this.viewFrame = viewFrame
     this.displayNotebook()
+  }
+
+  handleMessage(e) {
+    if (e.source === this.viewFrame?.contentWindow) {
+      parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+    }
   }
 
   static get styles() {
@@ -820,7 +831,7 @@ export class ContentView extends HTMLElement {
         :host {
           display: grid;
           grid-template-rows: var(--top-area-height, 50%)
-            min-content calc(100% - var(--top-area-height, 50%));
+            min-content calc(100% - var(--top-area-height, 50%) - 3px);
           box-sizing: border-box;
           color: #d7d7d7;
         }
