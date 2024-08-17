@@ -52,7 +52,7 @@ Each block will optionally store its ranges for scrolling as well as error handl
 
 The inner reader reads inline content. This will use regexes to skip over the inline code blocks and the escaped characters. It will probably use [String.replace](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace) with [String.repeat](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/repeat), replacing them with some syntactically insignificant text, to skip over them, while saving the ranges. After that, the regexes will find the ranges for other inline features. CodeMirror calls these features *marks*. Once it has processed the inline content, it can be rendered, using the original text and the feature data with its ranges.
 
-`MarkdownView.js`
+`MarkdownCodeBlock.js`
 
 ```js
 export class MarkdownCodeBlock extends HTMLElement {
@@ -138,7 +138,11 @@ export class MarkdownCodeBlock extends HTMLElement {
     }
   `
 }
+```
 
+`MarkdownView.js`
+
+```js
 export class MarkdownView extends HTMLElement {
   constructor() {
     super()
@@ -1260,7 +1264,8 @@ export class ExampleView extends HTMLElement {
 import {SplitView} from '/split-pane/split-view.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
-import {MarkdownView, MarkdownCodeBlock} from '/MarkdownView.js'
+import {MarkdownCodeBlock} from '/MarkdownCodeBlock.js'
+import {MarkdownView} from '/MarkdownView.js'
 import {ContentView, OutputView} from '/ContentView.js'
 import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
