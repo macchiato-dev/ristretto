@@ -12,7 +12,9 @@ This is the main view of the app. It has a sidebar and a content view. Within th
     ["file-cards.md", "FileCard.js"],
     ["file-cards.md", "FileCardList.js"],
     ["split-pane.md", "split-view.js"],
-    ["file-tree.md", "file-tree.js"]
+    ["file-tree.md", "file-tree.js"],
+    ["tabs-new.md", "TabList.js"],
+    ["tabs-new.md", "TabItem.js"]
   ]
 }
 ```
@@ -519,6 +521,8 @@ import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
 import {FileTree} from '/file-tree/file-tree.js'
 import {Storage} from '/storage/storage.js'
+import {TabItem} from '/tabs-new/TabItem.js'
+import {TabList} from '/tabs-new/TabList.js'
 import {AppView} from '/AppView.js'
 import {ExploreView} from '/ExploreView.js'
 
@@ -526,6 +530,8 @@ customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
 customElements.define('file-tree', FileTree)
+customElements.define('tab-item', TabItem)
+customElements.define('tab-list', TabList)
 customElements.define('app-view', AppView)
 customElements.define('explore-view', ExploreView)
 
