@@ -354,7 +354,7 @@ ${runEntry}
       })
       this.selectPane.append(this.exploreView)
       await this.exploreView.init()
-      this.exploreView.classList.add()
+      this.exploreView.classList.add('tab-content')
     }
     for (const [tabName, el] of [
       ['Files', this.filesView], ['Explore', this.exploreView]
