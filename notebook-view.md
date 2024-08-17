@@ -491,7 +491,9 @@ export class OutputView extends HTMLElement {
       importFiles: this.config.importFiles,
       dataFiles: this.config.dataFiles,
     }
-    if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
+    if (typeof this.deps === 'string' &&
+        JSON.stringify(newDepsConfig) ===
+        JSON.stringify(this.depsConfig ?? null)) {
       return this.deps
     } else {
       const channel = new MessageChannel()
@@ -556,7 +558,10 @@ export class OutputView extends HTMLElement {
     const depsSection = '\n**' + 'deps' + '**' + '\n\n' + deps + '\n\n---\n'
     const notebookSection = '\n**' + 'notebook' + '**\n\n' + notebookContent + '\n\n'
     const notebookSrc = depsSection + notebookSection
-    const re = new RegExp(`(?:^|\n)\s*\n\`entry.js\`\n\s*\n${'`'.repeat(3)}.*?\n(.*?)${'`'.repeat(3)}\s*(?:\n|$)`, 's')
+    const re = new RegExp(
+      `(?:^|\n)\s*\n\`entry.js\`\n\s*\n${'`'.repeat(3)}.*?` +
+      `\n(.*?)${'`'.repeat(3)}\s*(?:\n|$)`, 's'
+    )
     const runEntry = `
 const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
 addEventListener('message', async e => {
@@ -642,6 +647,7 @@ export class ContentView extends HTMLElement {
   constructor() {
     super()
     this.codeViews = {}
+    this.ready = false
   }
 
   connectedCallback() {
@@ -694,7 +700,13 @@ export class ContentView extends HTMLElement {
     })
     this.addEventListener('tabClose', e => {
       const tab = e.composedPath()[0]
-      const toSelect = tab.selected ? (tab.previousElementSibling ?? tab.nextElementSibling ?? undefined) : undefined
+      const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
+      const toSelect = tab.selected ? (
+        tab.previousElementSibling ?? tab.nextElementSibling ?? undefined
+      ) : undefined
+      const contentView = tab.isPreview ?
+        tab.codeBlock.outputView : tab.codeBlock.codeEdit
+      contentView?.removeAttribute('selected')
       e.composedPath()[0].remove()
       if (toSelect !== undefined) {
         toSelect.selected = true
@@ -705,8 +717,13 @@ export class ContentView extends HTMLElement {
 
   openCodeBlock(markdownCodeBlock, isPreview) {
     if (!this.getRootNode().host.classList.contains('source')) {
-      const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-      let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name && tab.isPreview === isPreview)
+      const allTabs = this.topTabList.tabLists.map(
+        tabList => [...(tabList.tabs || [])]
+      ).flat()
+      let tab = allTabs.find(
+        tab => tab.name === markdownCodeBlock.name &&
+               tab.isPreview === isPreview
+      )
       if (tab !== undefined) {
         tab.selected = true
       } else {
@@ -743,7 +760,9 @@ export class ContentView extends HTMLElement {
         codeEdit.dark = true
         codeEdit.value = tab.codeBlock.content
         codeEdit.addEventListener('codeInput', () => {
-          tab.dispatchEvent(new CustomEvent('codeInput', {detail: tab.codeBlock, bubbles: true, composed: true}))
+          tab.dispatchEvent(new CustomEvent('codeInput', {
+            detail: tab.codeBlock, bubbles: true, composed: true
+          }))
         })
         tab.codeBlock.codeEdit = codeEdit
         contentView = codeEdit
@@ -754,10 +773,13 @@ export class ContentView extends HTMLElement {
     }
     contentView?.setAttribute('selected', '')
     for (const t of [...tab.tabList.tabs].filter(t => t !== tab)) {
-      const contentView = t.isPreview ? t.codeBlock.outputView : t.codeBlock.codeEdit
-      contentView?.removeAttribute?.('selected')
+      const contentView = t.isPreview ?
+        t.codeBlock.outputView : t.codeBlock.codeEdit
+      contentView?.removeAttribute('selected')
     }
-    tab.codeBlock.scrollIntoView({block: 'nearest'})
+    if (this.ready) {
+      tab.codeBlock.scrollIntoView({block: 'nearest'})
+    }
   }
 
   markDeletedTabs(foundTabs) {
@@ -788,6 +810,7 @@ export class ContentView extends HTMLElement {
     if (bottomCodeBlock) {
       this.openCodeBlock(bottomCodeBlock, true)
     }
+    this.ready = true
   }
 
   static get styles() {
@@ -796,7 +819,8 @@ export class ContentView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-rows: var(--top-area-height, 50%) min-content calc(100% - var(--top-area-height, 50%));
+          grid-template-rows: var(--top-area-height, 50%)
+            min-content calc(100% - var(--top-area-height, 50%));
           box-sizing: border-box;
           color: #d7d7d7;
         }
