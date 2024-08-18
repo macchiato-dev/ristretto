@@ -22,7 +22,12 @@ export class Builder {
   }
 
   getConfig() {
-    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
+    const defaultConfig = {
+      bundleFiles: [],
+      importFiles: [],
+      dataFiles: [],
+      includeFiles: [],
+    }
     for (const block of readBlocksWithNames(this.src)) {
       if (block.name === 'notebook.json') {
         return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
@@ -36,7 +41,12 @@ export class Builder {
     let entry = ''
     let loader = ''
     const config = this.getConfig()
-    const deps = [...config.bundleFiles, ...config.importFiles, ...config.dataFiles].map(a => a[0])
+    const deps = [
+      ...config.bundleFiles,
+      ...config.importFiles,
+      ...config.dataFiles,
+      ...config.includeFiles,
+    ].map(v => Array.isArray(v) ? v[0] : v)
     for (const block of readBlocksWithNames(this.parentSrc)) {
       if (block.name === 'loader.md') {
         loader = `\n\n` + this.parentSrc.slice(...block.blockRange)
