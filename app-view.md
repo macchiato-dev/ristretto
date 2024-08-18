@@ -33,7 +33,12 @@ TODO:
     "planets.csv.md",
     "table.md",
     "editable-data-table.md",
-    "data-cards.md"
+    "data-cards.md",
+    "notebook-view.md",
+    "code-edit-new.md",
+    "tabs-new.md",
+    "codemirror-bundle.md",
+    "font.woff2.md"
   ]
 }
 ```
