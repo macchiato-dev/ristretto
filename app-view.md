@@ -4,12 +4,20 @@ This is the main view of the app. It has a sidebar and a content view. Within th
 
 TODO:
 
-- [ ] Add list of tabs
-- [ ] Style tabs
+- [x] Add list of tabs
+- [x] Style tabs
 - [ ] Allow italic preview tabs (in tabs-new)
 - [ ] Open document clicked in sidebar in preview tab
-- [ ] Upon clicking a tab, make tab non-preview
-- [ ] Upon editing a tab, make tab non-preview
+- [ ] Add two initial tabs with content and make it switch between content
+- [ ] Upon clicking a preview tab, make tab non-preview
+- [ ] Upon editing a preview tab, make tab non-preview
+- [ ] Make it pull deps content from content in tabs, controlled by option in notebook.json
+- [ ] Make tab content show in sidebar
+- [ ] Make content in sidebar be deletable
+- [ ] Make it store edited content in session (set up postmessage in host)
+- [ ] Make sidebar collapsible
+- [ ] Make sidebar responsive
+- [ ] Make notebook-view responsive
 
 `notebook.json`
 
@@ -559,8 +567,14 @@ ${runEntry}
       background-color: #2b172a;
       padding: 2px;
       border-radius: 8px;
-      --bg-selected: #55391b;
+      --bg: #3a2a10;
+      --bg-hover: color-mix(in srgb, #3a2a10, #eda 5%);
+      --fg: #aaa;
+      --fg-hover: #ccc;
+      --bg-selected: #65491b;
+      --bg-selected-hover: color-mix(in srgb, #55391b, #eda 10%);
       --fg-selected: #d1cf3b;
+      --fg-selected-hover: color-mix(in srgb, #d1cf3b, #eee 10%);
     }
     @media (max-width: 600px) {
       :host {
