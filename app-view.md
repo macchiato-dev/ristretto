@@ -2,6 +2,15 @@
 
 This is the main view of the app. It has a sidebar and a content view. Within the sidebar there is a list of files and an explore view.
 
+TODO:
+
+- [ ] Add list of tabs
+- [ ] Style tabs
+- [ ] Allow italic preview tabs (in tabs-new)
+- [ ] Open document clicked in sidebar in preview tab
+- [ ] Upon clicking a tab, make tab non-preview
+- [ ] Upon editing a tab, make tab non-preview
+
 `notebook.json`
 
 ```json
@@ -15,9 +24,43 @@ This is the main view of the app. It has a sidebar and a content view. Within th
     ["file-tree.md", "file-tree.js"],
     ["tabs-new.md", "TabList.js"],
     ["tabs-new.md", "TabItem.js"]
+  ],
+  "includeFiles": [
+    "app-view.md",
+    "_welcome.md",
+    "intro.md",
+    "app-content.md",
+    "planets.csv.md",
+    "table.md",
+    "editable-data-table.md",
+    "data-cards.md"
   ]
 }
 ```
+
+This displays a document. There is one per tab. It renders a document in a sandboxed iframe.
+
+`DocView.js`
+
+```js
+export class DocView extends HTMLElement {
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+  }
+
+  static get styles() {
+    let s; return s ?? (
+      v => { s = new CSSStyleSheet(); s.replaceSync(v); return s }
+    )(this.stylesCss)
+  }
+
+  static stylesCss = `
+    
+  `
+}
+```
+
+This is the explore view. It has some example documents in different formats, and notebooks that can do something with each document.
 
 `ExploreView.js`
 
@@ -167,6 +210,8 @@ export class ExploreView extends HTMLElement {
   `
 }
 ```
+
+The AppView has the layout and manages the state of the app.
 
 `AppView.js`
 
