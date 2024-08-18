@@ -454,12 +454,15 @@ export class MarkdownView extends HTMLElement {
 }
 ```
 
-`ContentView.js`
+`OutputView.js`
 
 ```js
 export class OutputView extends HTMLElement {
   constructor() {
     super()
+    if (!this.constructor.initialized) {
+      throw new Error('OutputView not initialized')
+    }
     this.attachShadow({mode: 'open'})
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
@@ -631,8 +634,14 @@ ${runEntry}
   }
 
   handleMessage(e) {
-    if (e.source === this.viewFrame?.contentWindow) {
-      parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+    if (this.dispatchEvent(
+      new CustomEvent('notebookMessage', {
+        bubbles: true, cancelable: true, detail: {event: e}
+      })
+    )) {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+      }
     }
   }
 
@@ -656,8 +665,18 @@ ${runEntry}
     }
     return this._styles
   }
-}
 
+  static init({Builder}) {
+    this.Builder = Builder
+    this.initialized = true
+    return this
+  }
+}
+```
+
+`ContentView.js`
+
+```js
 export class ContentView extends HTMLElement {
   constructor() {
     super()
@@ -1266,15 +1285,14 @@ import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
 import {MarkdownCodeBlock} from '/MarkdownCodeBlock.js'
 import {MarkdownView} from '/MarkdownView.js'
-import {ContentView, OutputView} from '/ContentView.js'
+import {OutputView} from '/OutputView.js'
+import {ContentView} from '/ContentView.js'
 import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
 import {CodeEdit} from '/code-edit-new/CodeEdit.js'
 import {Builder} from '/loader/builder.js'
-
-OutputView.Builder = Builder
 
 customElements.define('split-view', SplitView)
 customElements.define('tab-item', TabItem)
@@ -1283,7 +1301,7 @@ customElements.define('code-edit', CodeEdit)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('content-view', ContentView)
-customElements.define('output-view', OutputView)
+customElements.define('output-view', OutputView.init({Builder}))
 customElements.define('notebook-source-view', NotebookSourceView)
 customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
