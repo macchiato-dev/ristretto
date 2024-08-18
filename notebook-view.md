@@ -480,7 +480,12 @@ export class OutputView extends HTMLElement {
   }
 
   loadConfig(data) {
-    let config = {bundleFiles: [], importFiles: [], dataFiles: []}
+    let config = {
+      bundleFiles: [],
+      importFiles: [],
+      dataFiles: [],
+      includeFiles: [],
+    }
     try {
       config = {...config, ...JSON.parse(data)}
     } catch (err) {
@@ -497,6 +502,7 @@ export class OutputView extends HTMLElement {
       bundleFiles: this.config.bundleFiles,
       importFiles: this.config.importFiles,
       dataFiles: this.config.dataFiles,
+      includeFiles: this.config.includeFiles,
     }
     if (typeof this.deps === 'string' &&
         JSON.stringify(newDepsConfig) ===

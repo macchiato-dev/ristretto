@@ -402,7 +402,12 @@ export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
-    this.depsConfig = {bundleFiles: [], importFiles: []}
+    this.depsConfig = {
+      bundleFiles: [],
+      importFiles: [],
+      dataFiles: [],
+      includeFiles: []
+    }
     this.notebook = this.getBlockContent('notebook.md')
     if ((this.notebook ?? true) === true) {
       const defExample = `export class Test {}`
@@ -504,7 +509,12 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
   }
 
   loadConfig(notebook) {
-    let config = {bundleFiles: [], importFiles: []}
+    let config = {
+      bundleFiles: [],
+      importFiles: [],
+      dataFiles: [],
+      includeFiles: []
+    }
     for (const block of readBlocksWithNames(notebook)) {
       if (block.name === 'notebook.json') {
         try {
@@ -519,7 +529,12 @@ document.body.innerHTML += '<p style="margin-top: 500px; color: blue">END.</p>'`
 
   async getDeps(notebook) {
     this.loadConfig(notebook)
-    const newDepsConfig = {bundleFiles: this.config.bundleFiles, importFiles: this.config.importFiles}
+    const newDepsConfig = {
+      bundleFiles: this.config.bundleFiles,
+      importFiles: this.config.importFiles,
+      dataFiles: this.config.dataFiles,
+      includeFiles: this.config.includeFiles,
+    }
     if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
       return this.deps
     } else {
