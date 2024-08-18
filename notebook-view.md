@@ -77,7 +77,10 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set name(value) {
     this.nameEl.innerText = value
-    if (this.name.startsWith('app') && this.name.endsWith('.js')) {
+    if (
+      this.name.startsWith('app') && this.name.endsWith('.js') &&
+      !this.name.includes('-view')
+    ) {
       if (!this.viewButton) {
         this.viewButton = document.createElement('button')
         this.viewButton.innerText = '👁️'
@@ -154,9 +157,6 @@ export class MarkdownView extends HTMLElement {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.render()
-    setTimeout(() => {
-      this.openInitialViews()
-    }, 50)
     this.shadowRoot.addEventListener('click', e => {
       if (e.target.tagName === 'A') {
         parent.postMessage(['link', e.target.href], '*')
@@ -206,6 +206,7 @@ export class MarkdownView extends HTMLElement {
         }
       }
     }))
+    this.dispatchEvent(new CustomEvent('renderMarkdown'))
   }
 
   *updateCodeBlocks() {
@@ -415,12 +416,6 @@ export class MarkdownView extends HTMLElement {
 
   static removeExtraSpace(s) {
     return s.replaceAll(/\r?\n/g, ' ').replaceAll(/[ \t]+/g, ' ')
-  }
-
-  openInitialViews() {
-    this.sidebarView.contentView.openTabs(this.codeBlocks.filter(codeBlock => (
-      !['notebook.json', 'thumbnail.svg'].includes(codeBlock.name)
-    )))
   }
 
   static get styles() {
@@ -816,6 +811,21 @@ export class ContentView extends HTMLElement {
     }
   }
 
+  openTabs(codeBlocks) {
+    for (const codeBlock of codeBlocks) {
+      this.openCodeBlock(
+        codeBlock, Boolean(codeBlock.shadowRoot.querySelector('button.view'))
+      )
+    }
+    for (const [cb, view] of [
+      [this.topTabList.tabs[0]?.codeBlock, false],
+      [this.bottomTabList.tabs[0]?.codeBlock, true]
+    ].filter(([cb, _]) => cb !== undefined)) {
+      this.openCodeBlock(cb, view)
+    }
+    this.ready = true
+  }
+
   markDeletedTabs(foundTabs) {
     for (const tab of [...this.topTabList.tabs, ...this.bottomTabList.tabs]) {
       const deleted = !foundTabs.has(tab)
@@ -823,28 +833,6 @@ export class ContentView extends HTMLElement {
         tab.deleted = deleted
       }
     }
-  }
-
-  openTabs(codeBlocks) {
-    let i = 0
-    for (const codeBlock of codeBlocks) {
-      if (i < 3) {
-        this.openCodeBlock(codeBlock, false)
-        i++
-      }
-      if (codeBlock.shadowRoot.querySelector('button.view')) {
-        this.openCodeBlock(codeBlock, true)
-      }
-    }
-    const topCodeBlock = this.topTabList.tabs[0]?.codeBlock
-    if (topCodeBlock) {
-      this.openCodeBlock(topCodeBlock, false)
-    }
-    const bottomCodeBlock = this.bottomTabList.tabs[0]?.codeBlock
-    if (bottomCodeBlock) {
-      this.openCodeBlock(bottomCodeBlock, true)
-    }
-    this.ready = true
   }
 
   static get styles() {
@@ -1147,6 +1135,19 @@ export class NotebookView extends HTMLElement {
       this.sidebarView.codeBtn.classList.toggle('on', enabled)
       this.classList.toggle('source', enabled)
     })
+    const initialOpenLimit = Date.now() + 1000
+    for (const markdownView of Object.values(this.sidebarView.markdownViews)) {
+      markdownView.addEventListener('renderMarkdown', e => {
+        if (Date.now() < initialOpenLimit) {
+          const codeBlocks = markdownView.codeBlocks.filter(codeBlock => (
+            !['notebook.json', 'thumbnail.svg'].includes(codeBlock.name)
+          ))
+          this.contentView.openTabs(codeBlocks.filter((codeBlock, i) => (
+            i < 3 || codeBlock.viewButton
+          )))
+        }
+      }, {once: true})
+    }
     this.shadowRoot.append(this.contentView, this.notebookSourceView, this.split, this.sidebarView)
   }
 
