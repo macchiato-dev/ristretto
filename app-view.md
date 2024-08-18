@@ -246,7 +246,17 @@ export class AppView extends HTMLElement {
     this.selectPane.setAttribute('draggable', 'false')
     this.viewPane = document.createElement('div')
     this.viewPane.classList.add('view-pane')
-    this.viewPane.setAttribute('draggable', 'false')
+    this.tabList = document.createElement('tab-list')
+    this.tabList.tabs = ['_welcome.md', 'New Tab'].map(name => {
+      const el = document.createElement('tab-item')
+      el.name = name
+      return el
+    })
+    this.tabList.tabs[0].selected = true
+    this.contentPane = document.createElement('div')
+    this.contentPane.append(this.tabList, this.viewPane)
+    this.contentPane.classList.add('content-pane')
+    this.contentPane.setAttribute('draggable', 'false')
     this.split = document.createElement('split-view')
     this.split.addEventListener('split-view-resize', e => {
       const x = e.detail.offsetX - this.offsetLeft
@@ -256,7 +266,7 @@ export class AppView extends HTMLElement {
       )
     })
     this.split.setAttribute('draggable', 'false')
-    this.shadowRoot.append(this.selectPane, this.split, this.viewPane)
+    this.shadowRoot.append(this.selectPane, this.split, this.contentPane)
     this.switchTab('Files', this.selectTabs.children[0])
   }
 
@@ -528,11 +538,13 @@ ${runEntry}
     div.select .tab-content.active {
       display: flex;
     }
-    div.view-pane {
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
+    div.content-pane {
+      padding: 5px;
       padding-left: 0px;
+      display: grid;
+      grid-template-rows: min-content 1fr;
+      grid-template-columns: 1fr;
+      gap: 5px;
     }
     div.view-pane iframe {
       flex-grow: 1;
@@ -540,6 +552,15 @@ ${runEntry}
       padding: 10px;
       border-radius: 10px;
       background-color: #2b172a;
+      width: 100%;
+      height: 100%;
+    }
+    tab-list {
+      background-color: #2b172a;
+      padding: 2px;
+      border-radius: 8px;
+      --bg-selected: #55391b;
+      --fg-selected: #d1cf3b;
     }
     @media (max-width: 600px) {
       :host {
@@ -554,9 +575,12 @@ ${runEntry}
       div.select {
         padding-right: 10px;
       }
-      div.view-pane {
+      div.content-pane {
         padding-left: 10px;
         padding-bottom: 100px;
+      }
+      div.view-pane {
+        
       }
     }
   `
