@@ -6,7 +6,7 @@ TODO:
 
 - [x] Add list of tabs
 - [x] Style tabs
-- [ ] Allow italic preview tabs (in tabs-new)
+- [x] Allow italic preview tabs (in tabs-new)
 - [ ] Open document clicked in sidebar in preview tab
 - [ ] Add two initial tabs with content and make it switch between content
 - [ ] Upon clicking a preview tab, make tab non-preview
@@ -59,6 +59,134 @@ This displays a document. There is one per tab. It renders a document in a sandb
 export class DocView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
+    this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    addEventListener('message', async e => {
+      const {Builder} = this.constructor
+      if (e.source === this.viewFrame?.contentWindow) {
+        const [cmd, ...args] = e.data
+        const port = e.ports[0]
+        if (cmd === 'getDeps') {
+          const [notebookSrc] = args
+          const builder = new Builder({src: notebookSrc, parentSrc: __source})
+          const deps = builder.getDeps()
+          port.postMessage(deps)
+        } else if (['download', 'link'].includes(cmd)) {
+          parent.postMessage(e.data, '*')
+        }
+      }
+    })
+    if (this.notebookFile !== undefined && this.dataFile !== undefined) {
+      this.displayNotebook()
+    }
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
+  }
+
+  displayNotebook() {
+    const {Builder} = this.constructor
+    this.viewFrame = document.createElement('iframe')
+    this.viewFrame.sandbox = 'allow-scripts'
+    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+    const runEntry = `
+const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
+  }
+}, {once: true})
+    `.trim()
+    const src = `
+<!doctype html>
+<html>
+<head>
+  <title>doc</title>
+<script type="module">
+${runEntry}
+</script>
+</head>
+<body>
+</body>
+</html>
+`.trim()
+    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
+    // this.viewFrame.srcdoc = src.trim()
+    this.viewFrame.addEventListener('load', () => {
+      const src = __source
+      let dataSrc = '', notebookSrc = ''
+      for (const block of readBlocksWithNames(src)) {
+        if (block.name === this.notebookFile) {
+          const blockSrc = src.slice(...block.contentRange)
+          notebookSrc = blockSrc
+        }
+      }
+      const builder = new Builder({src: notebookSrc, parentSrc: src})
+      const depsSrc = builder.getDeps()
+      for (const block of readBlocksWithNames(src)) {
+        if (block.name === this.dataFile) {
+          if (this.mode === 'explore') {
+            dataSrc += `\n\n\`${block.name}\`\n\n` +
+              src.slice(...block.contentRange)
+          } else {
+            dataSrc += `\n\n\`notebook.md\`\n\n` +
+              this.fence(src.slice(...block.contentRange), 'md')
+          }
+        }
+      }
+      const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n` +
+        `**begin data**\n\n${dataSrc}\n\n---\n\n**notebook**\n\n${notebookSrc}\n\n`
+      const messageData = new TextEncoder().encode(messageText)
+      this.viewFrame.contentWindow.postMessage(
+        ['notebook', messageData],
+        '*',
+        [messageData.buffer]
+      )
+    })
+    this.shadowRoot.replaceChildren(this.viewFrame)
+  }
+
+  get mode() {
+    return this._mode
+  }
+
+  set mode(value) {
+    this._mode = value
+    if (this.shadowRoot) {
+      this.displayNotebook()
+    }
+  }
+
+  get notebookFile() {
+    return this._notebookFile
+  }
+
+  set notebookFile(value) {
+    this._notebookFile = value
+    if (this.shadowRoot) {
+      this.displayNotebook()
+    }
+  }
+
+  get dataFile() {
+    return this._dataFile
+  }
+
+  set dataFile(value) {
+    this._dataFile = value
+    if (this.shadowRoot) {
+      this.displayNotebook()
+    }
+  }
+
+  static init({Builder}) {
+    this.Builder = Builder
+    return this
   }
 
   static get styles() {
@@ -68,7 +196,12 @@ export class DocView extends HTMLElement {
   }
 
   static stylesCss = `
-    
+    iframe {
+      background-color: #2b172a;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
   `
 }
 ```
@@ -229,12 +362,11 @@ The AppView has the layout and manages the state of the app.
 `AppView.js`
 
 ```js
-import {Builder} from '/loader/builder.js'
-
 export class AppView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
+    this.mode = 'files'
     this.selectTabs = document.createElement('div')
     this.selectTabs.append(...['Files', 'Explore'].map(name => {
       const el = document.createElement('a')
@@ -252,17 +384,24 @@ export class AppView extends HTMLElement {
     this.selectPane.append(this.selectTabs)
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
-    this.viewPane = document.createElement('div')
-    this.viewPane.classList.add('view-pane')
+    this.previewDocView = document.createElement('doc-view')
+    this.previewDocView.classList.add('preview')
+    this.previewDocView.mode = this.mode
+    this.previewDocView.notebookFile = 'notebook-view.md'
+    this.previewDocView.dataFile = '_welcome.md'
     this.tabList = document.createElement('tab-list')
-    this.tabList.tabs = ['_welcome.md', 'New Tab'].map(name => {
+    this.tabList.tabs = ['New Tab', '_welcome.md'].map(name => {
       const el = document.createElement('tab-item')
       el.name = name
+      if (el.name === '_welcome.md') {
+        el.preview = true
+      }
       return el
     })
     this.tabList.tabs[0].selected = true
+    this.tabList.tabs[1].docView = this.previewDocView
     this.contentPane = document.createElement('div')
-    this.contentPane.append(this.tabList, this.viewPane)
+    this.contentPane.append(this.tabList, this.previewDocView)
     this.contentPane.classList.add('content-pane')
     this.contentPane.setAttribute('draggable', 'false')
     this.split = document.createElement('split-view')
@@ -283,94 +422,6 @@ export class AppView extends HTMLElement {
     if (![...document.adoptedStyleSheets].includes(this.constructor.globalStyles)) {
       document.adoptedStyleSheets = [...document.adoptedStyleSheets, this.constructor.globalStyles]
     }
-    addEventListener('message', async e => {
-      if (e.source === this.viewFrame?.contentWindow) {
-        const [cmd, ...args] = e.data
-        const port = e.ports[0]
-        if (cmd === 'getDeps') {
-          const [notebookSrc] = args
-          const builder = new Builder({src: notebookSrc, parentSrc: __source})
-          const deps = builder.getDeps()
-          port.postMessage(deps)
-        } else if (['download', 'link'].includes(cmd)) {
-          parent.postMessage(e.data, '*')
-        }
-      }
-    })
-  }
-
-  fence(text, info = '') {
-    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
-    const maxCount = matches.map(m => m[1].length).toSorted((a, b) => a - b).at(-1) ?? 0
-    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
-    return `\n${quotes}${info}\n${text}\n${quotes}\n`
-  }
-
-  displayNotebook() {
-    this.viewFrame = document.createElement('iframe')
-    this.viewFrame.sandbox = 'allow-scripts'
-    const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
-    const runEntry = `
-const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
-addEventListener('message', async e => {
-  if (e.data[0] === 'notebook') {
-    globalThis.__source = new TextDecoder().decode(e.data[1])
-    const entrySrc = globalThis.__source.match(re)[1]
-    await import(\`data:text/javascript;base64,\${btoa(entrySrc)}\`)
-  }
-}, {once: true})
-    `.trim()
-    const src = `
-<!doctype html>
-<html>
-<head>
-  <title>doc</title>
-<script type="module">
-${runEntry}
-</script>
-</head>
-<body>
-</body>
-</html>
-`.trim()
-    this.viewFrame.src = `data:text/html;base64,${btoa(src.trim())}`
-    // this.viewFrame.srcdoc = src.trim()
-    this.viewFrame.addEventListener('load', () => {
-      const src = __source
-      let dataSrc = '', notebookSrc = ''
-      const notebookFile = this.mode === 'explore' ?
-        this.exploreView.notebookSelect.selectedItem?.name : 'notebook-view.md'
-      const dataFile = this.mode === 'explore' ?
-        this.exploreView.dataSelect.selectedItem?.filename : this.fileTree.selected.slice(1).join('/')
-      for (const block of readBlocksWithNames(src)) {
-        if (block.name === notebookFile) {
-          const blockSrc = src.slice(...block.contentRange)
-          notebookSrc = blockSrc
-        }
-      }
-      const builder = new Builder({src: notebookSrc, parentSrc: src})
-      const depsSrc = builder.getDeps()
-      for (const block of readBlocksWithNames(src)) {
-        if (block.name === dataFile) {
-          if (this.mode === 'explore') {
-            dataSrc += `\n\n\`${block.name}\`\n\n` +
-              src.slice(...block.contentRange)
-          } else {
-            dataSrc += `\n\n\`notebook.md\`\n\n` +
-              this.fence(src.slice(...block.contentRange), 'md')
-          }
-        }
-      }
-      const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n` +
-        `**begin data**\n\n${dataSrc}\n\n---\n\n**begin notebook**\n\n${notebookSrc}\n\n`
-      const messageData = new TextEncoder().encode(messageText)
-      this.viewFrame.contentWindow.postMessage(
-        ['notebook', messageData],
-        '*',
-        [messageData.buffer]
-      )
-    })
-    this.viewPane.replaceChildren(this.viewFrame)
   }
 
   get selectedNotebook() {
@@ -420,7 +471,7 @@ ${runEntry}
     } else if (name === 'Explore' && !this.exploreView) {
       this.exploreView = document.createElement('explore-view')
       this.exploreView.addEventListener('selectNotebook', () => {
-        this.displayNotebook()
+        this.displayPreview()
       })
       this.selectPane.append(this.exploreView)
       await this.exploreView.init()
@@ -434,10 +485,12 @@ ${runEntry}
     el.classList.add('active')
     if (name === 'Explore') {
       this.mode = 'explore'
+      this.previewDocView.mode = this.mode
+      this.displayPreview()
     } else {
       this.mode = 'files'
+      this.previewDocView.mode = this.mode
     }
-    this.displayNotebook()
   }
 
   async initFiles() {
@@ -448,10 +501,20 @@ ${runEntry}
     this.fileTree.data = fileTreeData
     this.fileTree.selected = ['System', Object.keys(fileTreeData['System'])[0]]
     this.fileTree.addEventListener('select-item', () => {
-      this.displayNotebook()
+      this.displayPreview()
     })
     this.filesView.append(this.fileTree)
     this.selectPane.append(this.filesView)
+  }
+
+  displayPreview() {
+    this.previewDocView.notebookFile = this.mode === 'explore' ?
+      this.exploreView.notebookSelect.selectedItem?.name :
+      'notebook-view.md'
+    this.previewDocView.dataFile = this.mode === 'explore' ?
+      this.exploreView.dataSelect.selectedItem?.filename :
+      this.fileTree.selected.slice(1).join('/')
+    this.previewDocView.mode = this.mode
   }
 
   static get globalStyles() {
@@ -554,14 +617,12 @@ ${runEntry}
       grid-template-columns: 1fr;
       gap: 5px;
     }
-    div.view-pane iframe {
+    doc-view {
       flex-grow: 1;
       border: none;
       padding: 10px;
       border-radius: 10px;
       background-color: #2b172a;
-      width: 100%;
-      height: 100%;
     }
     tab-list {
       background-color: #2b172a;
@@ -611,8 +672,10 @@ import {FileTree} from '/file-tree/file-tree.js'
 import {Storage} from '/storage/storage.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
+import {DocView} from '/DocView.js'
 import {AppView} from '/AppView.js'
 import {ExploreView} from '/ExploreView.js'
+import {Builder} from '/loader/builder.js'
 
 customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
@@ -620,6 +683,7 @@ customElements.define('file-card-list', FileCardList)
 customElements.define('file-tree', FileTree)
 customElements.define('tab-item', TabItem)
 customElements.define('tab-list', TabList)
+customElements.define('doc-view', DocView.init({Builder}))
 customElements.define('app-view', AppView)
 customElements.define('explore-view', ExploreView)
 
