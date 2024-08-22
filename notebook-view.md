@@ -149,12 +149,12 @@ export class MarkdownCodeBlock extends HTMLElement {
 export class MarkdownView extends HTMLElement {
   constructor() {
     super()
+    this.attachShadow({mode: 'open'})
     this.codeBlockData = []
     this.codeBlockViews = new WeakMap()
   }
 
   connectedCallback() {
-    this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.render()
     this.shadowRoot.addEventListener('click', e => {
