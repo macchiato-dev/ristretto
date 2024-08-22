@@ -37,6 +37,7 @@ TODO:
   "includeFiles": [
     "app-view.md",
     "_welcome.md",
+    "blank-page.md",
     "intro.md",
     "app-content.md",
     "planets.csv.md",
@@ -120,7 +121,7 @@ ${runEntry}
     // this.viewFrame.srcdoc = src.trim()
     this.viewFrame.addEventListener('load', () => {
       const src = __source
-      let dataSrc = '', notebookSrc = ''
+      let notebookSrc = ''
       for (const block of readBlocksWithNames(src)) {
         if (block.name === this.notebookFile) {
           const blockSrc = src.slice(...block.contentRange)
@@ -129,17 +130,8 @@ ${runEntry}
       }
       const builder = new Builder({src: notebookSrc, parentSrc: src})
       const depsSrc = builder.getDeps()
-      for (const block of readBlocksWithNames(src)) {
-        if (block.name === this.dataFile) {
-          if (this.mode === 'explore') {
-            dataSrc += `\n\n\`${block.name}\`\n\n` +
-              src.slice(...block.contentRange)
-          } else {
-            dataSrc += `\n\n\`notebook.md\`\n\n` +
-              this.fence(src.slice(...block.contentRange), 'md')
-          }
-        }
-      }
+      const dataSrc = `\n\n\`notebook.md\`\n\n` +
+        this.fence(this.value, 'md')
       const messageText = `**begin deps**\n\n${depsSrc}\n\n---\n\n` +
         `**begin data**\n\n${dataSrc}\n\n---\n\n**notebook**\n\n${notebookSrc}\n\n`
       const messageData = new TextEncoder().encode(messageText)
@@ -180,8 +172,17 @@ ${runEntry}
 
   set dataFile(value) {
     this._dataFile = value
+    this.value = this.getFile(value)
     if (this.shadowRoot) {
       this.displayNotebook()
+    }
+  }
+
+  getFile(name) {
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name === name) {
+        return __source.slice(...block.contentRange)
+      }
     }
   }
 
@@ -368,6 +369,16 @@ export class AppView extends HTMLElement {
     super()
     this.attachShadow({mode: 'open'})
     this.mode = 'files'
+    this.markdownView = document.createElement('markdown-view')
+    this.markdownView.value = `
+# Project
+
+\`project.json\`
+
+${this.fence(JSON.stringify([]), 'json')}
+`.trimLeft()
+    this.markdownView.render()
+    this.shadowRoot.append(this.markdownView)
     this.selectTabs = document.createElement('div')
     this.selectTabs.append(...['Files', 'Explore'].map(name => {
       const el = document.createElement('a')
@@ -385,20 +396,21 @@ export class AppView extends HTMLElement {
     this.selectPane.append(this.selectTabs)
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
-    this.previewDocView = document.createElement('doc-view')
-    this.previewDocView.classList.add('preview')
-    this.previewDocView.mode = this.mode
-    this.previewDocView.notebookFile = 'notebook-view.md'
-    this.previewDocView.dataFile = '_welcome.md'
     this.tabList = document.createElement('tab-list')
     this.tabList.tabs = ['New Tab', '_welcome.md'].map(name => {
       const el = document.createElement('tab-item')
       el.name = name
+      el.docView = document.createElement('doc-view')
+      el.docView.classList.add('preview')
+      el.docView.mode = this.mode
+      el.docView.notebookFile = 'notebook-view.md'
+      el.docView.dataFile = el.name === '_welcome.md' ? '_welcome.md' : 'blank-page.md'
       if (el.name === '_welcome.md') {
         el.preview = true
       }
       return el
     })
+    this.previewDocView = this.tabList.tabs[1].docView
     this.tabList.tabs[0].selected = true
     this.tabList.tabs[1].docView = this.previewDocView
     this.contentPane = document.createElement('div')
@@ -530,6 +542,15 @@ export class AppView extends HTMLElement {
     )(this.stylesCss)
   }
 
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(
+      m => m[1].length
+    ).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
+  }
+
   static globalStylesCss = `
     body {
       margin: 0;
@@ -637,6 +658,9 @@ export class AppView extends HTMLElement {
       --bg-selected-hover: color-mix(in srgb, #55391b, #eda 10%);
       --fg-selected: #d1cf3b;
       --fg-selected-hover: color-mix(in srgb, #d1cf3b, #eee 10%);
+    }
+    markdown-view {
+      display: none;
     }
     @media (max-width: 600px) {
       :host {
