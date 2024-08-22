@@ -24,7 +24,8 @@ TODO:
 ```json
 {
   "importFiles": [
-    ["storage.md", "storage.js"],
+    ["notebook-view.md", "MarkdownCodeBlock.js"],
+    ["notebook-view.md", "MarkdownView.js"],
     ["loader.md", "builder.js"],
     ["file-cards.md", "FileCard.js"],
     ["file-cards.md", "FileCardList.js"],
@@ -665,11 +666,12 @@ export class AppView extends HTMLElement {
 `app.js`
 
 ```js
+import {MarkdownView} from '/notebook-view/MarkdownView.js'
+import {MarkdownCodeBlock} from '/notebook-view/MarkdownCodeBlock.js'
 import {SplitView} from '/split-pane/split-view.js'
 import {FileCard} from '/file-cards/FileCard.js'
 import {FileCardList} from '/file-cards/FileCardList.js'
 import {FileTree} from '/file-tree/file-tree.js'
-import {Storage} from '/storage/storage.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
 import {DocView} from '/DocView.js'
@@ -677,6 +679,8 @@ import {AppView} from '/AppView.js'
 import {ExploreView} from '/ExploreView.js'
 import {Builder} from '/loader/builder.js'
 
+customElements.define('markdown-view', MarkdownView)
+customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('split-view', SplitView)
 customElements.define('file-card', FileCard)
 customElements.define('file-card-list', FileCardList)
@@ -689,7 +693,6 @@ customElements.define('explore-view', ExploreView)
 
 async function setup() {
   const appView = document.createElement('app-view')
-  appView.storage = new Storage()
   appView.setAttribute('draggable', 'false')
   document.body.append(appView)
 }
