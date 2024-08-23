@@ -413,6 +413,7 @@ ${this.fence(JSON.stringify([]), 'json')}
       const el = document.createElement('tab-item')
       el.name = name
       el.docView = document.createElement('doc-view')
+      el.docView.tab = el
       el.docView.classList.add('preview')
       el.docView.mode = this.mode
       el.docView.notebookFile = 'notebook-view.md'
@@ -546,6 +547,7 @@ ${this.fence(JSON.stringify([]), 'json')}
   }
 
   displayPreview() {
+    this.previewDocView.tab.selected = true
     this.previewDocView.notebookFile = this.mode === 'explore' ?
       this.exploreView.notebookSelect.selectedItem?.name :
       'notebook-view.md'
