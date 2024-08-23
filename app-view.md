@@ -186,6 +186,18 @@ ${runEntry}
     }
   }
 
+  set selected(value) {
+    if (value) {
+      this.setAttribute('selected', '')
+    } else {
+      this.removeAttribute('selected')
+    }
+  }
+
+  get selected() {
+    return this.hasAttribute('selected')
+  }
+
   static init({Builder}) {
     this.Builder = Builder
     return this
@@ -412,9 +424,22 @@ ${this.fence(JSON.stringify([]), 'json')}
     })
     this.previewDocView = this.tabList.tabs[1].docView
     this.tabList.tabs[0].selected = true
-    this.tabList.tabs[1].docView = this.previewDocView
+    this.tabList.tabs[0].docView.selected = true
+    this.tabList.addEventListener('tabSelect', e => {
+      const target = e.composedPath()[0]
+      const selectedDocView = this.contentPane.querySelector('doc-view[selected]')
+      if (selectedDocView !== target.docView) {
+        if (selectedDocView) {
+          selectedDocView.selected = false
+        }
+        if (!target.docView.parentElement) {
+          this.contentPane.append(target.docView)
+        }
+        target.docView.selected = true
+      }
+    })
     this.contentPane = document.createElement('div')
-    this.contentPane.append(this.tabList, this.previewDocView)
+    this.contentPane.append(this.tabList, this.tabList.tabs[0].docView)
     this.contentPane.classList.add('content-pane')
     this.contentPane.setAttribute('draggable', 'false')
     this.split = document.createElement('split-view')
@@ -645,6 +670,9 @@ ${this.fence(JSON.stringify([]), 'json')}
       padding: 10px;
       border-radius: 10px;
       background-color: #2b172a;
+    }
+    doc-view:not([selected]) {
+      display: none;
     }
     tab-list {
       background-color: #2b172a;
