@@ -439,6 +439,12 @@ ${this.fence(JSON.stringify([]), 'json')}
         target.docView.selected = true
       }
     })
+    this.tabList.addEventListener('clickPreview', e => {
+      const target = e.composedPath()[0]
+      target.preview = false
+      target.docView.preview = false
+      this.previewDocView = undefined
+    })
     this.contentPane = document.createElement('div')
     this.contentPane.append(this.tabList, this.tabList.tabs[0].docView)
     this.contentPane.classList.add('content-pane')
@@ -547,14 +553,25 @@ ${this.fence(JSON.stringify([]), 'json')}
   }
 
   displayPreview() {
-    this.previewDocView.tab.selected = true
+    if (!this.previewDocView) {
+      this.previewDocView = document.createElement('doc-view')
+      this.previewDocView.preview = false
+      const tab = document.createElement('tab-item')
+      tab.docView = this.previewDocView
+      this.previewDocView.tab = tab
+      this.tabList.listEl.append(tab)
+    }
     this.previewDocView.notebookFile = this.mode === 'explore' ?
       this.exploreView.notebookSelect.selectedItem?.name :
       'notebook-view.md'
     this.previewDocView.dataFile = this.mode === 'explore' ?
       this.exploreView.dataSelect.selectedItem?.filename :
       this.fileTree.selected.slice(1).join('/')
+    this.previewDocView.tab.name = this.mode === 'explore' ?
+      this.exploreView.dataSelect.selectedItem?.filename :
+      this.fileTree.selected.at(-1)
     this.previewDocView.mode = this.mode
+    this.previewDocView.tab.selected = true
   }
 
   static get globalStyles() {
