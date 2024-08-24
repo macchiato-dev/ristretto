@@ -150,7 +150,11 @@ export class TabItem extends HTMLElement {
           }
         }
       } else if (!this.tabList.dragging) {
-        this.selected = true
+        if (this.selected && this.preview) {
+          this.dispatchEvent(new CustomEvent('clickPreview', {bubbles: true, composed: true}))
+        } else if (!this.selected) {
+          this.selected = true
+        }
       }
       this.moved = false
       this.pointerDown = false
@@ -590,6 +594,10 @@ export class ExampleView extends HTMLElement {
       if (toSelect !== undefined) {
         toSelect.selected = true
       }
+    })
+    this.addEventListener('clickPreview', e => {
+      const tab = e.composedPath()[0]
+      tab.preview = false
     })
     this.topTabList.tabs[0].deleted = true
   }
