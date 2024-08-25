@@ -441,9 +441,17 @@ ${this.fence(JSON.stringify([]), 'json')}
     })
     this.tabList.addEventListener('clickPreview', e => {
       const target = e.composedPath()[0]
+      this.previewDocView = undefined
       target.preview = false
       target.docView.preview = false
-      this.previewDocView = undefined
+    })
+    this.tabList.addEventListener('tabClose', e => {
+      const target = e.composedPath()[0]
+      if (target === this.previewDocView) {
+        this.previewDocView = undefined
+      }
+      target.docView.remove()
+      target.remove()
     })
     this.contentPane = document.createElement('div')
     this.contentPane.append(this.tabList, this.tabList.tabs[0].docView)
@@ -555,9 +563,10 @@ ${this.fence(JSON.stringify([]), 'json')}
   displayPreview() {
     if (!this.previewDocView) {
       this.previewDocView = document.createElement('doc-view')
-      this.previewDocView.preview = false
+      this.previewDocView.preview = true
       const tab = document.createElement('tab-item')
       tab.docView = this.previewDocView
+      tab.preview = true
       this.previewDocView.tab = tab
       this.tabList.listEl.append(tab)
     }
