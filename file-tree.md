@@ -2,6 +2,14 @@
 
 This displays a tree of files.
 
+TODO:
+
+- [ ] add method for getting item at path
+- [ ] document adding/removing files
+- [ ] keyboard navigation
+- [ ] showing bold
+- [ ] dot menu, configurable on active or on all items, show on hover when hover supported
+
 `notebook.json`
 
 ```json
