@@ -74,6 +74,12 @@ export class DocView extends HTMLElement {
           port.postMessage(deps)
         } else if (['download', 'link'].includes(cmd)) {
           parent.postMessage(e.data, '*')
+        } else if (cmd === 'edited') {
+          if (this.tab?.preview) {
+            this.classList.remove('preview')
+            this.tab.preview = false
+            this.getRootNode().host.previewDocView = undefined
+          }
         }
       }
     })

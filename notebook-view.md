@@ -798,6 +798,10 @@ export class ContentView extends HTMLElement {
           tab.dispatchEvent(new CustomEvent('codeInput', {
             detail: tab.codeBlock, bubbles: true, composed: true
           }))
+          if (!this.reportedEdit) {
+            parent.postMessage(['edited'], '*')
+            this.reportedEdit = true
+          }
         })
         tab.codeBlock.codeEdit = codeEdit
         contentView = codeEdit
