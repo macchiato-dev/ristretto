@@ -415,7 +415,7 @@ ${this.fence(JSON.stringify([]), 'json')}
     this.selectPane.classList.add('select')
     this.selectPane.setAttribute('draggable', 'false')
     this.tabList = document.createElement('tab-list')
-    this.tabList.tabs = ['New Tab', '_welcome.md'].map(name => {
+    this.tabList.tabs = ['_welcome.md', 'New Tab'].map(name => {
       const el = document.createElement('tab-item')
       el.name = name
       el.docView = document.createElement('doc-view')
@@ -429,7 +429,7 @@ ${this.fence(JSON.stringify([]), 'json')}
       }
       return el
     })
-    this.previewDocView = this.tabList.tabs[1].docView
+    this.previewDocView = this.tabList.tabs[0].docView
     this.tabList.tabs[0].selected = true
     this.tabList.tabs[0].docView.selected = true
     this.tabList.addEventListener('tabSelect', e => {
@@ -452,12 +452,16 @@ ${this.fence(JSON.stringify([]), 'json')}
       target.docView.preview = false
     })
     this.tabList.addEventListener('tabClose', e => {
-      const target = e.composedPath()[0]
-      if (target === this.previewDocView) {
+      const tab = e.composedPath()[0]
+      const toSelect = tab.selected ? (
+        tab.previousElementSibling ?? tab.nextElementSibling ?? undefined
+      ) : undefined
+      if (tab.docView === this.previewDocView) {
         this.previewDocView = undefined
       }
-      target.docView.remove()
-      target.remove()
+      tab.docView.remove()
+      tab.remove()
+      toSelect.selected = true
     })
     this.contentPane = document.createElement('div')
     this.contentPane.append(this.tabList, this.tabList.tabs[0].docView)
