@@ -1119,6 +1119,17 @@ export class NotebookView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    addEventListener('message', e => {
+      if (e.source === window.parent) {
+        const [cmd, ...args] = e.data
+        if (cmd === 'getNotebook') {
+          const port = e.ports[0]
+          const markdownView = Object.values(this.sidebarView.markdownViews)[0]
+          markdownView.updateFromContentViews()
+          port.postMessage({value: markdownView.value})
+        }
+      }
+    })
     this.sidebarView = document.createElement('sidebar-view')
     this.sidebarView.notebooks = this.notebooks
     this.split = document.createElement('split-view')

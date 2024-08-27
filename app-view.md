@@ -79,6 +79,9 @@ export class DocView extends HTMLElement {
         if (cmd === 'getDeps') {
           const [notebookSrc] = args
           const builder = new Builder({src: notebookSrc, parentSrc: __source})
+          for (const tab of this.getRootNode().host.tabList.tabs) {
+            console.log(tab.name, await tab.docView.getNotebook())
+          }
           const deps = builder.getDeps()
           port.postMessage(deps)
         } else if (['download', 'link'].includes(cmd)) {
@@ -157,6 +160,23 @@ ${runEntry}
       )
     })
     this.shadowRoot.replaceChildren(this.viewFrame)
+  }
+
+  async getNotebook() {
+    if (this.viewFrame?.contentWindow) {
+      const channel = new MessageChannel()
+      return await new Promise((resolve, reject) => {
+        channel.port1.onmessage = (message) => {
+          channel.port1.close()
+          resolve(message.data)
+        }
+        this.viewFrame.contentWindow.postMessage(
+          ['getNotebook'],
+          '*',
+          [channel.port2]
+        )
+      })
+    }
   }
 
   get mode() {
