@@ -7,10 +7,12 @@ TODO:
 - [x] Add list of tabs
 - [x] Style tabs
 - [x] Allow italic preview tabs (in tabs-new)
-- [ ] Open document clicked in sidebar in preview tab
-- [ ] Add two initial tabs with content and make it switch between content
-- [ ] Upon clicking a preview tab, make tab non-preview
-- [ ] Upon editing a preview tab, make tab non-preview
+- [x] Open document clicked in sidebar in preview tab
+- [x] Add two initial tabs with content and make it switch between content
+- [x] Upon clicking a preview tab, make tab non-preview
+- [x] Upon editing a preview tab, make tab non-preview
+- [ ] Make it open new tab on closing last tab, and only show welcome preview tab on load
+- [ ] Add new tab button
 - [ ] Make it pull deps content from content in tabs, controlled by option in notebook.json
 - [ ] Make tab content show in sidebar
 - [ ] Make content in sidebar be deletable
@@ -18,6 +20,13 @@ TODO:
 - [ ] Make sidebar collapsible
 - [ ] Make sidebar responsive
 - [ ] Make notebook-view responsive
+- [ ] Make sidebar hidden by default, with hamburger menu in tab area
+- [ ] have sidebar use a dropdown, and separate System from My Files
+- [ ] Make system show grouped pages (some hidden like drafts?) with an option to show all, and give it a search field
+- [ ] Have app tab area take up full size and give rest of screen to currently open page
+- [ ] Set up command-p menu and make it so app tabs can be shown or hidden, and so that iframe height can be customized
+- [ ] Provide way to open command-p menu on mobile
+- [ ] In new tab page, give it a dot menu, and add a suggestions area that can be hidden, with them centered, and depending on what's been entered or uploaded, and when hovering over them show a button with an icon to the right for opening it with a notebook view (otherwise open a plain view)
 
 `notebook.json`
 
