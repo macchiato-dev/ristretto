@@ -320,7 +320,7 @@ Only the content security policy needs to be changed in order to deploy this to 
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; webrtc 'block';">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#55391b">
     <title></title>
@@ -600,7 +600,7 @@ addEventListener('message', e => {
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; webrtc 'block';">
     <title></title>
 <style type="text/css">
 body, html {
