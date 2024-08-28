@@ -1,5 +1,9 @@
 # Header with font
 
+This renders a header with a custom font loaded from a code block.
+
+The base64 of the font is added to the stylesheet.
+
 `ExampleView.js`
 
 ```js
