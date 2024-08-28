@@ -45,8 +45,14 @@ export class ExampleView extends HTMLElement {
 
   getFont() {
     for (const block of readBlocksWithNames(__source)) {
+      const blockSrc = __source.slice(...block.contentRange)
       if (block.name === 'font.woff2') {
-        return __source.slice(...block.contentRange).replaceAll(/\s*/g, '')
+        return blockSrc.replaceAll(/\s*/g, '')
+      }
+      for (const subBlock of readBlocksWithNames(blockSrc)) {
+        if (subBlock.name === 'font.woff2') {
+          return blockSrc.slice(...subBlock.contentRange).replaceAll(/\s*/g, '')
+        }
       }
     }
   }
@@ -61,6 +67,16 @@ customElements.define('example-view', ExampleView)
 
 const el = document.createElement('example-view')
 document.body.append(el)
+```
+
+`notebook.json`
+
+```json
+{
+  "dataFiles": [
+    ["font.woff2.md", "font.woff2"]
+  ]
+}
 ```
 
 `thumbnail.svg`
