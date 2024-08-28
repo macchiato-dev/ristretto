@@ -515,38 +515,34 @@ export class OutputView extends HTMLElement {
       dataFiles: this.config.dataFiles,
       includeFiles: this.config.includeFiles,
     }
-    if (false) {
-      return this.deps
-    } else {
-      const channel = new MessageChannel()
-      let loaded = false
-      const remotePromise = new Promise((resolve, _) => {
-        channel.port1.onmessage = (message) => {
-          channel.port1.close()
-          loaded = true
-          resolve(message.data)
+    const channel = new MessageChannel()
+    let loaded = false
+    const remotePromise = new Promise((resolve, _) => {
+      channel.port1.onmessage = (message) => {
+        channel.port1.close()
+        loaded = true
+        resolve(message.data)
+      }
+      const depsJson = JSON.stringify(newDepsConfig, null, 2)
+      const depsCodeBlock = this.fence(depsJson, 'json')
+      const notebook = `\n\n${'`notebook.json`'}\n\n${depsCodeBlock}\n\n'}`
+      parent.postMessage(['getDeps', notebook], '*', [channel.port2])
+    })
+    const localPromise = new Promise((resolve, _reject) => {
+      setTimeout(() => {
+        if (loaded) {
+          resolve(undefined)
+        } else {
+          const builder = new this.constructor.Builder({src: '', parentSrc: __source})
+          const deps = builder.getDeps()
+          resolve(deps)
         }
-        const depsJson = JSON.stringify(newDepsConfig, null, 2)
-        const depsCodeBlock = this.fence(depsJson, 'json')
-        const notebook = `\n\n${'`notebook.json`'}\n\n${depsCodeBlock}\n\n'}`
-        parent.postMessage(['getDeps', notebook], '*', [channel.port2])
-      })
-      const localPromise = new Promise((resolve, _reject) => {
-        setTimeout(() => {
-          if (loaded) {
-            resolve(undefined)
-          } else {
-            const builder = new this.constructor.Builder({src: '', parentSrc: __source})
-            const deps = builder.getDeps()
-            resolve(deps)
-          }
-        }, 500)
-      })
-      const deps = await Promise.race([remotePromise, localPromise])
-      this.depsConfig = newDepsConfig
-      this.deps = deps
-      return deps
-    }
+      }, 500)
+    })
+    const deps = await Promise.race([remotePromise, localPromise])
+    this.depsConfig = newDepsConfig
+    this.deps = deps
+    return deps
   }
 
   fence(text, info = '') {
