@@ -190,7 +190,7 @@ export class MarkdownView extends HTMLElement {
           el.name = block.name
           el.content = block.content
           el.contentRange = block.contentRange
-          el.blockRange = block.blockRange
+          el.range = block.range
           el.info = block.info
           return el
         } else if (block.type === 'code') {
@@ -198,7 +198,7 @@ export class MarkdownView extends HTMLElement {
           el.name = block.name
           el.content = block.content
           el.contentRange = block.contentRange
-          el.blockRange = block.blockRange
+          el.range = block.range
           el.info = block.info
           el.markdownView = this
           this.codeBlockViews.set(block, el)
@@ -222,7 +222,7 @@ export class MarkdownView extends HTMLElement {
           codeBlock.name = block.name
           codeBlock.content = block.content
           codeBlock.contentRange = block.contentRange
-          codeBlock.blockRange = block.blockRange
+          codeBlock.range = block.range
           codeBlock.info = block.info
           yield codeBlock
           codeBlockData.splice(codeBlockData.indexOf(codeBlock), 1)
@@ -266,7 +266,7 @@ export class MarkdownView extends HTMLElement {
       const codeBlockStart = input.slice(pos).match(/^(`{3,})([^\n]*)\n/s)
       if (codeBlockStart) {
         const codeBlockEnd = input.slice(pos + codeBlockStart.index + codeBlockStart[0].length).match(
-          new RegExp(`\n${codeBlockStart[1]}[ \t]*(?:$|\n)`)
+          new RegExp(`(\n${codeBlockStart[1]})[ \t]*(?:$|\n)`)
         )
         if (codeBlockEnd) {
           yield {
@@ -280,10 +280,10 @@ export class MarkdownView extends HTMLElement {
               pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
             ],
             range: [
-              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
-              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length,
+              pos + codeBlockStart.index,
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[1].length,
             ],
-            info: codeBlockStart[1],
+            info: codeBlockStart[2],
           }
           pos += codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
           pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
@@ -348,7 +348,9 @@ export class MarkdownView extends HTMLElement {
   }
 
   get codeBlocks() {
-    return [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK')
+    return [...this.shadowRoot.children].filter(
+      el => el.tagName === 'MARKDOWN-CODE-BLOCK' && (el.name ?? '').length > 0
+    )
   }
 
   updateFromContentViews() {
@@ -360,9 +362,9 @@ export class MarkdownView extends HTMLElement {
       if (codeBlock.codeEdit) {
         const newValue = codeBlock.codeEdit.value
         if (currentValue !== newValue) {
-          // TODO: fence code block (allowing change in number of backquotes)
           // TODO: partial codemirror update
-          updated = updated.slice(0, codeBlock.contentRange[0]) + newValue + updated.slice(codeBlock.contentRange[1])
+          const newBlock = this.fence(codeBlock.codeEdit.value, codeBlock.info)
+          updated = updated.slice(0, codeBlock.range[0]) + newBlock + updated.slice(codeBlock.range[1])
           updateCount += 1
         }
       }
@@ -416,6 +418,15 @@ export class MarkdownView extends HTMLElement {
 
   static removeExtraSpace(s) {
     return s.replaceAll(/\r?\n/g, ' ').replaceAll(/[ \t]+/g, ' ')
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(
+      m => m[1].length
+    ).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `${quotes}${info}\n${text}\n${quotes}`
   }
 
   static get styles() {
