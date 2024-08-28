@@ -19,24 +19,41 @@ export class Builder {
   constructor({src, parentSrc}) {
     this.src = src
     this.parentSrc = parentSrc
+    this.edits = {}
   }
 
   getConfig() {
-    const defaultConfig = {bundleFiles: [], importFiles: [], dataFiles: []}
-    for (const block of readBlocksWithNames(this.src)) {
-      if (block.name === 'notebook.json') {
-        return {...defaultConfig, ...JSON.parse(this.src.slice(...block.contentRange))}
+    if (this._config === undefined) {
+      this._config = {
+        bundleFiles: [],
+        importFiles: [],
+        dataFiles: [],
+        includeFiles: [],
+      }
+      for (const block of readBlocksWithNames(this.src)) {
+        if (block.name === 'notebook.json') {
+          this._config = {...this._config, ...JSON.parse(this.src.slice(...block.contentRange))}
+        }
       }
     }
-    return defaultConfig
+    return this._config
+  }
+
+  getDepsFiles() {
+    const config = this.getConfig()
+    return [
+      ...config.bundleFiles,
+      ...config.importFiles,
+      ...config.dataFiles,
+      ...config.includeFiles,
+    ].map(v => Array.isArray(v) ? v[0] : v)
   }
 
   getDeps() {
     let result = ''
     let entry = ''
     let loader = ''
-    const config = this.getConfig()
-    const deps = [...config.bundleFiles, ...config.importFiles, ...config.dataFiles].map(a => a[0])
+    const deps = this.getDepsFiles()
     for (const block of readBlocksWithNames(this.parentSrc)) {
       if (block.name === 'loader.md') {
         loader = `\n\n` + this.parentSrc.slice(...block.blockRange)
@@ -47,10 +64,23 @@ export class Builder {
           }
         }
       } else if (deps.includes(block.name)) {
-        result += `\n\n` + this.parentSrc.slice(...block.blockRange)
+        if (block.name in this.edits) {
+          result += '\n\n`' + block.name + '`\n\n' + this.fence(this.edits[block.name], block.info) + '\n\n'
+        } else {
+          result += `\n\n` + this.parentSrc.slice(...block.blockRange)
+        }
       }
     }
     return entry + loader + result
+  }
+
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(
+      m => m[1].length
+    ).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `\n${quotes}${info}\n${text}\n${quotes}\n`
   }
 }
 ```

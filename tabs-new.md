@@ -5,18 +5,18 @@ This is a set of components for tabs that are draggable across different lists a
 TODO:
 
 - [x] Add drag and drop from tabs-draggable
-- [ ] Track the tab being dragged and style it differently
+- [x] Track the tab being dragged and style it differently
 - [ ] Allow cancelling drag with Esc and prevent dropping from changing what is selected
 - [x] Move on drag
-- [ ] Allow moving to other Tab List
+- [x] Allow moving to other Tab List
 - [x] Remove context menu
 - [ ] Move context menu to example
 - [ ] Support dragging with one finger to move, and dragging with two fingers or mousewheel to scroll (with arrows)
-- [ ] Make it show an x on hover
+- [x] Make it show an x on hover
 - [ ] Give extra space for scrollbar if it overflows
 - [ ] Roving keyboard navigation
 - [ ] Return focus after rename if renamed by double-click
-- [ ] Go to position on double-click
+- [ ] Edit and go to position on double-click
 - [ ] Support New Tab icon that is included in the scrolling
 
 `notebook.json`
@@ -150,7 +150,11 @@ export class TabItem extends HTMLElement {
           }
         }
       } else if (!this.tabList.dragging) {
-        this.selected = true
+        if (this.selected && this.preview) {
+          this.dispatchEvent(new CustomEvent('clickPreview', {bubbles: true, composed: true}))
+        } else if (!this.selected) {
+          this.selected = true
+        }
       }
       this.moved = false
       this.pointerDown = false
@@ -261,6 +265,14 @@ export class TabItem extends HTMLElement {
 
   set deleted(value) {
     this.classList.toggle('deleted', value)
+  }
+
+  get preview() {
+    return this.classList.contains('preview')
+  }
+
+  set preview(value) {
+    this.classList.toggle('preview', value)
   }
 
   get tabList() {
@@ -401,6 +413,10 @@ export class TabItem extends HTMLElement {
         }
         :host(.deleted) .name::before, :host(.deleted) .name::after {
           content: "\\00a0";
+        }
+        :host(.preview) {
+          font-style: italic;
+          font-weight: 300;
         }
       `)
     }
@@ -552,6 +568,7 @@ export class ExampleView extends HTMLElement {
     this.topTabBlankArea.classList.add('drop')
     this.topTabList.appendDropArea = this.topTabBlankArea
     this.topTabList.tabGroup = this.tabGroup
+    this.topTabList.tabs[4].preview = true
     this.topAreaHeader = document.createElement('div')
     this.topAreaHeader.classList.add('header')
     this.topAreaHeader.append(this.topTabList, this.topTabBlankArea)
@@ -577,6 +594,10 @@ export class ExampleView extends HTMLElement {
       if (toSelect !== undefined) {
         toSelect.selected = true
       }
+    })
+    this.addEventListener('clickPreview', e => {
+      const tab = e.composedPath()[0]
+      tab.preview = false
     })
     this.topTabList.tabs[0].deleted = true
   }

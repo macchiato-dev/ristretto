@@ -21,6 +21,8 @@ TODO:
 - [x] make it so default view opened is on bottom for app view and add code icon for opening code view (differentiated in tab)
 - [x] add main, dev, test tab and code/download buttons to sidebar
 - [x] give tabs close buttons
+- [x] open some tabs on load
+- [x] make it the view for files
 - [ ] implement download button
 - [ ] save tab state in notebook.json
 
@@ -50,7 +52,7 @@ Each block will optionally store its ranges for scrolling as well as error handl
 
 The inner reader reads inline content. This will use regexes to skip over the inline code blocks and the escaped characters. It will probably use [String.replace](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace) with [String.repeat](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/repeat), replacing them with some syntactically insignificant text, to skip over them, while saving the ranges. After that, the regexes will find the ranges for other inline features. CodeMirror calls these features *marks*. Once it has processed the inline content, it can be rendered, using the original text and the feature data with its ranges.
 
-`MarkdownView.js`
+`MarkdownCodeBlock.js`
 
 ```js
 export class MarkdownCodeBlock extends HTMLElement {
@@ -75,7 +77,10 @@ export class MarkdownCodeBlock extends HTMLElement {
 
   set name(value) {
     this.nameEl.innerText = value
-    if (this.name.startsWith('app') && this.name.endsWith('.js')) {
+    if (
+      this.name.startsWith('app') && this.name.endsWith('.js') &&
+      !this.name.includes('-view')
+    ) {
       if (!this.viewButton) {
         this.viewButton = document.createElement('button')
         this.viewButton.innerText = '👁️'
@@ -136,16 +141,20 @@ export class MarkdownCodeBlock extends HTMLElement {
     }
   `
 }
+```
 
+`MarkdownView.js`
+
+```js
 export class MarkdownView extends HTMLElement {
   constructor() {
     super()
+    this.attachShadow({mode: 'open'})
     this.codeBlockData = []
     this.codeBlockViews = new WeakMap()
   }
 
   connectedCallback() {
-    this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.render()
     this.shadowRoot.addEventListener('click', e => {
@@ -181,7 +190,7 @@ export class MarkdownView extends HTMLElement {
           el.name = block.name
           el.content = block.content
           el.contentRange = block.contentRange
-          el.blockRange = block.blockRange
+          el.range = block.range
           el.info = block.info
           return el
         } else if (block.type === 'code') {
@@ -189,7 +198,7 @@ export class MarkdownView extends HTMLElement {
           el.name = block.name
           el.content = block.content
           el.contentRange = block.contentRange
-          el.blockRange = block.blockRange
+          el.range = block.range
           el.info = block.info
           el.markdownView = this
           this.codeBlockViews.set(block, el)
@@ -197,6 +206,7 @@ export class MarkdownView extends HTMLElement {
         }
       }
     }))
+    this.dispatchEvent(new CustomEvent('renderMarkdown'))
   }
 
   *updateCodeBlocks() {
@@ -212,7 +222,7 @@ export class MarkdownView extends HTMLElement {
           codeBlock.name = block.name
           codeBlock.content = block.content
           codeBlock.contentRange = block.contentRange
-          codeBlock.blockRange = block.blockRange
+          codeBlock.range = block.range
           codeBlock.info = block.info
           yield codeBlock
           codeBlockData.splice(codeBlockData.indexOf(codeBlock), 1)
@@ -256,7 +266,7 @@ export class MarkdownView extends HTMLElement {
       const codeBlockStart = input.slice(pos).match(/^(`{3,})([^\n]*)\n/s)
       if (codeBlockStart) {
         const codeBlockEnd = input.slice(pos + codeBlockStart.index + codeBlockStart[0].length).match(
-          new RegExp(`\n${codeBlockStart[1]}[ \t]*(?:$|\n)`)
+          new RegExp(`(\n${codeBlockStart[1]})[ \t]*(?:$|\n)`)
         )
         if (codeBlockEnd) {
           yield {
@@ -270,10 +280,10 @@ export class MarkdownView extends HTMLElement {
               pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
             ],
             range: [
-              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index,
-              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length,
+              pos + codeBlockStart.index,
+              pos + codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[1].length,
             ],
-            info: codeBlockStart[1],
+            info: codeBlockStart[2],
           }
           pos += codeBlockStart.index + codeBlockStart[0].length + codeBlockEnd.index + codeBlockEnd[0].length
           pos += input.slice(pos).match(skipBlankLines)?.[0]?.length ?? 0
@@ -338,7 +348,9 @@ export class MarkdownView extends HTMLElement {
   }
 
   get codeBlocks() {
-    return [...this.shadowRoot.children].filter(el => el.tagName === 'MARKDOWN-CODE-BLOCK')
+    return [...this.shadowRoot.children].filter(
+      el => el.tagName === 'MARKDOWN-CODE-BLOCK' && (el.name ?? '').length > 0
+    )
   }
 
   updateFromContentViews() {
@@ -350,9 +362,9 @@ export class MarkdownView extends HTMLElement {
       if (codeBlock.codeEdit) {
         const newValue = codeBlock.codeEdit.value
         if (currentValue !== newValue) {
-          // TODO: fence code block (allowing change in number of backquotes)
           // TODO: partial codemirror update
-          updated = updated.slice(0, codeBlock.contentRange[0]) + newValue + updated.slice(codeBlock.contentRange[1])
+          const newBlock = this.fence(codeBlock.codeEdit.value, codeBlock.info)
+          updated = updated.slice(0, codeBlock.range[0]) + newBlock + updated.slice(codeBlock.range[1])
           updateCount += 1
         }
       }
@@ -408,6 +420,15 @@ export class MarkdownView extends HTMLElement {
     return s.replaceAll(/\r?\n/g, ' ').replaceAll(/[ \t]+/g, ' ')
   }
 
+  fence(text, info = '') {
+    const matches = Array.from(text.matchAll(new RegExp('^\\s*(`+)', 'gm')))
+    const maxCount = matches.map(
+      m => m[1].length
+    ).toSorted((a, b) => a - b).at(-1) ?? 0
+    const quotes = '`'.repeat(Math.max(maxCount + 1, 3))
+    return `${quotes}${info}\n${text}\n${quotes}`
+  }
+
   static get styles() {
     let s; return s ?? (v => { s = new CSSStyleSheet(); s.replaceSync(v); return s })(this.stylesCss)
   }
@@ -439,32 +460,43 @@ export class MarkdownView extends HTMLElement {
 }
 ```
 
-`ContentView.js`
+`OutputView.js`
 
 ```js
 export class OutputView extends HTMLElement {
   constructor() {
     super()
+    if (!this.constructor.initialized) {
+      throw new Error('OutputView not initialized')
+    }
     this.attachShadow({mode: 'open'})
     this.viewFrame = document.createElement('iframe')
     this.viewFrame.sandbox = 'allow-scripts'
     this.shadowRoot.append(this.viewFrame)
     this.handleInput = this.handleInput.bind(this)
+    this.handleMessage = this.handleMessage.bind(this)
   }
 
   connectedCallback() {
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     this.loadConfig()
     this.contentView.addEventListener('codeInput', this.handleInput)
+    addEventListener('message', this.handleMessage)
     this.update()
   }
 
   disconnectedCallback() {
     this.contentView.removeEventListener('codeInput', this.handleInput)
+    removeEventListener('message', this.handleMessage)
   }
 
   loadConfig(data) {
-    let config = {bundleFiles: [], importFiles: []}
+    let config = {
+      bundleFiles: [],
+      importFiles: [],
+      dataFiles: [],
+      includeFiles: [],
+    }
     try {
       config = {...config, ...JSON.parse(data)}
     } catch (err) {
@@ -477,39 +509,40 @@ export class OutputView extends HTMLElement {
     const codeBlocks = this.codeBlock.markdownView.codeBlocks
     const codeBlock = codeBlocks.find(cb => cb.name === 'notebook.json')
     this.loadConfig(codeBlock?.currentContent ?? '{}')
-    const newDepsConfig = {bundleFiles: this.config.bundleFiles, importFiles: this.config.importFiles}
-    if (typeof this.deps === 'string' && JSON.stringify(newDepsConfig) === JSON.stringify(this.depsConfig ?? null)) {
-      return this.deps
-    } else {
-      const channel = new MessageChannel()
-      let loaded = false
-      const remotePromise = new Promise((resolve, _) => {
-        channel.port1.onmessage = (message) => {
-          channel.port1.close()
-          loaded = true
-          resolve(message.data)
-        }
-        const depsJson = JSON.stringify(newDepsConfig, null, 2)
-        const depsCodeBlock = this.fence(depsJson, 'json')
-        const notebook = `\n\n${'`notebook.json`'}\n\n${depsCodeBlock}\n\n'}`
-        parent.postMessage(['getDeps', notebook], '*', [channel.port2])
-      })
-      const localPromise = new Promise((resolve, _reject) => {
-        setTimeout(() => {
-          if (loaded) {
-            resolve(undefined)
-          } else {
-            const builder = new this.constructor.Builder({src: '', parentSrc: __source})
-            const deps = builder.getDeps()
-            resolve(deps)
-          }
-        }, 500)
-      })
-      const deps = await Promise.race([remotePromise, localPromise])
-      this.depsConfig = newDepsConfig
-      this.deps = deps
-      return deps
+    const newDepsConfig = {
+      bundleFiles: this.config.bundleFiles,
+      importFiles: this.config.importFiles,
+      dataFiles: this.config.dataFiles,
+      includeFiles: this.config.includeFiles,
     }
+    const channel = new MessageChannel()
+    let loaded = false
+    const remotePromise = new Promise((resolve, _) => {
+      channel.port1.onmessage = (message) => {
+        channel.port1.close()
+        loaded = true
+        resolve(message.data)
+      }
+      const depsJson = JSON.stringify(newDepsConfig, null, 2)
+      const depsCodeBlock = this.fence(depsJson, 'json')
+      const notebook = `\n\n${'`notebook.json`'}\n\n${depsCodeBlock}\n\n'}`
+      parent.postMessage(['getDeps', notebook], '*', [channel.port2])
+    })
+    const localPromise = new Promise((resolve, _reject) => {
+      setTimeout(() => {
+        if (loaded) {
+          resolve(undefined)
+        } else {
+          const builder = new this.constructor.Builder({src: '', parentSrc: __source})
+          const deps = builder.getDeps()
+          resolve(deps)
+        }
+      }, 500)
+    })
+    const deps = await Promise.race([remotePromise, localPromise])
+    this.depsConfig = newDepsConfig
+    this.deps = deps
+    return deps
   }
 
   fence(text, info = '') {
@@ -524,7 +557,8 @@ export class OutputView extends HTMLElement {
       name: cb.name,
       data: cb.currentContent,
     })).filter(({name}) => (
-      (name === this.codeBlock.name) || !(name.startsWith('app') && name.endsWith('.js'))
+      (name === this.codeBlock.name) ||
+      !(name.startsWith('app') && name.endsWith('.js') && !name.includes('view'))
     ))
     let result = ''
     for (const file of files) {
@@ -542,7 +576,10 @@ export class OutputView extends HTMLElement {
     const depsSection = '\n**' + 'deps' + '**' + '\n\n' + deps + '\n\n---\n'
     const notebookSection = '\n**' + 'notebook' + '**\n\n' + notebookContent + '\n\n'
     const notebookSrc = depsSection + notebookSection
-    const re = new RegExp(`(?:^|\n)\s*\n\`entry.js\`\n\s*\n${'`'.repeat(3)}.*?\n(.*?)${'`'.repeat(3)}\s*(?:\n|$)`, 's')
+    const re = new RegExp(
+      `(?:^|\n)\s*\n\`entry.js\`\n\s*\n${'`'.repeat(3)}.*?` +
+      `\n(.*?)${'`'.repeat(3)}\s*(?:\n|$)`, 's'
+    )
     const runEntry = `
 const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
 addEventListener('message', async e => {
@@ -602,6 +639,18 @@ ${runEntry}
     this.displayNotebook()
   }
 
+  handleMessage(e) {
+    if (this.dispatchEvent(
+      new CustomEvent('notebookMessage', {
+        bubbles: true, cancelable: true, detail: {event: e}
+      })
+    )) {
+      if (e.source === this.viewFrame?.contentWindow) {
+        parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+      }
+    }
+  }
+
   static get styles() {
     if (!this._styles) {
       this._styles = new CSSStyleSheet()
@@ -622,12 +671,23 @@ ${runEntry}
     }
     return this._styles
   }
-}
 
+  static init({Builder}) {
+    this.Builder = Builder
+    this.initialized = true
+    return this
+  }
+}
+```
+
+`ContentView.js`
+
+```js
 export class ContentView extends HTMLElement {
   constructor() {
     super()
     this.codeViews = {}
+    this.ready = false
   }
 
   connectedCallback() {
@@ -669,27 +729,7 @@ export class ContentView extends HTMLElement {
       const markdownCodeBlock = target.getRootNode().host
       if (markdownCodeBlock?.tagName === 'MARKDOWN-CODE-BLOCK') {
         const isPreview = Boolean(target.closest('button.view'))
-        if (!this.getRootNode().host.classList.contains('source')) {
-          const allTabs = this.topTabList.tabLists.map(tabList => [...(tabList.tabs || [])]).flat()
-          let tab = allTabs.find(tab => tab.name === markdownCodeBlock.name && tab.isPreview === isPreview)
-          if (tab !== undefined) {
-            tab.selected = true
-          } else {
-            tab = document.createElement('tab-item')
-            tab.isPreview = isPreview
-            tab.codeBlock = markdownCodeBlock
-            if (tab.isPreview) {
-              tab.codeBlock.tab = tab
-            } else {
-              tab.codeBlock.viewTab = tab
-            }
-            tab.name = tab.codeBlock.name
-            tab.suffix = tab.isPreview ? ' (output)' : ''
-            const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
-            tabList.listEl.insertAdjacentElement('beforeend', tab)
-            tab.selected = true
-          }
-        }
+        this.openCodeBlock(markdownCodeBlock, isPreview)
       }
     })
     this.addEventListener('tabSelect', e => {
@@ -700,13 +740,48 @@ export class ContentView extends HTMLElement {
     })
     this.addEventListener('tabClose', e => {
       const tab = e.composedPath()[0]
-      const toSelect = tab.selected ? (tab.previousElementSibling ?? tab.nextElementSibling ?? undefined) : undefined
+      const area = tab.tabList === this.bottomTabList ? this.bottomArea : this.topArea
+      const toSelect = tab.selected ? (
+        tab.previousElementSibling ?? tab.nextElementSibling ?? undefined
+      ) : undefined
+      const contentView = tab.isPreview ?
+        tab.codeBlock.outputView : tab.codeBlock.codeEdit
+      contentView?.removeAttribute('selected')
       e.composedPath()[0].remove()
       if (toSelect !== undefined) {
         toSelect.selected = true
       }
     })
     this.shadowRoot.append(this.topArea, this.split, this.bottomArea)
+  }
+
+  openCodeBlock(markdownCodeBlock, isPreview) {
+    if (!this.getRootNode().host.classList.contains('source')) {
+      const allTabs = this.topTabList.tabLists.map(
+        tabList => [...(tabList.tabs || [])]
+      ).flat()
+      let tab = allTabs.find(
+        tab => tab.name === markdownCodeBlock.name &&
+               tab.isPreview === isPreview
+      )
+      if (tab !== undefined) {
+        tab.selected = true
+      } else {
+        tab = document.createElement('tab-item')
+        tab.isPreview = isPreview
+        tab.codeBlock = markdownCodeBlock
+        if (tab.isPreview) {
+          tab.codeBlock.tab = tab
+        } else {
+          tab.codeBlock.viewTab = tab
+        }
+        tab.name = tab.codeBlock.name
+        tab.suffix = tab.isPreview ? ' (output)' : ''
+        const tabList = tab.isPreview ? this.bottomTabList : this.topTabList
+        tabList.listEl.insertAdjacentElement('beforeend', tab)
+        tab.selected = true
+      }
+    }
   }
 
   showTab(tab) {
@@ -725,21 +800,45 @@ export class ContentView extends HTMLElement {
         codeEdit.dark = true
         codeEdit.value = tab.codeBlock.content
         codeEdit.addEventListener('codeInput', () => {
-          tab.dispatchEvent(new CustomEvent('codeInput', {detail: tab.codeBlock, bubbles: true, composed: true}))
+          tab.dispatchEvent(new CustomEvent('codeInput', {
+            detail: tab.codeBlock, bubbles: true, composed: true
+          }))
+          if (!this.reportedEdit) {
+            parent.postMessage(['edited'], '*')
+            this.reportedEdit = true
+          }
         })
         tab.codeBlock.codeEdit = codeEdit
         contentView = codeEdit
       }
     }
-    if (contentView.parent !== area) {
+    if (contentView.parentElement !== area) {
       area.append(contentView)
     }
     contentView?.setAttribute('selected', '')
     for (const t of [...tab.tabList.tabs].filter(t => t !== tab)) {
-      const contentView = t.isPreview ? t.codeBlock.outputView : t.codeBlock.codeEdit
-      contentView?.removeAttribute?.('selected')
+      const contentView = t.isPreview ?
+        t.codeBlock.outputView : t.codeBlock.codeEdit
+      contentView?.removeAttribute('selected')
     }
-    tab.codeBlock.scrollIntoView({block: 'nearest'})
+    if (this.ready) {
+      tab.codeBlock.scrollIntoView({block: 'nearest'})
+    }
+  }
+
+  openTabs(codeBlocks) {
+    for (const codeBlock of codeBlocks) {
+      this.openCodeBlock(
+        codeBlock, Boolean(codeBlock.shadowRoot.querySelector('button.view'))
+      )
+    }
+    for (const [cb, view] of [
+      [this.topTabList.tabs[0]?.codeBlock, false],
+      [this.bottomTabList.tabs[0]?.codeBlock, true]
+    ].filter(([cb, _]) => cb !== undefined)) {
+      this.openCodeBlock(cb, view)
+    }
+    this.ready = true
   }
 
   markDeletedTabs(foundTabs) {
@@ -757,7 +856,8 @@ export class ContentView extends HTMLElement {
       this._styles.replaceSync(`
         :host {
           display: grid;
-          grid-template-rows: var(--top-area-height, 50%) min-content calc(100% - var(--top-area-height, 50%));
+          grid-template-rows: var(--top-area-height, 50%)
+            min-content calc(100% - var(--top-area-height, 50%) - 3px);
           box-sizing: border-box;
           color: #d7d7d7;
         }
@@ -935,6 +1035,7 @@ export class SidebarView extends HTMLElement {
       const el = document.createElement('markdown-view')
       el.name = name
       el.value = content
+      el.sidebarView = this
       return [name, el]
     }))
   }
@@ -1023,6 +1124,17 @@ export class NotebookView extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
+    addEventListener('message', e => {
+      if (e.source === window.parent) {
+        const [cmd, ...args] = e.data
+        if (cmd === 'getNotebook') {
+          const port = e.ports[0]
+          const markdownView = Object.values(this.sidebarView.markdownViews)[0]
+          markdownView.updateFromContentViews()
+          port.postMessage({value: markdownView.value})
+        }
+      }
+    })
     this.sidebarView = document.createElement('sidebar-view')
     this.sidebarView.notebooks = this.notebooks
     this.split = document.createElement('split-view')
@@ -1031,6 +1143,7 @@ export class NotebookView extends HTMLElement {
       this.style.setProperty('--main-width', `${x}px`)
     })
     this.contentView = document.createElement('content-view')
+    this.sidebarView.contentView = this.contentView
     this.notebookSourceView = document.createElement('notebook-source-view')
     this.notebookSourceView.sidebarView = this.sidebarView
     this.sidebarView.notebookSourceView = this.notebookSourceView
@@ -1048,6 +1161,19 @@ export class NotebookView extends HTMLElement {
       this.sidebarView.codeBtn.classList.toggle('on', enabled)
       this.classList.toggle('source', enabled)
     })
+    const initialOpenLimit = Date.now() + 1000
+    for (const markdownView of Object.values(this.sidebarView.markdownViews)) {
+      markdownView.addEventListener('renderMarkdown', e => {
+        if (Date.now() < initialOpenLimit) {
+          const codeBlocks = markdownView.codeBlocks.filter(codeBlock => (
+            !['notebook.json', 'thumbnail.svg'].includes(codeBlock.name)
+          ))
+          this.contentView.openTabs(codeBlocks.filter((codeBlock, i) => (
+            i < 3 || codeBlock.viewButton
+          )))
+        }
+      }, {once: true})
+    }
     this.shadowRoot.append(this.contentView, this.notebookSourceView, this.split, this.sidebarView)
   }
 
@@ -1184,16 +1310,16 @@ export class ExampleView extends HTMLElement {
 import {SplitView} from '/split-pane/split-view.js'
 import {TabItem} from '/tabs-new/TabItem.js'
 import {TabList} from '/tabs-new/TabList.js'
-import {MarkdownView, MarkdownCodeBlock} from '/MarkdownView.js'
-import {ContentView, OutputView} from '/ContentView.js'
+import {MarkdownCodeBlock} from '/MarkdownCodeBlock.js'
+import {MarkdownView} from '/MarkdownView.js'
+import {OutputView} from '/OutputView.js'
+import {ContentView} from '/ContentView.js'
 import {NotebookSourceView} from '/NotebookSourceView.js'
 import {SidebarView} from '/SidebarView.js'
 import {NotebookView} from '/NotebookView.js'
 import {ExampleView} from '/ExampleView.js'
 import {CodeEdit} from '/code-edit-new/CodeEdit.js'
 import {Builder} from '/loader/builder.js'
-
-OutputView.Builder = Builder
 
 customElements.define('split-view', SplitView)
 customElements.define('tab-item', TabItem)
@@ -1202,7 +1328,7 @@ customElements.define('code-edit', CodeEdit)
 customElements.define('markdown-view', MarkdownView)
 customElements.define('markdown-code-block', MarkdownCodeBlock)
 customElements.define('content-view', ContentView)
-customElements.define('output-view', OutputView)
+customElements.define('output-view', OutputView.init({Builder}))
 customElements.define('notebook-source-view', NotebookSourceView)
 customElements.define('sidebar-view', SidebarView)
 customElements.define('notebook-view', NotebookView)
