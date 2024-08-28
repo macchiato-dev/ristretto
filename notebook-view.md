@@ -504,9 +504,7 @@ export class OutputView extends HTMLElement {
       dataFiles: this.config.dataFiles,
       includeFiles: this.config.includeFiles,
     }
-    if (typeof this.deps === 'string' &&
-        JSON.stringify(newDepsConfig) ===
-        JSON.stringify(this.depsConfig ?? null)) {
+    if (false) {
       return this.deps
     } else {
       const channel = new MessageChannel()

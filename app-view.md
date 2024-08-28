@@ -79,8 +79,15 @@ export class DocView extends HTMLElement {
         if (cmd === 'getDeps') {
           const [notebookSrc] = args
           const builder = new Builder({src: notebookSrc, parentSrc: __source})
-          for (const tab of this.getRootNode().host.tabList.tabs) {
-            console.log(tab.name, await tab.docView.getNotebook())
+          const config = builder.getConfig()
+          const depsFiles = builder.getDepsFiles()
+          if (config.applyDependencyEdits !== false) {
+            for (const tab of this.getRootNode().host.tabList.tabs) {
+              if (depsFiles.includes(tab.name)) {
+                const depNotebook = await tab.docView.getNotebook()
+                builder.edits[tab.name] = depNotebook.value
+              }
+            }
           }
           const deps = builder.getDeps()
           port.postMessage(deps)
