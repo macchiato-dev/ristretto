@@ -320,7 +320,7 @@ Only the content security policy needs to be changed in order to deploy this to 
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; webrtc 'block';">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; child-src: 'none'; webrtc 'block';">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#55391b">
     <title></title>
@@ -592,15 +592,13 @@ addEventListener('message', e => {
 </html>
 ```
 
-
-
 `frame.html`
 
 ```html
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; webrtc 'block';">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; frame-src https://ristretto.codeberg.page/inner-frame.html; webrtc 'block';">
     <title></title>
 <style type="text/css">
 body, html {
@@ -633,35 +631,7 @@ addEventListener('message', e => {
         const data = e.data[1]
         iframe.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
       })
-      const re = new RegExp('(?:^|\\n)\\s*\\n`entry.js`\\n\\s*\\n```.*?\\n(.*?)```\\s*(?:\\n|$)', 's')
-    const src = `
-<!doctype html>
-<html>
-  <head>
-    <title>frame</title>
-    <meta charset="utf-8">
-  </head>
-  <body>
-<script type="module">
-addEventListener('message', e => {
-  if (e.source === parent) {
-    if (e.data[0] === 'notebook') {
-      window.__source = new TextDecoder().decode(e.data[1])
-      const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
-      const entrySrc = window.__source.match(re)[1]
-      const script = document.createElement('script')
-      script.type = 'module'
-      script.textContent = entrySrc
-      document.body.append(script)
-    }
-  }
-})
-<-script>
-  </body>
-</html>
-      `.trim().replace('-script', '/script')
-      iframe.src = `data:text/html;base64,${btoa(src.trim())}`
-      // iframe.srcdoc = src.trim()
+      iframe.src = `/inner-frame.html?role=frame`
       document.body.replaceChildren(iframe)
     } else {
       iframe.contentWindow.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
@@ -670,6 +640,35 @@ addEventListener('message', e => {
 })
 </script>
   </body>
+</html>
+```
+
+`inner-frame.html`
+
+```html
+<!doctype html>
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; child-src 'none'; webrtc 'block';">
+  <title>doc</title>
+<script type="module">
+const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
+addEventListener('message', async e => {
+  if (e.data[0] === 'notebook') {
+    Object.defineProperties(window, Object.fromEntries(
+      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
+        name => ([name, {value: '', configurable: false, writable: false}])
+      )
+    ))
+    globalThis.__source = new TextDecoder().decode(e.data[1])
+    const entrySrc = globalThis.__source.match(re)[1]
+    await import(`data:text/javascript;base64,${btoa(entrySrc)}`)
+  }
+}, {once: true})
+</script>
+</head>
+<body>
+</body>
 </html>
 ```
 
