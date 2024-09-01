@@ -2,6 +2,22 @@
 
 This is the host for Ristretto. It facilitates uploading data, downloading data, and following links in a controlled manner.
 
+## Preventing exfiltration
+
+By having a restrictive Content-Security-Policy, a frame can be made exfiltration-resistant. This does that.
+There is one thing that allows exfiltration and that is [WebRTC](https://github.com/w3c/webappsec-csp/issues/92).
+There's no simple way to turn it off. It appears that removing everything RTC from the global scope before
+running code could work, because there seems to only be one global object with the RTC objects attatched to it
+per frame or worker, and there shouldn't be any other references to WebRTC. In order for this to work, the CSP
+for `child-src` would have to be `'none'` because any nested browsing contexts would get their own window object
+that has the original RTC objects attached to it. Ristretto heavily uses nested iframes. For this to work, it
+would need to overlay iframes instead. These could be managed with a custom web component `<overlay-frame>`
+that would send a postMessage to create the frame and set up a MessageChannel. It would keep track of the
+position and visibility and the object managing the frames could set CSS properties like `--frame-display`,
+`--frame-top`, `--frame-height` and so on. With nested ones it could add them up do generate it. To prevent
+having to add the dimensions in js, the variables could be set according to the nesting level and css calc could
+be used to compute them. So instead it could be `--frame-lvl0-display` and `--frame-lvl0-top`.
+
 ## Development
 
 The interface for showing *upload*, *download*, and *follow link* is developed here.
