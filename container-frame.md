@@ -1,4 +1,4 @@
-# Global Lockdown
+# ContainerFrame
 
 This attempts to remove the ability for a any code running an in `iframe` to access certain global variables by removing them from `globalThis`. It does this by prefixing all custom code with a call to a function that must be defined before the module is loaded, and checking that the function isn't declared within the module in a way that would be overridden from below where it's called.
 
@@ -6,18 +6,19 @@ How does it prefix all custom code? It has a Content-Security-Policy with a scri
 
 This Content-Security-Policy is applied to all iframes and workers beneath it. With the iframes and workers being beneath a sandboxed `data:` iframe, they can't access contentWindow of another iframe, making it so that it can't gain access to those certain global variables by that means.
 
-## RunFrame
+## ContainerFrame
 
 This creates an iFrame with a Content-Security-Policy containing all hashes when it's [connected](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks), and then proceeds to create a nested iFrame beneath it when it's loaded, so that the iFrame with the Content-Security-Policy can't be replaced with one without the Content-Security-Policy by navigating away from it.
 
-`RunFrame.js`
+`ContainerFrame.js`
 
 ```js
-export class RunFrame extends HTMLElement {
+export class ContainerFrame extends HTMLElement {
   constructor() {
     super()
     this.scripts = []
     this.fnName = 'GlobalLockdown'
+    this.callPrefix = `${this.fnName}()\n\n`
     this.lockdownScript = `
 globalThis.GlobalLockdown = function() {
   function replacementFn() { throw new Error('WebRTC call blocked') }
@@ -36,7 +37,7 @@ globalThis.GlobalLockdown = function() {
   throw new Error('Expected error creating WebRTC object')
 }
 GlobalLockdown()
-`
+`.trimLeft()
   }
 
   connectedCallback() {
@@ -49,35 +50,53 @@ GlobalLockdown()
   }
 
   checkForwardDeclarations(script) {
-    
+    if (script.includes(this.fnName)) {
+      throw new Error('')
+    }
   }
 
-  addCall() {
-    
+  addCall(script) {
+    return `${this.callPrefix}${script}`
   }
 
   async getSha(script) {
     this.checkForwardDeclarations(script)
     const scriptWithCall = this.addCall(script)
+    const data = new TextEncoder().encode(scriptWithCall)
+    const hash = await crypto.subtle.digest('SHA-384', data)
+    return hash
+  }
+
+  async getLockdownSha() {
+    const data = new TextEncoder().encode(this.lockdownSha)
+    const hash = await crypto.subtle.digest('SHA-384', data)
+    return hash
   }
 
   async initFrame() {
-    const result = await Promise.allSettled(
+    const results = await Promise.allSettled(
       this.scripts.map(script => this.getSha(script))
     )
-    this.scriptShas = result.map(result => {
-      
+    this.scriptShas = results.map(result => {
+      if (result.status === 'rejected') {
+        throw new Error('Digest failed')
+      } else {
+        return `sha384-${result.value}`
+      }
     })
+    const lockdownSha = await this.getLockdownSha()
+    this.scriptShas.unshift(`sha384-${lockdownSha}`)
     this.frame = document.createElement('iframe')
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
     const defaultSrc = `default-src data:`
     const styleSrc = `style-src data: 'unsafe-inline' 'unsafe-eval'`
-    const scriptSrc = `script-src 'unsafe-eval' ${scriptShas}`
+    const scriptSrc = `script-src 'unsafe-eval' ${scriptShas.join(' ')}`
     const webRtc = `webrtc 'block'`
-    meta.setAttribute('content', '; '.join(
+    meta.setAttribute('content', [
       defaultSrc, styleSrc, scriptSrc, webRtc
-    )
+    ].join('; '))
+    const metaTag = meta.outerHTML
   }
 }
 ```
@@ -129,7 +148,7 @@ export class AppView extends HTMLElement {
       }
     `
     this.shadowRoot.appendChild(style)
-    const runFrame = document.createElement('run-frame')
+    const runFrame = document.createElement('container-frame')
     this.shadowRoot.append(runFrame)
   }
 }
@@ -146,10 +165,10 @@ export class AppView extends HTMLElement {
 `app.js`
 
 ```js
-import {RunFrame} from '/RunFrame.js'
+import {ContainerFrame} from '/ContainerFrame.js'
 import {AppView} from '/AppView.js'
 
-customElements.define('run-frame', RunFrame)
+customElements.define('container-frame', ContainerFrame)
 customElements.define('app-view', AppView)
 
 const el = document.createElement('app-view')
