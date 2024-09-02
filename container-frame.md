@@ -174,3 +174,73 @@ customElements.define('app-view', AppView)
 const el = document.createElement('app-view')
 document.body.append(el)
 ```
+
+This tests that script SHAs are applied to the child iframe.
+
+`app-test-sha.js`
+
+```js
+async function prepareScript(src) {
+  const data = new TextEncoder().encode(src)
+  const shaData = await crypto.subtle.digest('SHA-256', data)
+  const shaText = await new Promise(r => {
+    const fr = new FileReader()
+    fr.onload = () => r(fr.result.split(',')[1])
+    fr.readAsDataURL(new Blob([shaData]))
+  })
+  const sha = `'sha256-${shaText}'`
+  const el = document.createElement('script')
+  el.type = 'module'
+  el.textContent = src
+  const tag = el.outerHTML
+  return {src, sha, tag}
+}
+
+async function setup() {
+  const script1 = await prepareScript(`
+addEventListener('message', e => {
+  const frameSrc = e.data
+  const iframe = document.createElement('iframe')
+  iframe.sandbox = 'allow-scripts'
+  iframe.src = \`data:text/html;base64,\${btoa(frameSrc)}\`
+  document.body.append(iframe)
+})
+`)
+  const script2 = await prepareScript(`document.body.append('hello')`)
+  const script3 = await prepareScript(`document.body.append('test')`)
+  const cspTag = document.createElement('meta')
+  cspTag.setAttribute('http-equiv', 'Content-Security-Policy')
+  cspTag.setAttribute(
+    'content',
+    [`default-src data:`, `script-src ${script1.sha} ${script2.sha}`].join('; ')
+  )
+  const frameSrc = `<!doctype html>
+<html>
+  <head>
+    ${cspTag.outerHTML}
+  </head>
+  <body>
+    ${script1.tag}
+  </body>
+</html>`
+  const subFrameSrc = `<!doctype html>
+<html>
+  <head>
+    ${cspTag.outerHTML}
+  </head>
+  <body>
+    ${script2.tag}
+    ${script3.tag}
+  </body>
+</html>`
+  const iframe = document.createElement('iframe')
+  iframe.sandbox = 'allow-scripts'
+  iframe.src = `data:text/html;base64,${btoa(frameSrc)}`
+  iframe.addEventListener('load', () => {
+    iframe.contentWindow.postMessage(subFrameSrc, '*')
+  })
+  document.body.append(iframe)
+}
+
+setup()
+```
