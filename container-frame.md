@@ -91,7 +91,7 @@ GlobalLockdown()
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
     const defaultSrc = `default-src data:`
     const styleSrc = `style-src data: 'unsafe-inline' 'unsafe-eval'`
-    const scriptSrc = `script-src 'unsafe-eval' ${scriptShas.join(' ')}`
+    const scriptSrc = `script-src 'unsafe-eval' ${this.scriptShas.join(' ')}`
     const webRtc = `webrtc 'block'`
     meta.setAttribute('content', [
       defaultSrc, styleSrc, scriptSrc, webRtc
