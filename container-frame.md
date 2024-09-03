@@ -6,21 +6,23 @@ How does it prefix all custom code? It has a Content-Security-Policy with a scri
 
 This Content-Security-Policy is applied to all iframes and workers beneath it. With the iframes and workers being beneath a sandboxed `data:` iframe, they can't access contentWindow of another iframe, making it so that it can't gain access to those certain global variables by that means.
 
-## ContainerFrame
+## ScriptRegistry
 
-This creates an iFrame with a Content-Security-Policy containing all hashes when it's [connected](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks), and then proceeds to create a nested iFrame beneath it when it's loaded, so that the iFrame with the Content-Security-Policy can't be replaced with one without the Content-Security-Policy by navigating away from it.
-
-`ContainerFrame.js`
+`ScriptRegistry.js`
 
 ```js
-export class ContainerFrame extends HTMLElement {
+export class ScriptRegistry {
+  #fnName
+  #prefix
+  #shas
+  #lockdownScript
+  #lockdownSha
+
   constructor() {
-    super()
-    this.scripts = []
-    this.fnName = 'GlobalLockdown'
-    this.callPrefix = `${this.fnName}()\n\n`
-    this.lockdownScript = `
-globalThis.GlobalLockdown = function() {
+    this.#fnName = 'GlobalLockdown'
+    this.#prefix = `${this.#fnName}()\n\n`
+    this.#shas = new Set()
+    this.#lockdownScript = lockdownScript = `globalThis.GlobalLockdown = function() {
   function replacementFn() { throw new Error('WebRTC call blocked') }
   if (!globalThis.lockdownComplete) {
     Object.defineProperties(window, Object.fromEntries(
@@ -36,8 +38,50 @@ globalThis.GlobalLockdown = function() {
   }
   throw new Error('Expected error creating WebRTC object')
 }
-GlobalLockdown()
-`.trimLeft()
+GlobalLockdown()`
+  }
+
+  checkShas(shas) {
+    
+  }
+
+  async addScript(str) {
+    if (!this.#lockdownSha) {
+      this.#lockdownSha = await this.getSha(this.#lockdownScript)
+    }
+  }
+
+  get lockdownScript() {
+    return this.#lockdownScript
+  }
+
+  get prefix() {
+    return this.#prefix
+  }
+
+  async getSha(src) {
+    const data = new TextEncoder().encode(src)
+    const shaData = await crypto.subtle.digest('SHA-384', data)
+    const shaText = await new Promise(r => {
+      const fr = new FileReader()
+      fr.onload = () => r(fr.result.split(',')[1])
+      fr.readAsDataURL(new Blob([shaData]))
+    })
+    return `'sha384-${shaText}'`
+  }
+}
+```
+
+## ContainerFrame
+
+This creates an iFrame with a Content-Security-Policy containing all hashes when it's [connected](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks), and then proceeds to create a nested iFrame beneath it when it's loaded, so that the iFrame with the Content-Security-Policy can't be replaced with one without the Content-Security-Policy by navigating away from it.
+
+`ContainerFrame.js`
+
+```js
+export class ContainerFrame extends HTMLElement {
+  constructor() {
+    super()
   }
 
   connectedCallback() {
@@ -59,20 +103,6 @@ GlobalLockdown()
     return `${this.callPrefix}${script}`
   }
 
-  async getSha(script) {
-    this.checkForwardDeclarations(script)
-    const scriptWithCall = this.addCall(script)
-    const data = new TextEncoder().encode(scriptWithCall)
-    const hash = await crypto.subtle.digest('SHA-384', data)
-    return hash
-  }
-
-  async getLockdownSha() {
-    const data = new TextEncoder().encode(this.lockdownSha)
-    const hash = await crypto.subtle.digest('SHA-384', data)
-    return hash
-  }
-
   async initFrame() {
     const results = await Promise.allSettled(
       this.scripts.map(script => this.getSha(script))
@@ -84,17 +114,15 @@ GlobalLockdown()
         return `sha384-${result.value}`
       }
     })
-    const lockdownSha = await this.getLockdownSha()
-    this.scriptShas.unshift(`sha384-${lockdownSha}`)
+    const scriptShas = [this.scriptRegistry.lockdownSha]
     this.frame = document.createElement('iframe')
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
-    const defaultSrc = `default-src data:`
-    const styleSrc = `style-src data: 'unsafe-inline' 'unsafe-eval'`
-    const scriptSrc = `script-src 'unsafe-eval' ${this.scriptShas.join(' ')}`
-    const webRtc = `webrtc 'block'`
     meta.setAttribute('content', [
-      defaultSrc, styleSrc, scriptSrc, webRtc
+      `default-src data:`,
+      `style-src data: 'unsafe-inline' 'unsafe-eval'`,
+      `script-src 'unsafe-eval' ${scriptShas.join(' ')}`,
+      `webrtc 'block'`,
     ].join('; '))
     const metaTag = meta.outerHTML
   }
@@ -180,6 +208,8 @@ This tests that script SHAs are applied to the child iframe.
 `app-test-sha.js`
 
 ```js
+document.body.style = `background-color: #fff`
+
 async function prepareScript(src) {
   const data = new TextEncoder().encode(src)
   const shaData = await crypto.subtle.digest('SHA-256', data)
