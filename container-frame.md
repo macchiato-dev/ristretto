@@ -256,7 +256,6 @@ addEventListener('message', e => {
   const subFrameSrc = `<!doctype html>
 <html>
   <head>
-    ${cspTag.outerHTML}
   </head>
   <body>
     ${script2.tag}
