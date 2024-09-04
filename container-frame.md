@@ -13,6 +13,12 @@ Now, to an overview of the limitations it tries to defend
 - Links from going to a remote server, or going to a data URL that can escape limitations in the page
 - `<link>` tags from prefetching, which is a bit more nuanced than other parts of `Content-Security-Policy`
 
+I've gone through some things that came to mind as ways it could be bypassed:
+
+- Navigation to a Data URL in the same frame - This works, but because the Content Security Policy is on the parent frame, it still applies
+- Navigation to a Data URL in the parent frame - A link to a Data URL in the _parent frame is blocked because it's sandboxed, tested on Chrome/Firefox/Safari
+- TODO: check for DNS prefetch
+
 ## ScriptRegistry
 
 This attempts to remove the ability for a any code running an in `iframe` to access certain global variables by removing them from the global object. It does this by prefixing all custom code with a call to a function that must be defined before the module is loaded, and checking that the function isn't declared within the module in a way that would be overridden from below where it's called.
