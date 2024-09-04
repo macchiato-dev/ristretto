@@ -1,12 +1,25 @@
 # ContainerFrame
 
-This attempts to remove the ability for a any code running an in `iframe` to access certain global variables by removing them from `globalThis`. It does this by prefixing all custom code with a call to a function that must be defined before the module is loaded, and checking that the function isn't declared within the module in a way that would be overridden from below where it's called.
+This attempts to increase the level of sandbox security. It takes a goal of a browser feature called Content Security Policy, which is to prevent exfiltration, and tries to handle some known limitations in preventing it.
+
+These limitations aren't especially well known, except that there's a common saying that you shouldn't run untrusted code, and they are discussed in the Content Security Policy project on GitHub.
+
+It's an attempt and it's not guaranteed to work, but fortunately this project also addresses supply chain security by having carefully chosen dependencies and hopefully easy-to-inspect source code, and has support in the works for other types of sandboxing, including with WebAssebmly. Supply chain security can work hand in hand with sandbox security to reduce the risk of security issues.
+
+Now, to an overview of the limitations it tries to defend
+
+- Loading resources dynamically from a server in a simple way that is defended from a simple and strict Content-Security-Policy
+- JavaScript code from setting up WebRTC which isn't currently adquately defended by Content-Security-Policy
+- Links from going to a remote server, or going to a data URL that can escape limitations in the page
+- `<link>` tags from prefetching, which is a bit more nuanced than other parts of `Content-Security-Policy`
+
+## ScriptRegistry
+
+This attempts to remove the ability for a any code running an in `iframe` to access certain global variables by removing them from the global object. It does this by prefixing all custom code with a call to a function that must be defined before the module is loaded, and checking that the function isn't declared within the module in a way that would be overridden from below where it's called.
 
 How does it prefix all custom code? It has a Content-Security-Policy with a script-src that doesn't include `unsafe-inline` and only includes SHAs for the custom code files given to it, with the prefixed function call added and the code checked for occurrences of the function name.
 
 This Content-Security-Policy is applied to all iframes and workers beneath it. With the iframes and workers being beneath a sandboxed `data:` iframe, they can't access contentWindow of another iframe, making it so that it can't gain access to those certain global variables by that means.
-
-## ScriptRegistry
 
 `ScriptRegistry.js`
 
