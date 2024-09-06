@@ -292,3 +292,100 @@ addEventListener('message', e => {
 
 setup()
 ```
+
+Some miscellaneous checks of how the global object works:
+
+`test.html`
+
+```html
+<!doctype html>
+<html>
+  <head>
+<script type="module">
+document.body.style = `background-color: #fff`
+
+async function prepareScript(src) {
+  const data = new TextEncoder().encode(src)
+  const shaData = await crypto.subtle.digest('SHA-256', data)
+  const shaText = await new Promise(r => {
+    const fr = new FileReader()
+    fr.onload = () => r(fr.result.split(',')[1])
+    fr.readAsDataURL(new Blob([shaData]))
+  })
+  const sha = `'sha256-${shaText}'`
+  const el = document.createElement('script')
+  el.type = 'module'
+  el.textContent = src
+  const tag = el.outerHTML
+  return {src, sha, tag}
+}
+
+async function setup() {
+  const script1 = await prepareScript(`
+addEventListener('message', e => {
+  const frameSrc = e.data
+  const iframe = document.createElement('iframe')
+  iframe.sandbox = 'allow-scripts'
+  iframe.src = \`data:text/html;base64,\${btoa(frameSrc)}\`
+  document.body.append(iframe)
+})
+`)
+  const script2 = await prepareScript(`document.body.append('hello')`)
+  const script3 = await prepareScript(`document.body.append('test')`)
+  const script4 = await prepareScript(`document.body.append('wow')`)
+
+  const dataScript = `delete window.RTCPeerConnection; const wp = new Proxy({}, {get(target, prop, receiver) { console.log('got ' + prop + ' on ' + target); return Reflect.get({[prop]: window[prop]}, prop) }}); export {wp as window}`
+  const dataUrl = `data:text/javascript;charset=utf-8;base64,${btoa(dataScript)}`
+  const script5 = await prepareScript(`import { window } from '${dataUrl}';
+  const globalThis = window
+  const frames = window
+  const self = window
+  console.log(new RTCPeerConnection())
+  console.log(RTCPeerConnection)
+
+  document.body.append(window.location.href.split(',')[0])`)
+  const script6 = await prepareScript(dataScript)
+  const cspTag = document.createElement('meta')
+  cspTag.setAttribute('http-equiv', 'Content-Security-Policy')
+  cspTag.setAttribute(
+    'content',
+    [`default-src data:`, `script-src ${script1.sha} ${script2.sha} ${script4.sha} ${script5.sha} ${script6.sha}`].join('; ')
+  )
+  const frameSrc = `<!doctype html>
+<html>
+  <head>
+    ${cspTag.outerHTML}
+    <link rel="modulepreload" href="${dataUrl}" integrity=${script6.sha}>
+  </head>
+  <body>
+    ${script1.tag}
+  </body>
+</html>`
+  const subFrameSrc = `<!doctype html>
+<html>
+  <head>
+    <link rel="modulepreload" href="${dataUrl}" integrity=${script6.sha}>
+  </head>
+  <body>
+    ${script2.tag}
+    ${script3.tag}
+    ${script4.tag}
+    ${script5.tag}
+  </body>
+</html>`
+  const iframe = document.createElement('iframe')
+  iframe.sandbox = 'allow-scripts'
+  iframe.src = `data:text/html;base64,${btoa(frameSrc)}`
+  iframe.addEventListener('load', () => {
+    iframe.contentWindow.postMessage(subFrameSrc, '*')
+  }, {once: true})
+  document.body.append(iframe)
+}
+
+setup()
+</script>
+  </head>
+  <body>
+  </body>
+</html>
+```
