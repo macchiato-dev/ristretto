@@ -1,47 +1,39 @@
 # ContainerFrame
 
-This attempts to increase the level of sandbox security. It takes a goal of a browser feature called Content Security Policy, which is to prevent exfiltration, and tries to handle some known limitations in preventing it.
+### DON'T USE THIS THINKING YOU CAN JUST RUN ANY AND ALL UNTRUSTED CODE! It is still under development. It may not work well, and probably won't work 100%, as every so often an unexpected exfiltration bug shows up in browsers. Another goal of this, in case it doesn't work very well, is to try bring attention to exfiltration prevention to browser vendors. To find out what is needed, look at security sensitive apps with plugin and environments and what they use. Currently Figma is using WebAssembly. That may be needed for your project. It will mean interfacing between the DOM and the code running in WebAssembly.
 
-These limitations aren't especially well known, except that there's a common saying that you shouldn't run untrusted code, and they are discussed in the Content Security Policy project on GitHub.
+**Help is wanted for finding ways to bypass the protection this attempts to provide. Please contact us for help or if you find any issues.**
 
-It's an attempt and it's not guaranteed to work, but fortunately this project also addresses supply chain security by having carefully chosen dependencies and hopefully easy-to-inspect source code, and has support in the works for other types of sandboxing, including with WebAssebmly. Supply chain security can work hand in hand with sandbox security to reduce the risk of security issues.
+This is a frame for running arbitrary JavaScript with some extra protection against [Data Exfiltration](https://en.wikipedia.org/wiki/Data_exfiltration). It only targets modern browsers and is not guaranteed to work.
 
-Now, to an overview of the limitations it tries to defend
+It starts with a sandboxed iFrame that has `allow-scripts` for usefulness and a strict Content Security Policy. It is hosted in a Data URL so it can work offline and without a custom web server configuration, and uses a nested iFrame to prevent the Content Security Policy from being overridden by navigation.
 
-- Loading resources dynamically from a server in a simple way that is defended from a simple and strict Content-Security-Policy
-- JavaScript code from setting up WebRTC which isn't currently adquately defended by Content-Security-Policy
-- Links from going to a remote server, or going to a data URL that can escape limitations in the page
-- `<link>` tags from prefetching, which is a bit more nuanced than other parts of `Content-Security-Policy`
+[The Content Security Policy spec mentions preventing exfiltration.](https://w3c.github.io/webappsec-csp/#exfiltration) However, there is one defense against exfiltration in the Content Security Policy that hasn't shipped in browsers yet, which is `webrtc: block`. There is another that is in flux, which is prefetching. [Here's a search for exfiltration in the issues for webappsec-csp.](https://github.com/w3c/webappsec-csp/issues?q=exfiltration)
 
-I've gone through some things that came to mind as ways it could be bypassed:
+The attempted defense against WebRTC this project makes is by running a bit of code that attempts to remove access to WebRTC objects like RTCPeerConnection before any JavaScript code is allowed to run, and enforcing that this bit of code has been run by only allowing the setup script and files prefixed with a call to the setup script to run using hashes (SHAs) in the Content-Security-Policy. Attempts are being made to find bypasses, but so far it appears to hold up. Please let us know if you find one. Due to the frame only having a Data URL for an origin, it can't bypass by creating an iFrame and accessing RTCPeerConnection through `iframeElement.contentWindow.RTCPeerConnection`. It can't bypass it by deleting RTCPeerConnection on the global object. It also can't by starting an RTC Peer Connection it through HTML or CSS, as JavaScript is needed to do that. Inline JavaScript HTML attributes like `onclick` are blocked by the CSP, and even if they weren't, they would still be subject to the same hashes (SHAs).
 
-- Navigation to a Data URL in the same frame - This works, but because the Content Security Policy is on the parent frame, it still applies
-- Navigation to a Data URL in the parent frame - A link to a Data URL in the _parent frame is blocked because it's sandboxed, tested on Chrome/Firefox/Safari
-- TODO: check for DNS prefetch
+For this to run, all the JavaScript code needs to be known before the frame is loaded. It adds a call to the start of the script running the lockdown function, and adds a SHA to the Content-Security-Policy in the outer frame with the call prepended before hashing it. These SHAs apply to the outer iframe, the inner iframe, and anything nested beneath it.
 
-## ScriptRegistry
+To change the scripts, either create a new frame, or create an overlayed sibling frame rather than a child frame. This technique will be used for a playground environment.
 
-This attempts to remove the ability for a any code running an in `iframe` to access certain global variables by removing them from the global object. It does this by prefixing all custom code with a call to a function that must be defined before the module is loaded, and checking that the function isn't declared within the module in a way that would be overridden from below where it's called.
+## ContainerFrame
 
-How does it prefix all custom code? It has a Content-Security-Policy with a script-src that doesn't include `unsafe-inline` and only includes SHAs for the custom code files given to it, with the prefixed function call added and the code checked for occurrences of the function name.
-
-This Content-Security-Policy is applied to all iframes and workers beneath it. With the iframes and workers being beneath a sandboxed `data:` iframe, they can't access contentWindow of another iframe, making it so that it can't gain access to those certain global variables by that means.
-
-`ScriptRegistry.js`
+`ContainerFrame.js`
 
 ```js
-export class ScriptRegistry {
+import { ScriptRegistry } from '/ScriptRegistry.js'
+
+export class ContainerFrame extends HTMLElement {
   #fnName
   #prefix
-  #shas
   #lockdownScript
   #lockdownSha
 
   constructor() {
+    super()
     this.#fnName = 'GlobalLockdown'
     this.#prefix = `${this.#fnName}()\n\n`
-    this.#shas = new Set()
-    this.#lockdownScript = lockdownScript = `globalThis.GlobalLockdown = function() {
+    this.#lockdownScript = `globalThis.GlobalLockdown = function() {
   function replacementFn() { throw new Error('WebRTC call blocked') }
   if (!globalThis.lockdownComplete) {
     Object.defineProperties(window, Object.fromEntries(
@@ -60,22 +52,23 @@ export class ScriptRegistry {
 GlobalLockdown()`
   }
 
-  checkShas(shas) {
-    
-  }
-
-  async addScript(str) {
-    if (!this.#lockdownSha) {
-      this.#lockdownSha = await this.getSha(this.#lockdownScript)
+  connectedCallback() {
+    if (!this.shadowRoot) {
+      this.attachShadow({mode: 'open'})
+    }
+    if (!this.framePromise) {
+      this.framePromise = this.initFrame()
     }
   }
 
-  get lockdownScript() {
-    return this.#lockdownScript
+  checkForwardDeclarations(script) {
+    if (script.includes(this.#fnName)) {
+      throw new Error('')
+    }
   }
 
-  get prefix() {
-    return this.#prefix
+  addCall(script) {
+    return `${this.#prefix}${script}`
   }
 
   async getSha(src) {
@@ -87,39 +80,6 @@ GlobalLockdown()`
       fr.readAsDataURL(new Blob([shaData]))
     })
     return `'sha384-${shaText}'`
-  }
-}
-```
-
-## ContainerFrame
-
-This creates an iFrame with a Content-Security-Policy containing all hashes when it's [connected](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks), and then proceeds to create a nested iFrame beneath it when it's loaded, so that the iFrame with the Content-Security-Policy can't be replaced with one without the Content-Security-Policy by navigating away from it.
-
-`ContainerFrame.js`
-
-```js
-export class ContainerFrame extends HTMLElement {
-  constructor() {
-    super()
-  }
-
-  connectedCallback() {
-    if (!this.shadowRoot) {
-      this.attachShadow({mode: 'open'})
-    }
-    if (!this.framePromise) {
-      this.framePromise = this.initFrame()
-    }
-  }
-
-  checkForwardDeclarations(script) {
-    if (script.includes(this.fnName)) {
-      throw new Error('')
-    }
-  }
-
-  addCall(script) {
-    return `${this.callPrefix}${script}`
   }
 
   async initFrame() {
@@ -195,8 +155,9 @@ export class AppView extends HTMLElement {
       }
     `
     this.shadowRoot.appendChild(style)
-    const runFrame = document.createElement('container-frame')
-    this.shadowRoot.append(runFrame)
+    this.frame = document.createElement('container-frame')
+    this.frame.scripts = []
+    this.shadowRoot.append(this.frame)
   }
 }
 ```
