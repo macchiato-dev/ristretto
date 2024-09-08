@@ -14,7 +14,7 @@ The attempted defense against WebRTC this project makes is by running a bit of c
 
 For this to run, all the JavaScript code needs to be known before the frame is loaded. It adds a call to the start of the script running the lockdown function, and adds a SHA to the Content-Security-Policy in the outer frame with the call prepended before hashing it. These SHAs apply to the outer iframe, the inner iframe, and anything nested beneath it.
 
-To change the scripts, either create a new frame, or create an overlayed sibling frame rather than a child frame. This technique will be used for a playground environment.
+To change the scripts, either replace it with a new frame, or create an overlayed sibling frame rather than a child frame. This technique will be used for a playground environment.
 
 ## ContainerFrame
 
@@ -86,14 +86,13 @@ GlobalLockdown()`
     const results = await Promise.allSettled(
       this.scripts.map(script => this.getSha(script))
     )
-    this.scriptShas = results.map(result => {
+    const scriptShas = [this.#lockdownSha, ...results.map(result => {
       if (result.status === 'rejected') {
         throw new Error('Digest failed')
       } else {
         return `sha384-${result.value}`
       }
-    })
-    const scriptShas = [this.scriptRegistry.lockdownSha]
+    })]
     this.frame = document.createElement('iframe')
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
@@ -101,6 +100,7 @@ GlobalLockdown()`
       `default-src data:`,
       `style-src data: 'unsafe-inline' 'unsafe-eval'`,
       `script-src 'unsafe-eval' ${scriptShas.join(' ')}`,
+      `script-src-attr 'none'`,
       `webrtc 'block'`,
     ].join('; '))
     const metaTag = meta.outerHTML
