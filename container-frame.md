@@ -41,6 +41,7 @@ export class ContainerFrame extends HTMLElement {
         name => ([name, {value: replacementFn, configurable: false, writable: false}])
       )
     ))
+    globalThis.lockdownComplete = true
   }
   try {
     new RTCPeerConnection()
@@ -63,7 +64,7 @@ GlobalLockdown()`
 
   checkForwardDeclarations(script) {
     if (script.includes(this.#fnName)) {
-      throw new Error('')
+      throw new Error(`possible forward declaration found for ${this.#fnName}`)
     }
   }
 
@@ -83,8 +84,13 @@ GlobalLockdown()`
   }
 
   async initFrame() {
+    const scripts = [...this.scripts]
+    for (const script of scripts) {
+      this.checkForwardDeclarations(script)
+    }
+    const prefixedScripts = scripts.map(`${this.#prefix}${script}`)
     const results = await Promise.allSettled(
-      this.scripts.map(script => this.getSha(script))
+      prefixedScripts.map(script => this.getSha(script))
     )
     const scriptShas = [this.#lockdownSha, ...results.map(result => {
       if (result.status === 'rejected') {
@@ -93,7 +99,6 @@ GlobalLockdown()`
         return `sha384-${result.value}`
       }
     })]
-    this.frame = document.createElement('iframe')
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
     meta.setAttribute('content', [
@@ -104,6 +109,8 @@ GlobalLockdown()`
       `webrtc 'block'`,
     ].join('; '))
     const metaTag = meta.outerHTML
+    this.frame = document.createElement('iframe')
+    // TODO: set src; add load event; send scripts
   }
 }
 ```
