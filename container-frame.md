@@ -4,13 +4,13 @@
 
 **Help is wanted for finding ways to bypass the protection this attempts to provide. Please contact us for help or if you find any issues.**
 
-This is a frame for running arbitrary JavaScript with some extra protection against [Data Exfiltration](https://en.wikipedia.org/wiki/Data_exfiltration). It only targets modern browsers and is not guaranteed to work.
+This is a frame for running JavaScript with some extra protection against [Data Exfiltration](https://en.wikipedia.org/wiki/Data_exfiltration). It only targets modern browsers and is not guaranteed to work.
 
 It starts with a sandboxed iFrame that has `allow-scripts` for usefulness and a strict Content Security Policy. It is hosted in a Data URL so it can work offline and without a custom web server configuration, and uses a nested iFrame to prevent the Content Security Policy from being overridden by navigation.
 
-[The Content Security Policy spec mentions preventing exfiltration.](https://w3c.github.io/webappsec-csp/#exfiltration) However, there is one defense against exfiltration in the Content Security Policy that hasn't shipped in browsers yet, which is `webrtc: block`. There is another that is in flux, which is prefetching. [Here's a search for exfiltration in the issues for webappsec-csp.](https://github.com/w3c/webappsec-csp/issues?q=exfiltration)
+[The Content Security Policy spec mentions preventing exfiltration.](https://w3c.github.io/webappsec-csp/#exfiltration) However, there is at least one defense against exfiltration in the Content Security Policy that hasn't shipped in browsers yet, which is `webrtc: block`. There is another that is in flux, which is prefetching. [Here's a search for exfiltration in the issues for webappsec-csp.](https://github.com/w3c/webappsec-csp/issues?q=exfiltration)
 
-The attempted defense against WebRTC this project makes is by running a bit of code that attempts to remove access to WebRTC objects like RTCPeerConnection before any JavaScript code is allowed to run, and enforcing that this bit of code has been run by only allowing the setup script and files prefixed with a call to the setup script to run using hashes (SHAs) in the Content-Security-Policy. Attempts are being made to find bypasses, but so far it appears to hold up. Please let us know if you find one. Due to the frame only having a Data URL for an origin, it can't bypass by creating an iFrame and accessing RTCPeerConnection through `iframeElement.contentWindow.RTCPeerConnection`. It can't bypass it by deleting RTCPeerConnection on the global object. It also can't by starting an RTC Peer Connection it through HTML or CSS, as JavaScript is needed to do that. Inline JavaScript HTML attributes like `onclick` are blocked by the CSP, and even if they weren't, they would still be subject to the same hashes (SHAs).
+The attempted defense against WebRTC this project makes is by running a bit of code that attempts to remove access to WebRTC objects like RTCPeerConnection before any JavaScript code is allowed to run, and enforcing that this bit of code has been run by only allowing the setup function and files prefixed with a call to the setup function to run using hashes (SHAs) in the Content-Security-Policy. Attempts are being made to find bypasses. Please let us know if you find one. Due to the frame only having a Data URL for an origin, it can't bypass by creating an iFrame and accessing RTCPeerConnection through `iframeElement.contentWindow.RTCPeerConnection`. It can't bypass it by deleting RTCPeerConnection on the global object, thanks to the change in browsers to provide a proxy to `window` rather than an object with a prototype chain available. It also can't by starting an RTC Peer Connection it through HTML or CSS, because JavaScript is needed to do that. Inline JavaScript HTML attributes like `onclick` are blocked by the CSP, and even if they weren't, they would still be subject to the same hashes (SHAs).
 
 For this to run, all the JavaScript code needs to be known before the frame is loaded. It adds a call to the start of the script running the lockdown function, and adds a SHA to the Content-Security-Policy in the outer frame with the call prepended before hashing it. These SHAs apply to the outer iframe, the inner iframe, and anything nested beneath it.
 
@@ -21,8 +21,6 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 `ContainerFrame.js`
 
 ```js
-import { ScriptRegistry } from '/ScriptRegistry.js'
-
 export class ContainerFrame extends HTMLElement {
   #fnName
   #prefix
@@ -88,7 +86,7 @@ GlobalLockdown()`
     for (const script of scripts) {
       this.checkForwardDeclarations(script)
     }
-    const prefixedScripts = scripts.map(`${this.#prefix}${script}`)
+    const prefixedScripts = scripts.map(script => `${this.#prefix}${script}`)
     const results = await Promise.allSettled(
       prefixedScripts.map(script => this.getSha(script))
     )
