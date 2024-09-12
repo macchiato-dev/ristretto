@@ -108,7 +108,72 @@ GlobalLockdown()`
     ].join('; '))
     const metaTag = meta.outerHTML
     this.frame = document.createElement('iframe')
-    // TODO: set src; add load event; send scripts
+    const innerFrame = `<!doctype html>
+<html>
+<head>
+  <title>doc</title>
+<script type="module">
+addEventListener('message', async e => {
+  if (e.data[0] === 'scripts') {
+    for (const script of scripts) {
+      const scriptEl = document.createElement('script')
+      scriptEl.type = 'module'
+      scriptEl.textContent = script
+      document.head.append(scriptEl)
+    }
+  }
+}, {once: true})
+</script>
+</head>
+<body>
+</body>
+</html>`
+    this.frame.src = `<!doctype html>
+<html>
+  <head>
+    ${metaTag}
+    <title></title>
+<style type="text/css">
+body, html {
+  background-color: #55391b;
+}
+body {
+  height: 100vh;
+  margin: 0;
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+}
+iframe {
+  flex-grow: 1;
+  border: 0;
+}
+</style>
+  </head>
+  <body>
+<script type="module">
+let iframe = undefined
+addEventListener('message', e => {
+  if (e.origin === 'null') {
+    parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+  } else {
+    if (e.data[0] === 'scripts') {
+      iframe = document.createElement('iframe')
+      iframe.sandbox = 'allow-scripts'
+      iframe.addEventListener('load', async () => {
+        const data = e.data[1]
+        iframe.contentWindow.postMessage(['scripts', scripts], '*', [data.buffer])
+      })
+      iframe.src = ${JSON.stringify(innerFrame)}
+      document.body.replaceChildren(iframe)
+    } else {
+      iframe.contentWindow.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
+    }
+  }
+})
+</script>
+  </body>
+</html>`
   }
 }
 ```
@@ -161,7 +226,7 @@ export class AppView extends HTMLElement {
     `
     this.shadowRoot.appendChild(style)
     this.frame = document.createElement('container-frame')
-    this.frame.scripts = []
+    this.frame.scripts = [`document.body.append('testing')`]
     this.shadowRoot.append(this.frame)
   }
 }
