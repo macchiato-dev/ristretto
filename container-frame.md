@@ -87,6 +87,7 @@ GlobalLockdown()`
       this.checkForwardDeclarations(script)
     }
     const prefixedScripts = scripts.map(script => `${this.#prefix}${script}`)
+    const allScripts = [this.#lockdownScript, ...prefixedScripts]
     const results = await Promise.allSettled(
       prefixedScripts.map(script => this.getSha(script))
     )
@@ -174,6 +175,10 @@ addEventListener('message', e => {
 </script>
   </body>
 </html>`
+    this.frame.addEventListener('load', () => {
+      this.frame.contentWindow.postMessage(['scripts', allScripts], '*')
+    }, {once: true})
+    this.shadowRoot.append(this.frame)
   }
 }
 ```
@@ -321,7 +326,7 @@ addEventListener('message', e => {
   document.body.append(iframe)
 }
 
-setup()
+//setup()
 ```
 
 Some miscellaneous checks of how the global object works:
