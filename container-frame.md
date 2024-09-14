@@ -24,13 +24,47 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 export class ContainerFrame extends HTMLElement {
   #fnName
   #prefix
+  #innerFrameScript
+  #innerFrame
+  #outerFrameScript
   #lockdownScript
-  #lockdownSha
 
   constructor() {
     super()
     this.#fnName = 'GlobalLockdown'
     this.#prefix = `${this.#fnName}()\n\n`
+    this.#innerFrameScript = `addEventListener('message', async e => {
+  if (e.data[0] === 'scripts') {
+    for (const script of e.data[1]) {
+      const scriptEl = document.createElement('script')
+      scriptEl.type = 'module'
+      scriptEl.textContent = script
+      document.head.append(scriptEl)
+    }
+  }
+}, {once: true})`
+    this.#innerFrame = `<!doctype html>
+<html>
+<head>
+  <title>doc</title>
+<script type="module">${this.#innerFrameScript}</script>
+</head>
+<body>
+</body>
+</html>`
+    this.#outerFrameScript = `let iframe = undefined
+addEventListener('message', e => {
+  if (e.data[0] === 'scripts') {
+    iframe = document.createElement('iframe')
+    iframe.sandbox = 'allow-scripts'
+    iframe.addEventListener('load', async () => {
+      const data = e.data[1]
+      iframe.contentWindow.postMessage(['scripts', e.data[1]], '*')
+    })
+    iframe.src = ${JSON.stringify(`data:text/html;base64,${btoa(this.#innerFrame)}`)}
+    document.body.replaceChildren(iframe)
+  }
+})`
     this.#lockdownScript = `globalThis.GlobalLockdown = function() {
   function replacementFn() { throw new Error('WebRTC call blocked') }
   if (!globalThis.lockdownComplete) {
@@ -54,6 +88,7 @@ GlobalLockdown()`
   connectedCallback() {
     if (!this.shadowRoot) {
       this.attachShadow({mode: 'open'})
+      this.shadowRoot.adoptedStyleSheets = [this.constructor.styles]
     }
     if (!this.framePromise) {
       this.framePromise = this.initFrame()
@@ -73,12 +108,11 @@ GlobalLockdown()`
   async getSha(src) {
     const data = new TextEncoder().encode(src)
     const shaData = await crypto.subtle.digest('SHA-384', data)
-    const shaText = await new Promise(r => {
+    return await new Promise(r => {
       const fr = new FileReader()
       fr.onload = () => r(fr.result.split(',')[1])
       fr.readAsDataURL(new Blob([shaData]))
     })
-    return `'sha384-${shaText}'`
   }
 
   async initFrame() {
@@ -87,17 +121,23 @@ GlobalLockdown()`
       this.checkForwardDeclarations(script)
     }
     const prefixedScripts = scripts.map(script => `${this.#prefix}${script}`)
-    const allScripts = [this.#lockdownScript, ...prefixedScripts]
+    const allScripts = [
+      this.#outerFrameScript,
+      this.#innerFrameScript,
+      this.#lockdownScript,
+      ...prefixedScripts
+    ]
     const results = await Promise.allSettled(
-      prefixedScripts.map(script => this.getSha(script))
+      allScripts.map(script => this.getSha(script))
     )
-    const scriptShas = [this.#lockdownSha, ...results.map(result => {
+    const scriptShas = results.map(result => {
       if (result.status === 'rejected') {
         throw new Error('Digest failed')
       } else {
-        return `sha384-${result.value}`
+        return `'sha384-${result.value}'`
       }
-    })]
+    })
+    console.log({scriptShas})
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
     meta.setAttribute('content', [
@@ -109,27 +149,7 @@ GlobalLockdown()`
     ].join('; '))
     const metaTag = meta.outerHTML
     this.frame = document.createElement('iframe')
-    const innerFrame = `<!doctype html>
-<html>
-<head>
-  <title>doc</title>
-<script type="module">
-addEventListener('message', async e => {
-  if (e.data[0] === 'scripts') {
-    for (const script of scripts) {
-      const scriptEl = document.createElement('script')
-      scriptEl.type = 'module'
-      scriptEl.textContent = script
-      document.head.append(scriptEl)
-    }
-  }
-}, {once: true})
-</script>
-</head>
-<body>
-</body>
-</html>`
-    this.frame.src = `<!doctype html>
+    const outerFrame = `<!doctype html>
 <html>
   <head>
     ${metaTag}
@@ -152,33 +172,35 @@ iframe {
 </style>
   </head>
   <body>
-<script type="module">
-let iframe = undefined
-addEventListener('message', e => {
-  if (e.origin === 'null') {
-    parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
-  } else {
-    if (e.data[0] === 'scripts') {
-      iframe = document.createElement('iframe')
-      iframe.sandbox = 'allow-scripts'
-      iframe.addEventListener('load', async () => {
-        const data = e.data[1]
-        iframe.contentWindow.postMessage(['scripts', scripts], '*', [data.buffer])
-      })
-      iframe.src = ${JSON.stringify(innerFrame)}
-      document.body.replaceChildren(iframe)
-    } else {
-      iframe.contentWindow.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
-    }
-  }
-})
-</script>
+<script type="module">${this.#outerFrameScript}</script>
   </body>
 </html>`
+    this.frame.src = `data:text/html;base64,${btoa(outerFrame)}`
     this.frame.addEventListener('load', () => {
       this.frame.contentWindow.postMessage(['scripts', allScripts], '*')
     }, {once: true})
     this.shadowRoot.append(this.frame)
+  }
+
+  static get styles() {
+    if (!this._styles) {
+      this._styles = new CSSStyleSheet()
+      this._styles.replaceSync(`
+        :host {
+          display: flex;
+          align-items: stretch;
+          box-sizing: border-box;
+        }
+        *, *:before, *:after {
+          box-sizing: inherit;
+        }
+        iframe {
+          flex-grow: 1;
+          border: 0;
+        }
+      `)
+    }
+    return this._styles
   }
 }
 ```
@@ -195,38 +217,35 @@ export class AppView extends HTMLElement {
   connectedCallback() {
     const globalStyle = document.createElement('style')
     globalStyle.textContent = `
+      html {
+        box-sizing: border-box;
+      }
+      *, *:before, *:after {
+        box-sizing: inherit;
+      }
+      body, html {
+        background-color: #55391b;
+      }
       body {
-        background: #2d1d0e;
-        max-width: 600px;
-        margin: auto;
-        color: #d7d7d7;
+        height: 100vh;
+        margin: 0;
+        display: flex;
+        align-items: stretch;
+        flex-direction: column;
+      }
+      app-view {
+        flex-grow: 1;
       }
     `
     document.head.append(globalStyle)
     const style = document.createElement('style')
     style.textContent = `
       :host {
-        
+        display: flex;
+        align-items: stretch;
       }
-      h1 {
-        color: #fff596;
-        text-align: center;
-        font-size: 48px;
-        letter-spacing: 2px;
-        font-family: Mohave;
-        margin: 10px;
-      }
-      a {
-        color: #fff596;
-      }
-      p {
-        line-height: 1.4;
-      }
-      code {
-        border: 2px #bbb7;
-        background: #bbb5;
-        padding: 2px;
-        border-radius: 3px;
+      container-frame {
+        flex-grow: 1;
       }
     `
     this.shadowRoot.appendChild(style)
