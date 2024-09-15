@@ -6,13 +6,13 @@
 
 This is a frame for running JavaScript with some extra protection against [Data Exfiltration](https://en.wikipedia.org/wiki/Data_exfiltration). It only targets modern browsers and is not guaranteed to work.
 
-It starts with a sandboxed iFrame that has `allow-scripts` for usefulness and a strict Content Security Policy. It is hosted in a Data URL so it can work offline and without a custom web server configuration, and uses a nested iFrame to prevent the Content Security Policy from being overridden by navigation.
+It starts with a sandboxed iFrame that has `allow-scripts` in order to run custom JavaScript code that uses the DOM and a strict Content Security Policy. It is hosted in a Data URL so it can work offline and without a custom web server configuration, and uses a nested iFrame to prevent the Content Security Policy from being overridden by navigation.
 
-[The Content Security Policy spec mentions preventing exfiltration.](https://w3c.github.io/webappsec-csp/#exfiltration) However, there is at least one defense against exfiltration in the Content Security Policy that hasn't shipped in browsers yet, which is `webrtc: block`. There is another that is in flux, which is prefetching. [Here's a search for exfiltration in the issues for webappsec-csp.](https://github.com/w3c/webappsec-csp/issues?q=exfiltration)
+[The Content Security Policy spec mentions preventing exfiltration.](https://w3c.github.io/webappsec-csp/#exfiltration) However, there is at least one defense against exfiltration in the Content Security Policy that [hasn't shipped in browsers yet](https://wpt.fyi/results/content-security-policy/webrtc?label=stable&aligned), which is [`webrtc: block`](https://www.w3.org/TR/CSP3/#directive-webrtc). There is another that is in flux, which is prefetching. [Here's a search for exfiltration in the issues for webappsec-csp.](https://github.com/w3c/webappsec-csp/issues?q=exfiltration)
 
-The attempted defense against WebRTC this project makes is by running a bit of code that attempts to remove access to WebRTC objects like RTCPeerConnection before any JavaScript code is allowed to run, and enforcing that this bit of code has been run by only allowing the setup function and files prefixed with a call to the setup function to run using hashes (SHAs) in the Content-Security-Policy. Attempts are being made to find bypasses. Please let us know if you find one. Due to the frame only having a Data URL for an origin, it can't bypass by creating an iFrame and accessing RTCPeerConnection through `iframeElement.contentWindow.RTCPeerConnection`. It can't bypass it by deleting RTCPeerConnection on the global object, thanks to the change in browsers to provide a proxy to `window` rather than an object with a prototype chain available. It also can't by starting an RTC Peer Connection it through HTML or CSS, because JavaScript is needed to do that. Inline JavaScript HTML attributes like `onclick` are blocked by the CSP, and even if they weren't, they would still be subject to the same hashes (SHAs).
+The attempted defense against WebRTC this project makes is by running a bit of code that attempts to remove access to WebRTC objects like RTCPeerConnection before any JavaScript code is allowed to run, and enforcing that this bit of code has been run by only allowing the setup function and files prefixed with a call to the setup function to run using [Subresource Integrity](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) hashes (SHAs) in the Content-Security-Policy. Attempts are being made to find bypasses. Please let us know if you find one. Due to the frame only having a Data URL for an origin, it can't bypass by creating an iFrame and accessing RTCPeerConnection through `iframeElement.contentWindow.RTCPeerConnection`. It can't bypass it by deleting RTCPeerConnection on the global object, thanks to the change in browsers to provide a [proxy to `window`](https://developer.mozilla.org/en-US/docs/Glossary/WindowProxy) rather than an object with a prototype chain available. It also can't bypass it by starting an RTC Peer Connection it through HTML or CSS, because JavaScript is needed to start connections with WebRTC. Inline JavaScript HTML attributes like `onclick` are blocked by the CSP, and even if they weren't, they would still be subject to the same hashes (SHAs).
 
-For this to run, all the JavaScript code needs to be known before the frame is loaded. It adds a call to the start of the script running the lockdown function, and adds a SHA to the Content-Security-Policy in the outer frame with the call prepended before hashing it. These SHAs apply to the outer iframe, the inner iframe, and anything nested beneath it.
+For this component to run, all the JavaScript code needs to be known before the frame is loaded. It adds a call to the start of the script running the lockdown function, and adds a SHA to the Content-Security-Policy in the outer frame with the call prepended before hashing it. These SHAs apply to the outer iframe, the inner iframe, and anything nested beneath it.
 
 To change the scripts, either replace it with a new frame, or create an overlayed sibling frame rather than a child frame. This technique will be used for a playground environment.
 
@@ -99,10 +99,6 @@ GlobalLockdown()`
     if (script.includes(this.#fnName)) {
       throw new Error(`possible forward declaration found for ${this.#fnName}`)
     }
-  }
-
-  addCall(script) {
-    return `${this.#prefix}${script}`
   }
 
   async getSha(src) {
