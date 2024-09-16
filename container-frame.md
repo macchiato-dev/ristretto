@@ -201,6 +201,31 @@ iframe {
 }
 ```
 
+FrameGroup contains a root ContainerFrame and allows the ContainerFrame to create virtually nested ContainerFrames within it.
+
+`FrameGroup.js`
+
+```js
+class FrameGroup extends HTMLElement {
+  #containerFrames
+
+  constructor() {
+    super()
+    this.#containerFrames = []
+  }
+}
+```
+
+A ProxyFrame calls the FrameGroup to create a virtually nested frame.
+
+`ProxyFrame.js`
+
+```js
+class FrameGroup extends HTMLElement {
+  
+}
+```
+
 `AppView.js`
 
 ```js
