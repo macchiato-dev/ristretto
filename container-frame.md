@@ -201,28 +201,28 @@ iframe {
 }
 ```
 
-FrameGroup contains a root ContainerFrame and allows the ContainerFrame to create virtually nested ContainerFrames within it.
+A ProxyFrame sends messages through postMessage to the enclosing FrameGroup to create, resize, hide, message, and remove a virtually nested frame.
+
+`ProxyFrame.js`
+
+```js
+export class ProxyFrame extends HTMLElement {
+  
+}
+```
+
+FrameGroup manages ContainerFrame objects and allows them to create, message, resize, and remove virtually nested ContainerFrames through postMessage.
 
 `FrameGroup.js`
 
 ```js
-class FrameGroup extends HTMLElement {
+export class FrameGroup extends HTMLElement {
   #containerFrames
 
   constructor() {
     super()
     this.#containerFrames = []
   }
-}
-```
-
-A ProxyFrame calls the FrameGroup to create a virtually nested frame.
-
-`ProxyFrame.js`
-
-```js
-class FrameGroup extends HTMLElement {
-  
 }
 ```
 
@@ -289,9 +289,13 @@ export class AppView extends HTMLElement {
 
 ```js
 import {ContainerFrame} from '/ContainerFrame.js'
+import {ProxyFrame} from '/ProxyFrame.js'
+import {FrameGroup} from '/FrameGroup.js'
 import {AppView} from '/AppView.js'
 
 customElements.define('container-frame', ContainerFrame)
+customElements.define('proxy-frame', ProxyFrame)
+customElements.define('frame-group', FrameGroup)
 customElements.define('app-view', AppView)
 
 const el = document.createElement('app-view')
