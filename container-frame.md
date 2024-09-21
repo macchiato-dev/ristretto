@@ -16,6 +16,15 @@ For this component to run, all the JavaScript code needs to be known before the 
 
 To change the scripts, either replace it with a new frame, or create an overlayed sibling frame rather than a child frame. This technique will be used for a playground environment.
 
+## TODO:
+
+- [ ] Display the initial ContainerFrame in a FrameGroup
+- [ ] Build the files needed for the ContainerFrame with a ProxyFrame
+- [ ] Add a view in the FrameGroup with a ProxyFrame
+- [ ] Have the ProxyFrame create a MessageChannel and use it to send a message to the enclosing page with content, dimensions, and MessageChannel
+- [ ] Have the FrameGroup create a ContainerFrame with the content, dimensions, and MessageChannel
+- [ ] Have the ProxyFrame update the ContainerFrame and apply the updates
+
 ## ContainerFrame
 
 `ContainerFrame.js`
