@@ -4,11 +4,15 @@ This displays a tree of files.
 
 TODO:
 
-- [ ] add method for getting item at path
-- [ ] document adding/removing files
-- [ ] keyboard navigation
-- [ ] showing bold
-- [ ] dot menu, configurable on active or on all items, show on hover when hover supported
+- [ ] Add a method for adding a single file and use it to show custom files alongside drafts
+- [ ] Add a method for showing a file that's been edited in bold
+- [ ] Add a dot menu that shows on active on mobile and on hover on desktop
+- [ ] Add delete to the dot menu and send event
+- [ ] Add rename to the dot menu and support renaming
+- [ ] Add roving tabindex keyboard navigation
+- [ ] Add moving with drag and drop (make it so it scrolls)
+- [ ] Add move to the dot menu and show a dialog with the folders (example?)
+- [ ] Add duplicate to the dot menu (example?)
 
 `notebook.json`
 
