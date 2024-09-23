@@ -19,10 +19,12 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 ## TODO:
 
 - [x] Display the initial ContainerFrame in a FrameGroup
-- [ ] Build the files needed for the ContainerFrame with a ProxyFrame
-- [ ] Add a view in the FrameGroup with a ProxyFrame
-- [ ] Have the ProxyFrame create a MessageChannel and use it to send a message to the enclosing page with content, dimensions, and MessageChannel
-- [ ] Have the FrameGroup create a ContainerFrame with the content, dimensions, and MessageChannel
+- [x] Build the files needed for the ContainerFrame with a ProxyFrame
+- [x] Add a view in the FrameGroup with a ProxyFrame
+- [x] Have the ProxyFrame create a MessageChannel and use it to send a message to the enclosing page with scripts
+- [x] Have the FrameGroup create a ContainerFrame with the content
+- [ ] Use build to generate scripts for ProxyFrame
+- [ ] Have ProxyFrame update dimensions
 - [ ] Have the ProxyFrame update the ContainerFrame and apply the updates
 
 ## ContainerFrame
@@ -63,7 +65,7 @@ export class ContainerFrame extends HTMLElement {
 </html>`
     this.#outerFrameScript = `let iframe = undefined
 addEventListener('message', e => {
-  if (e.data[0] === 'scripts') {
+  if (e.source === parent && e.data[0] === 'scripts') {
     iframe = document.createElement('iframe')
     iframe.sandbox = 'allow-scripts'
     iframe.addEventListener('load', async () => {
@@ -72,6 +74,8 @@ addEventListener('message', e => {
     })
     iframe.src = ${JSON.stringify(`data:text/html;base64,${btoa(this.#innerFrame)}`)}
     document.body.replaceChildren(iframe)
+  } else if (e.source !== parent) {
+    parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
   }
 })`
     this.#lockdownScript = `globalThis.GlobalLockdown = function() {
@@ -142,7 +146,6 @@ GlobalLockdown()`
         return `'sha384-${result.value}'`
       }
     })
-    console.log({scriptShas})
     const meta = document.createElement('meta')
     meta.setAttribute('http-equiv', 'Content-Security-Policy')
     meta.setAttribute('content', [
@@ -216,8 +219,19 @@ A ProxyFrame sends messages through postMessage to the enclosing FrameGroup to c
 
 ```js
 export class ProxyFrame extends HTMLElement {
-  
+  connectedCallback() {
+    this.attachShadow({mode: 'open'})
+    this.display()
+  }
+
+  async display() {
+    this.channel = new MessageChannel()
+    const {scripts} = this
+    parent.postMessage(['initProxyFrame', {scripts}], '*', [this.channel.port2])
+  }
 }
+
+customElements.define('proxy-frame', ProxyFrame)
 ```
 
 FrameGroup manages ContainerFrame objects and allows them to create, message, resize, and remove virtually nested ContainerFrames through postMessage.
@@ -226,8 +240,6 @@ FrameGroup manages ContainerFrame objects and allows them to create, message, re
 
 ```js
 export class FrameGroup extends HTMLElement {
-  #containerFrames
-
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -235,7 +247,36 @@ export class FrameGroup extends HTMLElement {
 
   connectedCallback() {
     this.shadowRoot.append(document.createElement('slot'))
+    addEventListener('message', this.handleMessage)
   }
+
+  disconnectedCallback() {
+    removeEventListener('message', this.handleMessage)
+  }
+
+  handleMessage = e => {
+    const frame = [...this.querySelectorAll('container-frame')].find(el => (
+      el.frame.contentWindow === e.source
+    ))
+    if (frame) {
+      const {scripts} = e.data[1]
+      const newFrame = document.createElement('container-frame')
+      newFrame.scripts = scripts
+      newFrame.parentFrame = frame
+      this.append(newFrame)
+    }
+  }
+}
+```
+
+`ExampleContent.js`
+
+```js
+function run() {
+  const proxyFrame = document.createElement('proxy-frame')
+  proxyFrame.scripts = [`document.body.append('in ProxyFrame')`]
+  document.body.append('testing')
+  document.body.append(proxyFrame)
 }
 ```
 
@@ -284,7 +325,19 @@ export class AppView extends HTMLElement {
     `
     this.shadowRoot.appendChild(style)
     const frame = document.createElement('container-frame')
-    frame.scripts = [`document.body.append('testing')`]
+    let proxyFrameSrc, exampleContentSrc
+    for (const block of readBlocksWithNames(__source)) {
+      if (block.name === 'ProxyFrame.js') {
+        proxyFrameSrc = __source.slice(...block.contentRange)
+      } else if (block.name === 'ExampleContent.js') {
+        exampleContentSrc = __source.slice(...block.contentRange)
+      }
+    }
+    const testScript = 
+    frame.scripts = [
+      proxyFrameSrc,
+      exampleContentSrc + `\nrun()\n`,
+    ]
     const frameGroup = document.createElement('frame-group')
     frameGroup.append(frame)
     this.shadowRoot.append(frameGroup)
@@ -304,12 +357,12 @@ export class AppView extends HTMLElement {
 
 ```js
 import {ContainerFrame} from '/ContainerFrame.js'
-import {ProxyFrame} from '/ProxyFrame.js'
+// import {ProxyFrame} from '/ProxyFrame.js'
 import {FrameGroup} from '/FrameGroup.js'
 import {AppView} from '/AppView.js'
 
 customElements.define('container-frame', ContainerFrame)
-customElements.define('proxy-frame', ProxyFrame)
+// customElements.define('proxy-frame', ProxyFrame)
 customElements.define('frame-group', FrameGroup)
 customElements.define('app-view', AppView)
 
