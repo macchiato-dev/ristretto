@@ -18,7 +18,7 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 
 ## TODO:
 
-- [ ] Display the initial ContainerFrame in a FrameGroup
+- [x] Display the initial ContainerFrame in a FrameGroup
 - [ ] Build the files needed for the ContainerFrame with a ProxyFrame
 - [ ] Add a view in the FrameGroup with a ProxyFrame
 - [ ] Have the ProxyFrame create a MessageChannel and use it to send a message to the enclosing page with content, dimensions, and MessageChannel
@@ -230,7 +230,11 @@ export class FrameGroup extends HTMLElement {
 
   constructor() {
     super()
-    this.#containerFrames = []
+    this.attachShadow({mode: 'open'})
+  }
+
+  connectedCallback() {
+    this.shadowRoot.append(document.createElement('slot'))
   }
 }
 ```
@@ -279,9 +283,11 @@ export class AppView extends HTMLElement {
       }
     `
     this.shadowRoot.appendChild(style)
-    this.frame = document.createElement('container-frame')
-    this.frame.scripts = [`document.body.append('testing')`]
-    this.shadowRoot.append(this.frame)
+    const frame = document.createElement('container-frame')
+    frame.scripts = [`document.body.append('testing')`]
+    const frameGroup = document.createElement('frame-group')
+    frameGroup.append(frame)
+    this.shadowRoot.append(frameGroup)
   }
 }
 ```
