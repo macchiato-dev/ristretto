@@ -27,6 +27,8 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 - [ ] Have ProxyFrame update dimensions
 - [ ] Have the ProxyFrame update the ContainerFrame and apply the updates
 
+The ContainerFrame can do the same build that the app does to load AppView. It's in `host.md`. Once that's set up it can build the pages nested beneath that.
+
 ## ContainerFrame
 
 `ContainerFrame.js`
