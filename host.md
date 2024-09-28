@@ -1,22 +1,8 @@
 # Host
 
-This is the host for Ristretto. It facilitates uploading data, downloading data, and following links in a controlled manner.
+This is the host for Ristretto. It attempts to block all access to the network and to facilitates downloading data and following links in a controlled manner.
 
-## Preventing exfiltration
-
-By having a restrictive Content-Security-Policy, a frame can be made exfiltration-resistant. This does that.
-There is one thing that allows exfiltration and that is [WebRTC](https://github.com/w3c/webappsec-csp/issues/92).
-There's no simple way to turn it off. It appears that removing everything RTC from the global scope before
-running code could work, because there seems to only be one global object with the RTC objects attatched to it
-per frame or worker, and there shouldn't be any other references to WebRTC. In order for this to work, the CSP
-for `child-src` would have to be `'none'` because any nested browsing contexts would get their own window object
-that has the original RTC objects attached to it. Ristretto heavily uses nested iframes. For this to work, it
-would need to overlay iframes instead. These could be managed with a custom web component `<overlay-frame>`
-that would send a postMessage to create the frame and set up a MessageChannel. It would keep track of the
-position and visibility and the object managing the frames could set CSS properties like `--frame-display`,
-`--frame-top`, `--frame-height` and so on. With nested ones it could add them up do generate it. To prevent
-having to add the dimensions in js, the variables could be set according to the nesting level and css calc could
-be used to compute them. So instead it could be `--frame-lvl0-display` and `--frame-lvl0-top`.
+A Content-Security-Policy is in place which prevents the code inside from accessing the network using fetch, and a nested iframe is in place which prevents it from navigating to a URL, where data could be sent as part of the URL and captured by a web server. However, there is a way of accessing the network which currently isn't entirely subject to the Content-Security-Policy, which is WebRTC, and this requires all scripts to be prefixed by something that attempts to block access to WebRTC in an effort to make it completely network-isolated.
 
 ## Development
 
@@ -336,7 +322,7 @@ Only the content security policy needs to be changed in order to deploy this to 
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; child-src: 'none'; webrtc 'block';">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; webrtc 'block'">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#55391b">
     <title></title>
@@ -608,13 +594,15 @@ addEventListener('message', e => {
 </html>
 ```
 
+
+
 `frame.html`
 
 ```html
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; frame-src https://ristretto.codeberg.page/inner-frame.html; webrtc 'block';">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; webrtc 'block'">
     <title></title>
 <style type="text/css">
 body, html {
@@ -647,7 +635,35 @@ addEventListener('message', e => {
         const data = e.data[1]
         iframe.contentWindow.postMessage(['notebook', data], '*', [data.buffer])
       })
-      iframe.src = `/inner-frame.html?role=frame`
+      const re = new RegExp('(?:^|\\n)\\s*\\n`entry.js`\\n\\s*\\n```.*?\\n(.*?)```\\s*(?:\\n|$)', 's')
+    const src = `
+<!doctype html>
+<html>
+  <head>
+    <title>frame</title>
+    <meta charset="utf-8">
+  </head>
+  <body>
+<script type="module">
+addEventListener('message', e => {
+  if (e.source === parent) {
+    if (e.data[0] === 'notebook') {
+      window.__source = new TextDecoder().decode(e.data[1])
+      const re = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags)})
+      const entrySrc = window.__source.match(re)[1]
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.textContent = entrySrc
+      document.body.append(script)
+    }
+  }
+})
+<-script>
+  </body>
+</html>
+      `.trim().replace('-script', '/script')
+      iframe.src = `data:text/html;base64,${btoa(src.trim())}`
+      // iframe.srcdoc = src.trim()
       document.body.replaceChildren(iframe)
     } else {
       iframe.contentWindow.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
@@ -656,35 +672,6 @@ addEventListener('message', e => {
 })
 </script>
   </body>
-</html>
-```
-
-`inner-frame.html`
-
-```html
-<!doctype html>
-<html>
-<head>
-  <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; child-src 'none'; webrtc 'block';">
-  <title>doc</title>
-<script type="module">
-const re = /(?:^|\n)\s*\n`entry.js`\n\s*\n```.*?\n(.*?)```\s*(?:\n|$)/s
-addEventListener('message', async e => {
-  if (e.data[0] === 'notebook') {
-    Object.defineProperties(window, Object.fromEntries(
-      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
-        name => ([name, {value: '', configurable: false, writable: false}])
-      )
-    ))
-    globalThis.__source = new TextDecoder().decode(e.data[1])
-    const entrySrc = globalThis.__source.match(re)[1]
-    await import(`data:text/javascript;base64,${btoa(entrySrc)}`)
-  }
-}, {once: true})
-</script>
-</head>
-<body>
-</body>
 </html>
 ```
 
