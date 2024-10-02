@@ -26,9 +26,10 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 - [ ] Load app-view
   - [x] Rename AppView to ExampleView
   - [ ] include build, AppView and dependencies
-- [ ] Use build to generate scripts for ProxyFrame
-- [ ] Have ProxyFrame update dimensions
-- [ ] Have the ProxyFrame update the ContainerFrame and apply the updates
+  - [ ] build scripts and place into ContainerFrame
+- [ ] Load notebook inside AppView
+  - [ ] pass load message from ContainerFrame to ProxyFrame
+- [ ] Have ProxyFrame update dimensions everywhere
 
 The ContainerFrame can do the same build that the app does to load AppView. It's in `host.md`. Once that's set up it can build the pages nested beneath that.
 
@@ -111,21 +112,26 @@ GlobalLockdown()`
     if (!this.framePromise) {
       this.framePromise = this.initFrame()
     }
-    if (this.port) {
-      this.port.addEventListener('message', this.handleMessage)
-    }
   }
 
   handleMessage = e => {
-    console.log(e.data)
+    if (e.data[0] === '__resize') {
+      this.updateDisplay(e.data[1])
+    }
   }
 
   updateDisplay = displayInfo => {
+    const parentRect = this.parentFrame.getBoundingClientRect()
+    const width = displayInfo.width
+    const height = Math.min(
+      displayInfo.height,
+      parentRect.height - displayInfo.top
+    )
     this.classList.toggle('visible', displayInfo.visible)
     this.style.setProperty('--top', `${displayInfo.top}px`)
     this.style.setProperty('--left', `${displayInfo.left}px`)
-    this.style.setProperty('--width', `${displayInfo.width}px`)
-    this.style.setProperty('--height', `${displayInfo.height}px`)
+    this.style.setProperty('--width', `${width}px`)
+    this.style.setProperty('--height', `${height}px`)
   }
 
   checkForwardDeclarations(script) {
@@ -194,8 +200,9 @@ body {
   flex-direction: column;
 }
 iframe {
-  flex-grow: 1;
   border: 0;
+  width: 100%;
+  height: 100%;
 }
 </style>
   </head>
@@ -232,9 +239,9 @@ iframe {
           top: var(--top, 0);
           left: var(--left, 0);
           width: var(--width, 0);
+          height: var(--height, 0);
         }
         iframe {
-          flex-grow: 1;
           border: 0;
           height: 100%;
           width: 100%;
@@ -273,6 +280,7 @@ export class ProxyFrame extends HTMLElement {
       '*',
       [this.channel.port2]
     )
+    setTimeout(() => this.channel.port1.postMessage('test'), 50)
   }
 
   getDisplayInfo() {
@@ -316,9 +324,10 @@ export class FrameGroup extends HTMLElement {
     if (frame) {
       const {scripts, ...display} = e.data[1]
       const newFrame = document.createElement('container-frame')
+      const port = e.ports[0]
+      port.onmessage = e => { newFrame.handleMessage(e) }
       newFrame.scripts = scripts
       newFrame.parentFrame = frame
-      newFrame.port = e.ports[0]
       newFrame.updateDisplay(display)
       this.append(newFrame)
     }
@@ -337,7 +346,7 @@ function run() {
       flex-direction: column;
     }
     proxy-frame {
-      height: 100px;
+      height: 50vh;
     }
   `
   document.head.append(style)
@@ -358,6 +367,11 @@ export class ExampleView extends HTMLElement {
   }
 
   connectedCallback() {
+    this.initExample()
+    // this.initAppView()
+  }
+
+  initExample() {
     const globalStyle = document.createElement('style')
     globalStyle.textContent = `
       html {
@@ -389,7 +403,7 @@ export class ExampleView extends HTMLElement {
       }
       container-frame.root {
         width: 500px;
-        height: 250px;
+        height: 50vh;
       }
     `
     this.shadowRoot.appendChild(style)
@@ -411,6 +425,17 @@ export class ExampleView extends HTMLElement {
     frameGroup.append(frame)
     this.shadowRoot.append(frameGroup)
   }
+
+  initAppView() {
+    const blocks = Object.fromEntries(
+      Array.from(readBlocksWithNames(__source)).filter(block => (
+        block.name !== undefined
+      )).map(block => (
+        [block.name, block]
+      ))
+    )
+    console.log(blocks)
+  }
 }
 ```
 
@@ -418,7 +443,23 @@ export class ExampleView extends HTMLElement {
 
 ```json
 {
-  "dataFiles": []
+  "dataFiles": [],
+  "includeFiles": [
+    "app-view.md",
+    "_welcome.md",
+    "blank-page.md",
+    "intro.md",
+    "app-content.md",
+    "planets.csv.md",
+    "table.md",
+    "editable-data-table.md",
+    "data-cards.md",
+    "notebook-view.md",
+    "code-edit-new.md",
+    "tabs-new.md",
+    "codemirror-bundle.md",
+    "font.woff2.md"
+  ]
 }
 ```
 
