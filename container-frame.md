@@ -108,6 +108,21 @@ GlobalLockdown()`
     if (!this.framePromise) {
       this.framePromise = this.initFrame()
     }
+    if (this.port) {
+      this.port.addEventListener('message', this.handleMessage)
+    }
+  }
+
+  handleMessage = e => {
+    
+  }
+
+  updateDisplay = displayInfo => {
+    this.classList.toggle('visible', displayInfo.visible)
+    this.style.setProperty('--top', `${displayInfo.top}px`)
+    this.style.setProperty('--left', `${displayInfo.left}px`)
+    this.style.setProperty('--width', `${displayInfo.width}px`)
+    this.style.setProperty('--height', `${displayInfo.height}px`)
   }
 
   checkForwardDeclarations(script) {
@@ -200,13 +215,26 @@ iframe {
           display: flex;
           align-items: stretch;
           box-sizing: border-box;
+          position: relative;
         }
         *, *:before, *:after {
           box-sizing: inherit;
         }
+        :hist(:not(.root)) {
+          display: none;
+        }
+        :host(:not(.root).visible) {
+          display: block;
+          position: absolute;
+          top: var(--top, 0);
+          left: var(--left, 0);
+          width: var(--width, 0);
+        }
         iframe {
           flex-grow: 1;
           border: 0;
+          height: 100%;
+          width: 100%;
         }
       `)
     }
@@ -224,12 +252,34 @@ export class ProxyFrame extends HTMLElement {
   connectedCallback() {
     this.attachShadow({mode: 'open'})
     this.display()
+    this.observer = new ResizeObserver(this.handleResize)
+    this.observer.observe(this)
+  }
+
+  disconnectedCallback() {
+    this.channel.port1.postMessage(['__remove'])
+    this.observer.unobserve(this)
   }
 
   async display() {
     this.channel = new MessageChannel()
     const {scripts} = this
-    parent.postMessage(['initProxyFrame', {scripts}], '*', [this.channel.port2])
+    parent.postMessage(
+      ['initProxyFrame',
+       {scripts, ...this.getDisplayInfo()}],
+      '*',
+      [this.channel.port2]
+    )
+  }
+
+  getDisplayInfo() {
+    const visible = this.checkVisibility()
+    const {top, left, width, height} = this.getBoundingClientRect()
+    return {top, left, width, height, visible}
+  }
+
+  handleResize = entries => {
+    this.channel.port1.postMessage('__resize', this.getDisplayInfo())
   }
 }
 
@@ -261,10 +311,12 @@ export class FrameGroup extends HTMLElement {
       el.frame.contentWindow === e.source
     ))
     if (frame) {
-      const {scripts} = e.data[1]
+      const {scripts, ...display} = e.data[1]
       const newFrame = document.createElement('container-frame')
       newFrame.scripts = scripts
       newFrame.parentFrame = frame
+      newFrame.port = e.ports[0]
+      newFrame.updateDisplay(display)
       this.append(newFrame)
     }
   }
@@ -275,8 +327,19 @@ export class FrameGroup extends HTMLElement {
 
 ```js
 function run() {
+  const style = document.createElement('style')
+  style.textContent = `
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+    proxy-frame {
+      height: 100px;
+    }
+  `
+  document.head.append(style)
   const proxyFrame = document.createElement('proxy-frame')
-  proxyFrame.scripts = [`document.body.append('in ProxyFrame')`]
+  proxyFrame.scripts = [`document.body.append('in ProxyFrame'); document.body.style = 'background: green'`]
   document.body.append('testing')
   document.body.append(proxyFrame)
 }
@@ -321,12 +384,14 @@ export class AppView extends HTMLElement {
         display: flex;
         align-items: stretch;
       }
-      container-frame {
-        flex-grow: 1;
+      container-frame.root {
+        width: 500px;
+        height: 250px;
       }
     `
     this.shadowRoot.appendChild(style)
     const frame = document.createElement('container-frame')
+    frame.classList.add('root')
     let proxyFrameSrc, exampleContentSrc
     for (const block of readBlocksWithNames(__source)) {
       if (block.name === 'ProxyFrame.js') {
@@ -335,7 +400,6 @@ export class AppView extends HTMLElement {
         exampleContentSrc = __source.slice(...block.contentRange)
       }
     }
-    const testScript = 
     frame.scripts = [
       proxyFrameSrc,
       exampleContentSrc + `\nrun()\n`,
