@@ -23,6 +23,9 @@ To change the scripts, either replace it with a new frame, or create an overlaye
 - [x] Add a view in the FrameGroup with a ProxyFrame
 - [x] Have the ProxyFrame create a MessageChannel and use it to send a message to the enclosing page with scripts
 - [x] Have the FrameGroup create a ContainerFrame with the content
+- [ ] Load app-view
+  - [x] Rename AppView to ExampleView
+  - [ ] include build, AppView and dependencies
 - [ ] Use build to generate scripts for ProxyFrame
 - [ ] Have ProxyFrame update dimensions
 - [ ] Have the ProxyFrame update the ContainerFrame and apply the updates
@@ -114,7 +117,7 @@ GlobalLockdown()`
   }
 
   handleMessage = e => {
-    
+    console.log(e.data)
   }
 
   updateDisplay = displayInfo => {
@@ -279,7 +282,7 @@ export class ProxyFrame extends HTMLElement {
   }
 
   handleResize = entries => {
-    this.channel.port1.postMessage('__resize', this.getDisplayInfo())
+    this.channel.port1.postMessage(['__resize', this.getDisplayInfo()])
   }
 }
 
@@ -345,10 +348,10 @@ function run() {
 }
 ```
 
-`AppView.js`
+`ExampleView.js`
 
 ```js
-export class AppView extends HTMLElement {
+export class ExampleView extends HTMLElement {
   constructor() {
     super()
     this.attachShadow({mode: 'open'})
@@ -373,7 +376,7 @@ export class AppView extends HTMLElement {
         align-items: stretch;
         flex-direction: column;
       }
-      app-view {
+      example-view {
         flex-grow: 1;
       }
     `
@@ -425,14 +428,14 @@ export class AppView extends HTMLElement {
 import {ContainerFrame} from '/ContainerFrame.js'
 // import {ProxyFrame} from '/ProxyFrame.js'
 import {FrameGroup} from '/FrameGroup.js'
-import {AppView} from '/AppView.js'
+import {ExampleView} from '/ExampleView.js'
 
 customElements.define('container-frame', ContainerFrame)
 // customElements.define('proxy-frame', ProxyFrame)
 customElements.define('frame-group', FrameGroup)
-customElements.define('app-view', AppView)
+customElements.define('example-view', ExampleView)
 
-const el = document.createElement('app-view')
+const el = document.createElement('example-view')
 document.body.append(el)
 ```
 
