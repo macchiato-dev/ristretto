@@ -84,23 +84,29 @@ addEventListener('message', e => {
     parent.postMessage(e.data, '*', [...(e.data[2] ?? []), ...e.ports])
   }
 })`
-    this.#lockdownScript = `globalThis.GlobalLockdown = function() {
-  function replacementFn() { throw new Error('WebRTC call blocked') }
-  if (!globalThis.lockdownComplete) {
-    Object.defineProperties(window, Object.fromEntries(
-      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
-        name => ([name, {value: replacementFn, configurable: false, writable: false}])
-      )
-    ))
-    globalThis.lockdownComplete = true
-  }
-  try {
-    new RTCPeerConnection()
-  } catch (err) {
-    return
-  }
-  throw new Error('Expected error creating WebRTC object')
-}
+    this.#lockdownScript = `Object.defineProperty(globalThis, 'GlobalLockdown', {
+      value: function() {
+        function replacementFn() { throw new Error('WebRTC call blocked') }
+        if (!globalThis.lockdownComplete) {
+          Object.defineProperties(window, Object.fromEntries(
+            Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
+              name => ([name, {value: replacementFn, configurable: false, writable: false}])
+            )
+          ))
+          Object.defineProperty(globalThis, 'lockdownComplete', {
+            value: true, configurable: false, writable: false
+          })
+        }
+        try {
+          new RTCPeerConnection()
+        } catch (err) {
+          return
+        }
+        throw new Error('Expected error creating WebRTC object')
+      },
+      writable: false,
+      configurable: false
+    })
 GlobalLockdown()`
   }
 
