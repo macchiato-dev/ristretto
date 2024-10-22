@@ -161,22 +161,21 @@ export class EditableDataTable extends HTMLElement {
     }
   }
 
-  createCell(tag, text) {
-    const el = document.createElement(tag)
-    el.innerText = text
-    el.contentEditable = true
-    return el
-  }
-
   set data(data) {
+    function createCell(tag, text) {
+      const el = document.createElement(tag)
+      el.innerText = text
+      el.contentEditable = true
+      return el
+    }
     const tableHead = document.createElement('thead')
     const tableHeadRow = document.createElement('tr')
-    tableHeadRow.append(...data[0].map(s => this.createCell('th', s)))
+    tableHeadRow.append(...data[0].map(s => createCell('th', s)))
     tableHead.append(tableHeadRow)
     const tableBody = document.createElement('tbody')
     tableBody.append(...data.slice(1).map(row => {
       const tableRow = document.createElement('tr')
-      tableRow.append(...row.map(s => this.createCell('td', s)))
+      tableRow.append(...row.map(s => createCell('td', s)))
       return tableRow
     }))
     if (this.table) {

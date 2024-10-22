@@ -374,20 +374,9 @@ export class AppView extends HTMLElement {
 `app.js`
 
 ```js
-import {SplitView} from '/split-pane/split-view.js'
-import {TabItem} from '/tabs-new/TabItem.js'
-import {TabList} from '/tabs-new/TabList.js'
-import {MarkdownView, MarkdownCodeBlock} from '/notebook-view/MarkdownView.js'
-import {NotebookView} from '/notebook-view/NotebookView.js'
 import {CodeEdit} from '/CodeEdit.js'
 import {AppView} from '/AppView.js'
 
-customElements.define('split-view', SplitView)
-customElements.define('tab-item', TabItem)
-customElements.define('tab-list', TabList)
-customElements.define('markdown-view', MarkdownView)
-customElements.define('markdown-code-block', MarkdownCodeBlock)
-customElements.define('notebook-view', NotebookView)
 customElements.define('code-edit', CodeEdit)
 customElements.define('app-view', AppView)
 

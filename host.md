@@ -1,6 +1,8 @@
 # Host
 
-This is the host for Ristretto. It facilitates uploading data, downloading data, and following links in a controlled manner.
+This is the host for Ristretto. It attempts to block all access to the network and to facilitates downloading data and following links in a controlled manner.
+
+A Content-Security-Policy is in place which prevents the code inside from accessing the network using fetch, and a nested iframe is in place which prevents it from navigating to a URL, where data could be sent as part of the URL and captured by a web server. However, there is a way of accessing the network which currently isn't entirely subject to the Content-Security-Policy, which is WebRTC, and this requires all scripts to be prefixed by something that attempts to block access to WebRTC in an effort to make it completely network-isolated.
 
 ## Development
 
@@ -320,7 +322,7 @@ Only the content security policy needs to be changed in order to deploy this to 
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src https://ristretto.codeberg.page/notebook.md; frame-src https://ristretto.codeberg.page/frame.html; webrtc 'block'">
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#55391b">
     <title></title>
@@ -600,7 +602,7 @@ addEventListener('message', e => {
 <!doctype html>
 <html>
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src data: 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; webrtc 'block'">
     <title></title>
 <style type="text/css">
 body, html {
