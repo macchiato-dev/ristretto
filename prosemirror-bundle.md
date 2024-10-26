@@ -1990,7 +1990,7 @@ function resolveName(stream, name) {
     let result = [];
     for (let typeName in types) {
         let type = types[typeName];
-        if (type.groups.indexOf(name) > -1)
+        if (type.isInGroup(name))
             result.push(type);
     }
     if (result.length == 0)
@@ -2268,6 +2268,13 @@ let NodeType$1 = class NodeType {
     directly editable content.
     */
     get isAtom() { return this.isLeaf || !!this.spec.atom; }
+    /**
+    Return true when this node type is part of the given
+    [group](https://prosemirror.net/docs/ref/#model.NodeSpec.group).
+    */
+    isInGroup(group) {
+        return this.groups.indexOf(group) > -1;
+    }
     /**
     The node type's [whitespace](https://prosemirror.net/docs/ref/#model.NodeSpec.whitespace) option.
     */
@@ -2725,7 +2732,7 @@ class DOMParser {
     */
     parse(dom, options = {}) {
         let context = new ParseContext(this, options, false);
-        context.addAll(dom, options.from, options.to);
+        context.addAll(dom, Mark.none, options.from, options.to);
         return context.finish();
     }
     /**
@@ -2738,7 +2745,7 @@ class DOMParser {
     */
     parseSlice(dom, options = {}) {
         let context = new ParseContext(this, options, true);
-        context.addAll(dom, options.from, options.to);
+        context.addAll(dom, Mark.none, options.from, options.to);
         return Slice.maxOpen(context.finish());
     }
     /**
@@ -2847,22 +2854,15 @@ function wsOptionsFor(type, preserveWhitespace, base) {
     return type && type.whitespace == "pre" ? OPT_PRESERVE_WS | OPT_PRESERVE_WS_FULL : base & ~OPT_OPEN_LEFT;
 }
 class NodeContext {
-    constructor(type, attrs, 
-    // Marks applied to this node itself
-    marks, 
-    // Marks that can't apply here, but will be used in children if possible
-    pendingMarks, solid, match, options) {
+    constructor(type, attrs, marks, solid, match, options) {
         this.type = type;
         this.attrs = attrs;
         this.marks = marks;
-        this.pendingMarks = pendingMarks;
         this.solid = solid;
         this.options = options;
         this.content = [];
         // Marks applied to the node's children
         this.activeMarks = Mark.none;
-        // Nested Marks with same type
-        this.stashMarks = [];
         this.match = match || (options & OPT_OPEN_LEFT ? null : type.contentMatch);
     }
     findWrapping(node) {
@@ -2902,21 +2902,6 @@ class NodeContext {
             content = content.append(this.match.fillBefore(Fragment.empty, true));
         return this.type ? this.type.create(this.attrs, content, this.marks) : content;
     }
-    popFromStashMark(mark) {
-        for (let i = this.stashMarks.length - 1; i >= 0; i--)
-            if (mark.eq(this.stashMarks[i]))
-                return this.stashMarks.splice(i, 1)[0];
-    }
-    applyPending(nextType) {
-        for (let i = 0, pending = this.pendingMarks; i < pending.length; i++) {
-            let mark = pending[i];
-            if ((this.type ? this.type.allowsMarkType(mark.type) : markMayApply(mark.type, nextType)) &&
-                !mark.isInSet(this.activeMarks)) {
-                this.activeMarks = mark.addToSet(this.activeMarks);
-                this.pendingMarks = mark.removeFromSet(this.pendingMarks);
-            }
-        }
-    }
     inlineContext(node) {
         if (this.type)
             return this.type.inlineContent;
@@ -2938,11 +2923,11 @@ class ParseContext {
         let topNode = options.topNode, topContext;
         let topOptions = wsOptionsFor(null, options.preserveWhitespace, 0) | (isOpen ? OPT_OPEN_LEFT : 0);
         if (topNode)
-            topContext = new NodeContext(topNode.type, topNode.attrs, Mark.none, Mark.none, true, options.topMatch || topNode.type.contentMatch, topOptions);
+            topContext = new NodeContext(topNode.type, topNode.attrs, Mark.none, true, options.topMatch || topNode.type.contentMatch, topOptions);
         else if (isOpen)
-            topContext = new NodeContext(null, null, Mark.none, Mark.none, true, null, topOptions);
+            topContext = new NodeContext(null, null, Mark.none, true, null, topOptions);
         else
-            topContext = new NodeContext(parser.schema.topNodeType, null, Mark.none, Mark.none, true, null, topOptions);
+            topContext = new NodeContext(parser.schema.topNodeType, null, Mark.none, true, null, topOptions);
         this.nodes = [topContext];
         this.find = options.findPositions;
         this.needsBlock = false;
@@ -2953,31 +2938,13 @@ class ParseContext {
     // Add a DOM node to the content. Text is inserted as text node,
     // otherwise, the node is passed to `addElement` or, if it has a
     // `style` attribute, `addElementWithStyles`.
-    addDOM(dom) {
+    addDOM(dom, marks) {
         if (dom.nodeType == 3)
-            this.addTextNode(dom);
+            this.addTextNode(dom, marks);
         else if (dom.nodeType == 1)
-            this.addElement(dom);
+            this.addElement(dom, marks);
     }
-    withStyleRules(dom, f) {
-        let style = dom.style;
-        if (!style || !style.length)
-            return f();
-        let marks = this.readStyles(dom.style);
-        if (!marks)
-            return; // A style with ignore: true
-        let [addMarks, removeMarks] = marks, top = this.top;
-        for (let i = 0; i < removeMarks.length; i++)
-            this.removePendingMark(removeMarks[i], top);
-        for (let i = 0; i < addMarks.length; i++)
-            this.addPendingMark(addMarks[i]);
-        f();
-        for (let i = 0; i < addMarks.length; i++)
-            this.removePendingMark(addMarks[i], top);
-        for (let i = 0; i < removeMarks.length; i++)
-            this.addPendingMark(removeMarks[i]);
-    }
-    addTextNode(dom) {
+    addTextNode(dom, marks) {
         let value = dom.nodeValue;
         let top = this.top;
         if (top.options & OPT_PRESERVE_WS_FULL ||
@@ -3004,7 +2971,7 @@ class ParseContext {
                 value = value.replace(/\r\n?/g, "\n");
             }
             if (value)
-                this.insertNode(this.parser.schema.text(value));
+                this.insertNode(this.parser.schema.text(value), marks);
             this.findInText(dom);
         }
         else {
@@ -3013,7 +2980,7 @@ class ParseContext {
     }
     // Try to find a handler for the given tag and use that to parse. If
     // none is found, the element's content nodes are added directly.
-    addElement(dom, matchAfter) {
+    addElement(dom, marks, matchAfter) {
         let name = dom.nodeName.toLowerCase(), ruleID;
         if (listTags.hasOwnProperty(name) && this.parser.normalizeLists)
             normalizeList(dom);
@@ -3021,7 +2988,7 @@ class ParseContext {
             (ruleID = this.parser.matchTag(dom, this, matchAfter));
         if (rule ? rule.ignore : ignoreTags.hasOwnProperty(name)) {
             this.findInside(dom);
-            this.ignoreFallback(dom);
+            this.ignoreFallback(dom, marks);
         }
         else if (!rule || rule.skip || rule.closeParent) {
             if (rule && rule.closeParent)
@@ -3039,45 +3006,44 @@ class ParseContext {
                     this.needsBlock = true;
             }
             else if (!dom.firstChild) {
-                this.leafFallback(dom);
+                this.leafFallback(dom, marks);
                 return;
             }
-            if (rule && rule.skip)
-                this.addAll(dom);
-            else
-                this.withStyleRules(dom, () => this.addAll(dom));
+            let innerMarks = rule && rule.skip ? marks : this.readStyles(dom, marks);
+            if (innerMarks)
+                this.addAll(dom, innerMarks);
             if (sync)
                 this.sync(top);
             this.needsBlock = oldNeedsBlock;
         }
         else {
-            this.withStyleRules(dom, () => {
-                this.addElementByRule(dom, rule, rule.consuming === false ? ruleID : undefined);
-            });
+            let innerMarks = this.readStyles(dom, marks);
+            if (innerMarks)
+                this.addElementByRule(dom, rule, innerMarks, rule.consuming === false ? ruleID : undefined);
         }
     }
     // Called for leaf DOM nodes that would otherwise be ignored
-    leafFallback(dom) {
+    leafFallback(dom, marks) {
         if (dom.nodeName == "BR" && this.top.type && this.top.type.inlineContent)
-            this.addTextNode(dom.ownerDocument.createTextNode("\n"));
+            this.addTextNode(dom.ownerDocument.createTextNode("\n"), marks);
     }
     // Called for ignored nodes
-    ignoreFallback(dom) {
+    ignoreFallback(dom, marks) {
         // Ignored BR nodes should at least create an inline context
         if (dom.nodeName == "BR" && (!this.top.type || !this.top.type.inlineContent))
-            this.findPlace(this.parser.schema.text("-"));
+            this.findPlace(this.parser.schema.text("-"), marks);
     }
     // Run any style parser associated with the node's styles. Either
-    // return an array of marks, or null to indicate some of the styles
-    // had a rule with `ignore` set.
-    readStyles(styles) {
-        let add = Mark.none, remove = Mark.none;
+    // return an updated array of marks, or null to indicate some of the
+    // styles had a rule with `ignore` set.
+    readStyles(dom, marks) {
+        let styles = dom.style;
         // Because many properties will only show up in 'normalized' form
         // in `style.item` (i.e. text-decoration becomes
         // text-decoration-line, text-decoration-color, etc), we directly
         // query the styles mentioned in our rules instead of iterating
         // over the items.
-        if (styles.length)
+        if (styles && styles.length)
             for (let i = 0; i < this.parser.matchedStyles.length; i++) {
                 let name = this.parser.matchedStyles[i], value = styles.getPropertyValue(name);
                 if (value)
@@ -3087,52 +3053,50 @@ class ParseContext {
                             break;
                         if (rule.ignore)
                             return null;
-                        if (rule.clearMark) {
-                            this.top.pendingMarks.concat(this.top.activeMarks).forEach(m => {
-                                if (rule.clearMark(m))
-                                    remove = m.addToSet(remove);
-                            });
-                        }
-                        else {
-                            add = this.parser.schema.marks[rule.mark].create(rule.attrs).addToSet(add);
-                        }
+                        if (rule.clearMark)
+                            marks = marks.filter(m => !rule.clearMark(m));
+                        else
+                            marks = marks.concat(this.parser.schema.marks[rule.mark].create(rule.attrs));
                         if (rule.consuming === false)
                             after = rule;
                         else
                             break;
                     }
             }
-        return [add, remove];
+        return marks;
     }
     // Look up a handler for the given node. If none are found, return
     // false. Otherwise, apply it, use its return value to drive the way
     // the node's content is wrapped, and return true.
-    addElementByRule(dom, rule, continueAfter) {
-        let sync, nodeType, mark;
+    addElementByRule(dom, rule, marks, continueAfter) {
+        let sync, nodeType;
         if (rule.node) {
             nodeType = this.parser.schema.nodes[rule.node];
             if (!nodeType.isLeaf) {
-                sync = this.enter(nodeType, rule.attrs || null, rule.preserveWhitespace);
+                let inner = this.enter(nodeType, rule.attrs || null, marks, rule.preserveWhitespace);
+                if (inner) {
+                    sync = true;
+                    marks = inner;
+                }
             }
-            else if (!this.insertNode(nodeType.create(rule.attrs))) {
-                this.leafFallback(dom);
+            else if (!this.insertNode(nodeType.create(rule.attrs), marks)) {
+                this.leafFallback(dom, marks);
             }
         }
         else {
             let markType = this.parser.schema.marks[rule.mark];
-            mark = markType.create(rule.attrs);
-            this.addPendingMark(mark);
+            marks = marks.concat(markType.create(rule.attrs));
         }
         let startIn = this.top;
         if (nodeType && nodeType.isLeaf) {
             this.findInside(dom);
         }
         else if (continueAfter) {
-            this.addElement(dom, continueAfter);
+            this.addElement(dom, marks, continueAfter);
         }
         else if (rule.getContent) {
             this.findInside(dom);
-            rule.getContent(dom, this.parser.schema).forEach(node => this.insertNode(node));
+            rule.getContent(dom, this.parser.schema).forEach(node => this.insertNode(node, marks));
         }
         else {
             let contentDOM = dom;
@@ -3143,28 +3107,27 @@ class ParseContext {
             else if (rule.contentElement)
                 contentDOM = rule.contentElement;
             this.findAround(dom, contentDOM, true);
-            this.addAll(contentDOM);
+            this.addAll(contentDOM, marks);
+            this.findAround(dom, contentDOM, false);
         }
         if (sync && this.sync(startIn))
             this.open--;
-        if (mark)
-            this.removePendingMark(mark, startIn);
     }
     // Add all child nodes between `startIndex` and `endIndex` (or the
     // whole node, if not given). If `sync` is passed, use it to
     // synchronize after every block element.
-    addAll(parent, startIndex, endIndex) {
+    addAll(parent, marks, startIndex, endIndex) {
         let index = startIndex || 0;
         for (let dom = startIndex ? parent.childNodes[startIndex] : parent.firstChild, end = endIndex == null ? null : parent.childNodes[endIndex]; dom != end; dom = dom.nextSibling, ++index) {
             this.findAtPoint(parent, index);
-            this.addDOM(dom);
+            this.addDOM(dom, marks);
         }
         this.findAtPoint(parent, index);
     }
     // Try to find a way to fit the given node type into the current
     // context. May add intermediate wrappers and/or leave non-solid
     // nodes that we're in.
-    findPlace(node) {
+    findPlace(node, marks) {
         let route, sync;
         for (let depth = this.open; depth >= 0; depth--) {
             let cx = this.nodes[depth];
@@ -3179,53 +3142,61 @@ class ParseContext {
                 break;
         }
         if (!route)
-            return false;
+            return null;
         this.sync(sync);
         for (let i = 0; i < route.length; i++)
-            this.enterInner(route[i], null, false);
-        return true;
+            marks = this.enterInner(route[i], null, marks, false);
+        return marks;
     }
     // Try to insert the given node, adjusting the context when needed.
-    insertNode(node) {
+    insertNode(node, marks) {
         if (node.isInline && this.needsBlock && !this.top.type) {
             let block = this.textblockFromContext();
             if (block)
-                this.enterInner(block);
+                marks = this.enterInner(block, null, marks);
         }
-        if (this.findPlace(node)) {
+        let innerMarks = this.findPlace(node, marks);
+        if (innerMarks) {
             this.closeExtra();
             let top = this.top;
-            top.applyPending(node.type);
             if (top.match)
                 top.match = top.match.matchType(node.type);
-            let marks = top.activeMarks;
-            for (let i = 0; i < node.marks.length; i++)
-                if (!top.type || top.type.allowsMarkType(node.marks[i].type))
-                    marks = node.marks[i].addToSet(marks);
-            top.content.push(node.mark(marks));
+            let nodeMarks = Mark.none;
+            for (let m of innerMarks.concat(node.marks))
+                if (top.type ? top.type.allowsMarkType(m.type) : markMayApply(m.type, node.type))
+                    nodeMarks = m.addToSet(nodeMarks);
+            top.content.push(node.mark(nodeMarks));
             return true;
         }
         return false;
     }
     // Try to start a node of the given type, adjusting the context when
     // necessary.
-    enter(type, attrs, preserveWS) {
-        let ok = this.findPlace(type.create(attrs));
-        if (ok)
-            this.enterInner(type, attrs, true, preserveWS);
-        return ok;
+    enter(type, attrs, marks, preserveWS) {
+        let innerMarks = this.findPlace(type.create(attrs), marks);
+        if (innerMarks)
+            innerMarks = this.enterInner(type, attrs, marks, true, preserveWS);
+        return innerMarks;
     }
     // Open a node of the given type
-    enterInner(type, attrs = null, solid = false, preserveWS) {
+    enterInner(type, attrs, marks, solid = false, preserveWS) {
         this.closeExtra();
         let top = this.top;
-        top.applyPending(type);
         top.match = top.match && top.match.matchType(type);
         let options = wsOptionsFor(type, preserveWS, top.options);
         if ((top.options & OPT_OPEN_LEFT) && top.content.length == 0)
             options |= OPT_OPEN_LEFT;
-        this.nodes.push(new NodeContext(type, attrs, top.activeMarks, top.pendingMarks, solid, null, options));
+        let applyMarks = Mark.none;
+        marks = marks.filter(m => {
+            if (top.type ? top.type.allowsMarkType(m.type) : markMayApply(m.type, type)) {
+                applyMarks = m.addToSet(applyMarks);
+                return false;
+            }
+            return true;
+        });
+        this.nodes.push(new NodeContext(type, attrs, applyMarks, solid, null, options));
         this.open++;
+        return marks;
     }
     // Make sure all nodes above this.open are finished and added to
     // their parents
@@ -3316,7 +3287,7 @@ class ParseContext {
                     let next = depth > 0 || (depth == 0 && useRoot) ? this.nodes[depth].type
                         : option && depth >= minDepth ? option.node(depth - minDepth).type
                             : null;
-                    if (!next || (next.name != part && next.groups.indexOf(part) == -1))
+                    if (!next || (next.name != part && !next.isInGroup(part)))
                         return false;
                     depth--;
                 }
@@ -3337,29 +3308,6 @@ class ParseContext {
             let type = this.parser.schema.nodes[name];
             if (type.isTextblock && type.defaultAttrs)
                 return type;
-        }
-    }
-    addPendingMark(mark) {
-        let found = findSameMarkInSet(mark, this.top.pendingMarks);
-        if (found)
-            this.top.stashMarks.push(found);
-        this.top.pendingMarks = mark.addToSet(this.top.pendingMarks);
-    }
-    removePendingMark(mark, upto) {
-        for (let depth = this.open; depth >= 0; depth--) {
-            let level = this.nodes[depth];
-            let found = level.pendingMarks.lastIndexOf(mark);
-            if (found > -1) {
-                level.pendingMarks = mark.removeFromSet(level.pendingMarks);
-            }
-            else {
-                level.activeMarks = mark.removeFromSet(level.activeMarks);
-                let stashMark = level.popFromStashMark(mark);
-                if (stashMark && level.type && level.type.allowsMarkType(stashMark.type))
-                    level.activeMarks = stashMark.addToSet(level.activeMarks);
-            }
-            if (level == upto)
-                break;
         }
     }
 }
@@ -3412,12 +3360,6 @@ function markMayApply(markType, nodeType) {
         };
         if (scan(parent.contentMatch))
             return true;
-    }
-}
-function findSameMarkInSet(mark, set) {
-    for (let i = 0; i < set.length; i++) {
-        if (mark.eq(set[i]))
-            return set[i];
     }
 }
 
@@ -4722,7 +4664,9 @@ function setBlockType$1(tr, from, to, type, attrs) {
         throw new RangeError("Type given to setBlockType should be a textblock");
     let mapFrom = tr.steps.length;
     tr.doc.nodesBetween(from, to, (node, pos) => {
-        if (node.isTextblock && !node.hasMarkup(type, attrs) && canChangeType(tr.doc, tr.mapping.slice(mapFrom).map(pos), type)) {
+        let attrsHere = typeof attrs == "function" ? attrs(node) : attrs;
+        if (node.isTextblock && !node.hasMarkup(type, attrsHere) &&
+            canChangeType(tr.doc, tr.mapping.slice(mapFrom).map(pos), type)) {
             let convertNewlines = null;
             if (type.schema.linebreakReplacement) {
                 let pre = type.whitespace == "pre", supportLinebreak = !!type.contentMatch.matchType(type.schema.linebreakReplacement);
@@ -4737,7 +4681,7 @@ function setBlockType$1(tr, from, to, type, attrs) {
             clearIncompatible(tr, tr.mapping.slice(mapFrom).map(pos, 1), type, undefined, convertNewlines === null);
             let mapping = tr.mapping.slice(mapFrom);
             let startM = mapping.map(pos, 1), endM = mapping.map(pos + node.nodeSize, 1);
-            tr.step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1, new Slice(Fragment.from(type.create(attrs, null, node.marks)), 0, 0), 1, true));
+            tr.step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1, new Slice(Fragment.from(type.create(attrsHere, null, node.marks)), 0, 0), 1, true));
             if (convertNewlines === true)
                 replaceNewlines(tr, node, pos, mapFrom);
             return false;
@@ -4828,8 +4772,24 @@ function canJoin(doc, pos) {
     return joinable($pos.nodeBefore, $pos.nodeAfter) &&
         $pos.parent.canReplace(index, index + 1);
 }
+function canAppendWithSubstitutedLinebreaks(a, b) {
+    if (!b.content.size)
+        a.type.compatibleContent(b.type);
+    let match = a.contentMatchAt(a.childCount);
+    let { linebreakReplacement } = a.type.schema;
+    for (let i = 0; i < b.childCount; i++) {
+        let child = b.child(i);
+        let type = child.type == linebreakReplacement ? a.type.schema.nodes.text : child.type;
+        match = match.matchType(type);
+        if (!match)
+            return false;
+        if (!a.type.allowsMarks(child.marks))
+            return false;
+    }
+    return match.validEnd;
+}
 function joinable(a, b) {
-    return !!(a && b && !a.isLeaf && a.canAppend(b));
+    return !!(a && b && !a.isLeaf && canAppendWithSubstitutedLinebreaks(a, b));
 }
 /**
 Find an ancestor of the given position that can be joined to the
@@ -4862,8 +4822,31 @@ function joinPoint(doc, pos, dir = -1) {
     }
 }
 function join(tr, pos, depth) {
-    let step = new ReplaceStep(pos - depth, pos + depth, Slice.empty, true);
-    tr.step(step);
+    let convertNewlines = null;
+    let { linebreakReplacement } = tr.doc.type.schema;
+    let $before = tr.doc.resolve(pos - depth), beforeType = $before.node().type;
+    if (linebreakReplacement && beforeType.inlineContent) {
+        let pre = beforeType.whitespace == "pre";
+        let supportLinebreak = !!beforeType.contentMatch.matchType(linebreakReplacement);
+        if (pre && !supportLinebreak)
+            convertNewlines = false;
+        else if (!pre && supportLinebreak)
+            convertNewlines = true;
+    }
+    let mapFrom = tr.steps.length;
+    if (convertNewlines === false) {
+        let $after = tr.doc.resolve(pos + depth);
+        replaceLinebreaks(tr, $after.node(), $after.before(), mapFrom);
+    }
+    if (beforeType.inlineContent)
+        clearIncompatible(tr, pos + depth - 1, beforeType, $before.node().contentMatchAt($before.index()), convertNewlines == null);
+    let mapping = tr.mapping.slice(mapFrom), start = mapping.map(pos - depth);
+    tr.step(new ReplaceStep(start, mapping.map(pos + depth, -1), Slice.empty, true));
+    if (convertNewlines === true) {
+        let $full = tr.doc.resolve(start);
+        replaceNewlines(tr, $full.node(), $full.before(), tr.steps.length);
+    }
+    return tr;
 }
 /**
 Try to find a point where a node of the given type can be inserted
@@ -5347,7 +5330,8 @@ function deleteRange(tr, from, to) {
             return tr.delete($from.before(depth), $to.after(depth));
     }
     for (let d = 1; d <= $from.depth && d <= $to.depth; d++) {
-        if (from - $from.start(d) == $from.depth - d && to > $from.end(d) && $to.end(d) - to != $to.depth - d)
+        if (from - $from.start(d) == $from.depth - d && to > $from.end(d) && $to.end(d) - to != $to.depth - d &&
+            $from.start(d - 1) == $to.start(d - 1) && $from.node(d - 1).canReplace($from.index(d - 1), $to.index(d - 1)))
             return tr.delete($from.before(d), to);
     }
     tr.delete(from, to);
@@ -6887,15 +6871,18 @@ function caretFromPoint(doc, x, y) {
     if (doc.caretPositionFromPoint) {
         try { // Firefox throws for this call in hard-to-predict circumstances (#994)
             let pos = doc.caretPositionFromPoint(x, y);
+            // Clip the offset, because Chrome will return a text offset
+            // into <input> nodes, which can't be treated as a regular DOM
+            // offset
             if (pos)
-                return { node: pos.offsetNode, offset: pos.offset };
+                return { node: pos.offsetNode, offset: Math.min(nodeSize(pos.offsetNode), pos.offset) };
         }
         catch (_) { }
     }
     if (doc.caretRangeFromPoint) {
         let range = doc.caretRangeFromPoint(x, y);
         if (range)
-            return { node: range.startContainer, offset: range.startOffset };
+            return { node: range.startContainer, offset: Math.min(nodeSize(range.startContainer), range.startOffset) };
     }
 }
 
@@ -7407,6 +7394,8 @@ function endOfTextblockHorizontal(view, state, dir) {
         return false;
     let offset = $head.parentOffset, atStart = !offset, atEnd = offset == $head.parent.content.size;
     let sel = view.domSelection();
+    if (!sel)
+        return $head.pos == $head.start() || $head.pos == $head.end();
     // If the textblock is all LTR, or the browser doesn't support
     // Selection.modify (Edge), fall back to a primitive approach
     if (!maybeRTL.test($head.parent.textContent) || !sel.modify)
@@ -8613,6 +8602,7 @@ class ViewTreeUpdater {
                     return true;
                 }
                 else if (!locked && (updated = this.recreateWrapper(next, node, outerDeco, innerDeco, view, pos))) {
+                    this.destroyBetween(this.index, i);
                     this.top.children[this.index] = updated;
                     if (updated.contentDOM) {
                         updated.dirty = CONTENT_DIRTY;
@@ -8632,7 +8622,8 @@ class ViewTreeUpdater {
     // identical content, move over its children.
     recreateWrapper(next, node, outerDeco, innerDeco, view, pos) {
         if (next.dirty || node.isAtom || !next.children.length ||
-            !next.node.content.eq(node.content))
+            !next.node.content.eq(node.content) ||
+            !sameOuterDeco(outerDeco, next.outerDeco) || !innerDeco.eq(next.innerDeco))
             return null;
         let wrapper = NodeViewDesc.create(this.top, node, outerDeco, innerDeco, view, pos);
         if (wrapper.contentDOM) {
@@ -8903,9 +8894,9 @@ function selectionFromDOM(view, origin = null) {
     let head = view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset, 1);
     if (head < 0)
         return null;
-    let $head = doc.resolve(head), $anchor, selection;
+    let $head = doc.resolve(head), anchor, selection;
     if (selectionCollapsed(domSel)) {
-        $anchor = $head;
+        anchor = head;
         while (nearestDesc && !nearestDesc.node)
             nearestDesc = nearestDesc.parent;
         let nearestDescNode = nearestDesc.node;
@@ -8916,11 +8907,25 @@ function selectionFromDOM(view, origin = null) {
         }
     }
     else {
-        let anchor = view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset, 1);
+        if (domSel instanceof view.dom.ownerDocument.defaultView.Selection && domSel.rangeCount > 1) {
+            let min = head, max = head;
+            for (let i = 0; i < domSel.rangeCount; i++) {
+                let range = domSel.getRangeAt(i);
+                min = Math.min(min, view.docView.posFromDOM(range.startContainer, range.startOffset, 1));
+                max = Math.max(max, view.docView.posFromDOM(range.endContainer, range.endOffset, -1));
+            }
+            if (min < 0)
+                return null;
+            [anchor, head] = max == view.state.selection.anchor ? [max, min] : [min, max];
+            $head = doc.resolve(head);
+        }
+        else {
+            anchor = view.docView.posFromDOM(domSel.anchorNode, domSel.anchorOffset, 1);
+        }
         if (anchor < 0)
             return null;
-        $anchor = doc.resolve(anchor);
     }
+    let $anchor = doc.resolve(anchor);
     if (!selection) {
         let bias = origin == "pointer" || (view.state.selection.head < $head.pos && !inWidget) ? 1 : -1;
         selection = selectionBetween(view, $anchor, $head, bias);
@@ -9029,12 +9034,14 @@ function removeClassOnSelectionChange(view) {
 }
 function selectCursorWrapper(view) {
     let domSel = view.domSelection(), range = document.createRange();
+    if (!domSel)
+        return;
     let node = view.cursorWrapper.dom, img = node.nodeName == "IMG";
     if (img)
-        range.setEnd(node.parentNode, domIndex(node) + 1);
+        range.setStart(node.parentNode, domIndex(node) + 1);
     else
-        range.setEnd(node, 0);
-    range.collapse(false);
+        range.setStart(node, 0);
+    range.collapse(true);
     domSel.removeAllRanges();
     domSel.addRange(range);
     // Kludge to kill 'control selection' in IE11 when selecting an
@@ -9322,6 +9329,8 @@ function setSelFocus(view, node, offset) {
         }
     }
     let sel = view.domSelection();
+    if (!sel)
+        return;
     if (selectionCollapsed(sel)) {
         let range = document.createRange();
         range.setEnd(node, offset);
@@ -9676,6 +9685,15 @@ let _detachedDoc = null;
 function detachedDoc() {
     return _detachedDoc || (_detachedDoc = document.implementation.createHTMLDocument("title"));
 }
+function maybeWrapTrusted(html) {
+    let trustedTypes = window.trustedTypes;
+    if (!trustedTypes)
+        return html;
+    // With the require-trusted-types-for CSP, Chrome will block
+    // innerHTML, even on a detached document. This wraps the string in
+    // a way that makes the browser allow us to use its parser again.
+    return trustedTypes.createPolicy("detachedDocument", { createHTML: (s) => s }).createHTML(html);
+}
 function readHTML(html) {
     let metas = /^(\s*<meta [^>]*>)*/.exec(html);
     if (metas)
@@ -9684,7 +9702,7 @@ function readHTML(html) {
     let firstTag = /<([a-z][^>\s]+)/i.exec(html), wrap;
     if (wrap = firstTag && wrapMap[firstTag[1].toLowerCase()])
         html = wrap.map(n => "<" + n + ">").join("") + html + wrap.map(n => "</" + n + ">").reverse().join("");
-    elt.innerHTML = html;
+    elt.innerHTML = maybeWrapTrusted(html);
     if (wrap)
         for (let i = 0; i < wrap.length; i++)
             elt = elt.querySelector(wrap[i]) || elt;
@@ -9825,7 +9843,9 @@ editHandlers.keydown = (view, _event) => {
     // and handling them eagerly tends to corrupt the input.
     if (android && chrome && event.keyCode == 13)
         return;
-    if (event.keyCode != 229)
+    if (view.domObserver.selectionChanged(view.domSelectionRange()))
+        view.domObserver.flush();
+    else if (event.keyCode != 229)
         view.domObserver.forceFlush();
     // On iOS, if we preventDefault enter key presses, the virtual
     // keyboard gets confused. So the hack here is to set a flag that
@@ -9888,6 +9908,8 @@ function runHandlerOnContext(view, propName, pos, inside, event) {
 function updateSelection(view, selection, origin) {
     if (!view.focused)
         view.focus();
+    if (view.state.selection.eq(selection))
+        return;
     let tr = view.state.tr.setSelection(selection);
     if (origin == "pointer")
         tr.setMeta("pointer", true);
@@ -10142,8 +10164,8 @@ const timeoutComposition = android ? 5000 : -1;
 editHandlers.compositionstart = editHandlers.compositionupdate = view => {
     if (!view.composing) {
         view.domObserver.flush();
-        let { state } = view, $pos = state.selection.$from;
-        if (state.selection.empty &&
+        let { state } = view, $pos = state.selection.$to;
+        if (state.selection instanceof TextSelection &&
             (state.storedMarks ||
                 (!$pos.textOffset && $pos.parentOffset && $pos.nodeBefore.marks.some(m => m.type.spec.inclusive === false)))) {
             // Need to wrap the cursor in mark nodes different from the ones in the DOM context
@@ -10152,7 +10174,7 @@ editHandlers.compositionstart = editHandlers.compositionupdate = view => {
             view.markCursor = null;
         }
         else {
-            endComposition(view);
+            endComposition(view, !state.selection.empty);
             // In firefox, if the cursor is after but outside a marked node,
             // the inserted text won't inherit the marks. So this moves it
             // inside if necessary.
@@ -10163,7 +10185,9 @@ editHandlers.compositionstart = editHandlers.compositionupdate = view => {
                     if (!before)
                         break;
                     if (before.nodeType == 3) {
-                        view.domSelection().collapse(before, before.nodeValue.length);
+                        let sel = view.domSelection();
+                        if (sel)
+                            sel.collapse(before, before.nodeValue.length);
                         break;
                     }
                     else {
@@ -10231,15 +10255,17 @@ function timestampFromCustomEvent() {
 /**
 @internal
 */
-function endComposition(view, forceUpdate = false) {
+function endComposition(view, restarting = false) {
     if (android && view.domObserver.flushingSoon >= 0)
         return;
     view.domObserver.forceFlush();
     clearComposition(view);
-    if (forceUpdate || view.docView && view.docView.dirty) {
+    if (restarting || view.docView && view.docView.dirty) {
         let sel = selectionFromDOM(view);
         if (sel && !sel.eq(view.state.selection))
             view.dispatch(view.state.tr.setSelection(sel));
+        else if ((view.markCursor || restarting) && !view.state.selection.empty)
+            view.dispatch(view.state.tr.deleteSelection());
         else
             view.updateState(view.state);
         return true;
@@ -10896,6 +10922,7 @@ class DecorationSet {
         }
         return result;
     }
+    forEachSet(f) { f(this); }
 }
 /**
 The empty set of decorations.
@@ -10970,6 +10997,10 @@ class DecorationGroup {
             default: return new DecorationGroup(members.every(m => m instanceof DecorationSet) ? members :
                 members.reduce((r, m) => r.concat(m instanceof DecorationSet ? m : m.members), []));
         }
+    }
+    forEachSet(f) {
+        for (let i = 0; i < this.members.length; i++)
+            this.members[i].forEachSet(f);
     }
 }
 function mapChildren(oldChildren, newLocal, mapping, node, offset, oldOffset, options) {
@@ -11337,6 +11368,9 @@ class DOMObserver {
                 this.queue.push(mut);
         return this.queue;
     }
+    selectionChanged(sel) {
+        return !this.suppressingSelectionUpdates && !this.currentSelection.eq(sel) && hasFocusAndSelection(this.view) && !this.ignoreSelectionChange(sel);
+    }
     flush() {
         let { view } = this;
         if (!view.docView || this.flushingSoon > -1)
@@ -11344,8 +11378,7 @@ class DOMObserver {
         let mutations = this.pendingRecords();
         if (mutations.length)
             this.queue = [];
-        let sel = view.domSelectionRange();
-        let newSel = !this.suppressingSelectionUpdates && !this.currentSelection.eq(sel) && hasFocusAndSelection(view) && !this.ignoreSelectionChange(sel);
+        let sel = view.domSelectionRange(), newSel = this.selectionChanged(sel);
         let from = -1, to = -1, typeOver = false, added = [];
         if (view.editable) {
             for (let i = 0; i < mutations.length; i++) {
@@ -11633,6 +11666,8 @@ function readDOMChange(view, from, to, typeOver, addedNodes) {
     }
     view.input.lastKeyCode = null;
     let change = findDiff(compare.content, parse.doc.content, parse.from, preferredPos, preferredSide);
+    if (change)
+        view.input.domChangeCount++;
     if ((ios && view.input.lastIOSEnter > Date.now() - 225 || android) &&
         addedNodes.some(n => n.nodeType == 1 && !isInline.test(n.nodeName)) &&
         (!change || change.endA >= change.endB) &&
@@ -11658,7 +11693,6 @@ function readDOMChange(view, from, to, typeOver, addedNodes) {
             return;
         }
     }
-    view.input.domChangeCount++;
     // Handle the case where overwriting a selection by typing matches
     // the start or end of the selected content, creating a change
     // that's smaller than what was actually overwritten.
@@ -12381,6 +12415,8 @@ class EditorView {
     */
     domSelectionRange() {
         let sel = this.domSelection();
+        if (!sel)
+            return { focusNode: null, focusOffset: 0, anchorNode: null, anchorOffset: 0 };
         return safari && this.root.nodeType === 11 &&
             deepActiveElement(this.dom.ownerDocument) == this.dom && safariShadowSelectionRange(this, sel) || sel;
     }
@@ -12418,7 +12454,7 @@ function updateCursorWrapper(view) {
         dom.className = "ProseMirror-separator";
         dom.setAttribute("mark-placeholder", "true");
         dom.setAttribute("alt", "");
-        view.cursorWrapper = { dom, deco: Decoration.widget(view.state.selection.head, dom, { raw: true, marks: view.markCursor }) };
+        view.cursorWrapper = { dom, deco: Decoration.widget(view.state.selection.from, dom, { raw: true, marks: view.markCursor }) };
     }
     else {
         view.cursorWrapper = null;
@@ -13820,21 +13856,26 @@ const joinBackward = (state, dispatch, view) => {
     }
     let before = $cut.nodeBefore;
     // Apply the joining algorithm
-    if (!before.type.spec.isolating && deleteBarrier(state, $cut, dispatch))
+    if (deleteBarrier(state, $cut, dispatch, -1))
         return true;
     // If the node below has no content and the node above is
     // selectable, delete the node below and select the one above.
     if ($cursor.parent.content.size == 0 &&
         (textblockAt(before, "end") || NodeSelection.isSelectable(before))) {
-        let delStep = replaceStep(state.doc, $cursor.before(), $cursor.after(), Slice.empty);
-        if (delStep && delStep.slice.size < delStep.to - delStep.from) {
-            if (dispatch) {
-                let tr = state.tr.step(delStep);
-                tr.setSelection(textblockAt(before, "end") ? Selection.findFrom(tr.doc.resolve(tr.mapping.map($cut.pos, -1)), -1)
-                    : NodeSelection.create(tr.doc, $cut.pos - before.nodeSize));
-                dispatch(tr.scrollIntoView());
+        for (let depth = $cursor.depth;; depth--) {
+            let delStep = replaceStep(state.doc, $cursor.before(depth), $cursor.after(depth), Slice.empty);
+            if (delStep && delStep.slice.size < delStep.to - delStep.from) {
+                if (dispatch) {
+                    let tr = state.tr.step(delStep);
+                    tr.setSelection(textblockAt(before, "end")
+                        ? Selection.findFrom(tr.doc.resolve(tr.mapping.map($cut.pos, -1)), -1)
+                        : NodeSelection.create(tr.doc, $cut.pos - before.nodeSize));
+                    dispatch(tr.scrollIntoView());
+                }
+                return true;
             }
-            return true;
+            if (depth == 1 || $cursor.node(depth - 1).childCount > 1)
+                break;
         }
     }
     // If the node before is an atom, delete it
@@ -13966,7 +14007,7 @@ const joinForward = (state, dispatch, view) => {
         return false;
     let after = $cut.nodeAfter;
     // Try the joining algorithm
-    if (deleteBarrier(state, $cut, dispatch))
+    if (deleteBarrier(state, $cut, dispatch, 1))
         return true;
     // If the node above has no content and the node below is
     // selectable, delete the node above and select the one below.
@@ -14180,32 +14221,44 @@ function splitBlockAs(splitNode) {
                 dispatch(state.tr.split($from.pos).scrollIntoView());
             return true;
         }
-        if (!$from.parent.isBlock)
+        if (!$from.depth)
             return false;
-        if (dispatch) {
-            let atEnd = $to.parentOffset == $to.parent.content.size;
-            let tr = state.tr;
-            if (state.selection instanceof TextSelection || state.selection instanceof AllSelection)
-                tr.deleteSelection();
-            let deflt = $from.depth == 0 ? null : defaultBlockAt($from.node(-1).contentMatchAt($from.indexAfter(-1)));
-            let splitType = splitNode && splitNode($to.parent, atEnd);
-            let types = splitType ? [splitType] : atEnd && deflt ? [{ type: deflt }] : undefined;
-            let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types);
-            if (!types && !can && canSplit(tr.doc, tr.mapping.map($from.pos), 1, deflt ? [{ type: deflt }] : undefined)) {
-                if (deflt)
-                    types = [{ type: deflt }];
-                can = true;
+        let types = [];
+        let splitDepth, deflt, atEnd = false, atStart = false;
+        for (let d = $from.depth;; d--) {
+            let node = $from.node(d);
+            if (node.isBlock) {
+                atEnd = $from.end(d) == $from.pos + ($from.depth - d);
+                atStart = $from.start(d) == $from.pos - ($from.depth - d);
+                deflt = defaultBlockAt($from.node(d - 1).contentMatchAt($from.indexAfter(d - 1)));
+                let splitType = splitNode && splitNode($to.parent, atEnd, $from);
+                types.unshift(splitType || (atEnd && deflt ? { type: deflt } : null));
+                splitDepth = d;
+                break;
             }
-            if (can) {
-                tr.split(tr.mapping.map($from.pos), 1, types);
-                if (!atEnd && !$from.parentOffset && $from.parent.type != deflt) {
-                    let first = tr.mapping.map($from.before()), $first = tr.doc.resolve(first);
-                    if (deflt && $from.node(-1).canReplaceWith($first.index(), $first.index() + 1, deflt))
-                        tr.setNodeMarkup(tr.mapping.map($from.before()), deflt);
-                }
+            else {
+                if (d == 1)
+                    return false;
+                types.unshift(null);
             }
-            dispatch(tr.scrollIntoView());
         }
+        let tr = state.tr;
+        if (state.selection instanceof TextSelection || state.selection instanceof AllSelection)
+            tr.deleteSelection();
+        let splitPos = tr.mapping.map($from.pos);
+        let can = canSplit(tr.doc, splitPos, types.length, types);
+        if (!can) {
+            types[0] = deflt ? { type: deflt } : null;
+            can = canSplit(tr.doc, splitPos, types.length, types);
+        }
+        tr.split(splitPos, types.length, types);
+        if (!atEnd && atStart && $from.node(splitDepth).type != deflt) {
+            let first = tr.mapping.map($from.before(splitDepth)), $first = tr.doc.resolve(first);
+            if (deflt && $from.node(splitDepth - 1).canReplaceWith($first.index(), $first.index() + 1, deflt))
+                tr.setNodeMarkup(tr.mapping.map($from.before(splitDepth)), deflt);
+        }
+        if (dispatch)
+            dispatch(tr.scrollIntoView());
         return true;
     };
 }
@@ -14260,19 +14313,15 @@ function joinMaybeClear(state, $pos, dispatch) {
     if (!$pos.parent.canReplace(index, index + 1) || !(after.isTextblock || canJoin(state.doc, $pos.pos)))
         return false;
     if (dispatch)
-        dispatch(state.tr
-            .clearIncompatible($pos.pos, before.type, before.contentMatchAt(before.childCount))
-            .join($pos.pos)
-            .scrollIntoView());
+        dispatch(state.tr.join($pos.pos).scrollIntoView());
     return true;
 }
-function deleteBarrier(state, $cut, dispatch) {
+function deleteBarrier(state, $cut, dispatch, dir) {
     let before = $cut.nodeBefore, after = $cut.nodeAfter, conn, match;
-    if (before.type.spec.isolating || after.type.spec.isolating)
-        return false;
-    if (joinMaybeClear(state, $cut, dispatch))
+    let isolated = before.type.spec.isolating || after.type.spec.isolating;
+    if (!isolated && joinMaybeClear(state, $cut, dispatch))
         return true;
-    let canDelAfter = $cut.parent.canReplace($cut.index(), $cut.index() + 1);
+    let canDelAfter = !isolated && $cut.parent.canReplace($cut.index(), $cut.index() + 1);
     if (canDelAfter &&
         (conn = (match = before.contentMatchAt(before.childCount)).findWrapping(after.type)) &&
         match.matchType(conn[0] || after.type).validEnd) {
@@ -14282,14 +14331,15 @@ function deleteBarrier(state, $cut, dispatch) {
                 wrap = Fragment.from(conn[i].create(null, wrap));
             wrap = Fragment.from(before.copy(wrap));
             let tr = state.tr.step(new ReplaceAroundStep($cut.pos - 1, end, $cut.pos, end, new Slice(wrap, 1, 0), conn.length, true));
-            let joinAt = end + 2 * conn.length;
-            if (canJoin(tr.doc, joinAt))
-                tr.join(joinAt);
+            let $joinAt = tr.doc.resolve(end + 2 * conn.length);
+            if ($joinAt.nodeAfter && $joinAt.nodeAfter.type == before.type &&
+                canJoin(tr.doc, $joinAt.pos))
+                tr.join($joinAt.pos);
             dispatch(tr.scrollIntoView());
         }
         return true;
     }
-    let selAfter = Selection.findFrom($cut, 1);
+    let selAfter = after.type.spec.isolating || (dir > 0 && isolated) ? null : Selection.findFrom($cut, 1);
     let range = selAfter && selAfter.$from.blockRange(selAfter.$to), target = range && liftTarget(range);
     if (target != null && target >= $cut.depth) {
         if (dispatch)
@@ -14396,12 +14446,12 @@ function setBlockType(nodeType, attrs = null) {
         return true;
     };
 }
-function markApplies(doc, ranges, type) {
+function markApplies(doc, ranges, type, enterAtoms) {
     for (let i = 0; i < ranges.length; i++) {
         let { $from, $to } = ranges[i];
         let can = $from.depth == 0 ? doc.inlineContent && doc.type.allowsMarkType(type) : false;
-        doc.nodesBetween($from.pos, $to.pos, node => {
-            if (can)
+        doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+            if (can || !enterAtoms && node.isAtom && node.isInline && pos >= $from.pos && pos + node.nodeSize <= $to.pos)
                 return false;
             can = node.inlineContent && node.type.allowsMarkType(type);
         });
@@ -14409,6 +14459,23 @@ function markApplies(doc, ranges, type) {
             return true;
     }
     return false;
+}
+function removeInlineAtoms(ranges) {
+    let result = [];
+    for (let i = 0; i < ranges.length; i++) {
+        let { $from, $to } = ranges[i];
+        $from.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+            if (node.isAtom && node.content.size && node.isInline && pos >= $from.pos && pos + node.nodeSize <= $to.pos) {
+                if (pos + 1 > $from.pos)
+                    result.push(new SelectionRange($from, $from.doc.resolve(pos + 1)));
+                $from = $from.doc.resolve(pos + 1 + node.content.size);
+                return false;
+            }
+        });
+        if ($from.pos < $to.pos)
+            result.push(new SelectionRange($from, $to));
+    }
+    return result;
 }
 /**
 Create a command function that toggles the given mark with the
@@ -14419,10 +14486,12 @@ selection is empty, this applies to the [stored
 marks](https://prosemirror.net/docs/ref/#state.EditorState.storedMarks) instead of a range of the
 document.
 */
-function toggleMark(markType, attrs = null) {
+function toggleMark(markType, attrs = null, options) {
+    let removeWhenPresent = (options && options.removeWhenPresent) !== false;
+    let enterAtoms = (options && options.enterInlineAtoms) !== false;
     return function (state, dispatch) {
         let { empty, $cursor, ranges } = state.selection;
-        if ((empty && !$cursor) || !markApplies(state.doc, ranges, markType))
+        if ((empty && !$cursor) || !markApplies(state.doc, ranges, markType, enterAtoms))
             return false;
         if (dispatch) {
             if ($cursor) {
@@ -14432,14 +14501,27 @@ function toggleMark(markType, attrs = null) {
                     dispatch(state.tr.addStoredMark(markType.create(attrs)));
             }
             else {
-                let has = false, tr = state.tr;
-                for (let i = 0; !has && i < ranges.length; i++) {
-                    let { $from, $to } = ranges[i];
-                    has = state.doc.rangeHasMark($from.pos, $to.pos, markType);
+                let add, tr = state.tr;
+                if (!enterAtoms)
+                    ranges = removeInlineAtoms(ranges);
+                if (removeWhenPresent) {
+                    add = !ranges.some(r => state.doc.rangeHasMark(r.$from.pos, r.$to.pos, markType));
+                }
+                else {
+                    add = !ranges.every(r => {
+                        let missing = false;
+                        tr.doc.nodesBetween(r.$from.pos, r.$to.pos, (node, pos, parent) => {
+                            if (missing)
+                                return false;
+                            missing = !markType.isInSet(node.marks) && !!parent && parent.type.allowsMarkType(markType) &&
+                                !(node.isText && /^\s*$/.test(node.textBetween(Math.max(0, r.$from.pos - pos), Math.min(node.nodeSize, r.$to.pos - pos))));
+                        });
+                        return !missing;
+                    });
                 }
                 for (let i = 0; i < ranges.length; i++) {
                     let { $from, $to } = ranges[i];
-                    if (has) {
+                    if (!add) {
                         tr.removeMark($from.pos, $to.pos, markType);
                     }
                     else {
