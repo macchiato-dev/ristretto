@@ -1,8 +1,16 @@
 # Host
 
-This is the host for Ristretto. It attempts to block all access to the network and to facilitates downloading data and following links in a controlled manner.
+This is the host for Ristretto. It attempts block all access to the network and to facilitate downloading data and following links in a controlled manner.
 
-A Content-Security-Policy is in place which prevents the code inside from accessing the network using fetch, and a nested iframe is in place which prevents it from navigating to a URL, where data could be sent as part of the URL and captured by a web server. However, there is a way of accessing the network which currently isn't entirely subject to the Content-Security-Policy, which is WebRTC, and this requires all scripts to be prefixed by something that attempts to block access to WebRTC in an effort to make it completely network-isolated.
+A Content-Security-Policy is in place which prevents the code inside from accessing the network using fetch, and a nested iframe is in place which prevents it from navigating to a URL, where data could be sent as part of the URL and captured by a web server. However, a Content-Security-Policy alone isn't currently enough to prevent all outside access, as there is at least one thing, [signaling in WebRTC](https://github.com/w3c/webappsec-csp/issues/92), which isn't covered by a Content-Security-Policy, [even on the latest browsers](https://wpt.fyi/results/content-security-policy/webrtc). Another thing that is iffy is prefetching in link and meta tags.
+
+Because of that, only allowlisted JavaScript code is run in a window context (such as an iFrame), and that JavaScript is written to prevent it from adding prefetch in links or arbitrary meta tags to the DOM tree. The allowlist is enforced with. It also instruments the iframe to detect, prevent, and report attempted use of WebRTC by patching the global, and insertion of a meta tag by using a MutationObserver.
+
+Currently whether workers can be fully sandboxed is being investigated, and there is an allowlist for those as well.
+
+WebAssembly sandboxing is more robust, and that is where code can run that isn't subject to an allowlist. Some is third party code, or plugin code, but a lot of the code is part of the project, and having it robustly sandboxing reduces the amount of code that needs to be audited to check the sandboxing. Depending on what the code is used for, even if it can't escape the container, it still may need to be audited. For instance, if the tool was a spreadsheet in which the sum of some amounts was used as the amount of money to send, it would be important for that amount to be correct.
+
+There is another host that allows switching off the allowlist, to use for development of the things that run in the frame or a worker.
 
 ## Development
 
