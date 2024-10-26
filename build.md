@@ -267,9 +267,23 @@ async function buildScripts() {
   )
 }
 
+async function buildCsps() {
+  const paths = (await readPaths()).filter(path => (
+    path.at('-1').endsWith('.md') &&
+    path.at(0) !== 'build' &&
+    path.at(0) !== 'out'
+  ))
+  for (const path of paths) {
+    for (const block of readNamedBlocks(path)) {
+      console.log(block.name)
+    }
+  }
+}
+
 async function build() {
   await buildScripts()
   await buildNotebook()
+  await buildCsps()
 }
 
 await build()

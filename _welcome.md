@@ -11,41 +11,50 @@ export class AppView extends HTMLElement {
     this.heading.innerText = 'welcome to ristretto'
     const blocks = [
       [
-        'This is Ristretto, a project to make a code playground and notebook environment written ',
-        'in itself, that can be customized by editing the code in the environment. ',
-        'This interface for editing code is composed of a collection of Markdown playground/notebook files. ',
-        'They are shipped to the browser in a big Markdown file, containing smaller Markdown files as code blocks. ',
-        'These are at ', ['[', 'macchiato/ristretto', '(', 'https://codeberg.org/macchiato/ristretto'],
+        'This is Ristretto, a project to make a code playground and notebook ',
+        'environment written in itself, that can be customized by editing the ',
+        'code in the environment. This interface for editing code is composed ',
+        'of a collection of Markdown playground/notebook files. They are ',
+        'shipped to the browser in a big Markdown file, containing smaller ',
+        'Markdown files as code blocks. These are at ',
+        [
+          '[', 'macchiato/ristretto',
+          '(', 'https://codeberg.org/macchiato/ristretto'
+        ],
         ' on Codeberg.'
       ],
       [
-        'The code loaded dynamically from Markdown files is run inside a tiny, quickly inspectable sandbox with ' +
-        'a Content Security Policy. By reading the code in ',
-        ['[', 'ristretto/pages', '(', 'https://codeberg.org/ristretto/pages'], ' on Codeberg and knowing how ',
-        ['[', 'Codeberg Pages', '(', 'https://docs.codeberg.org/codeberg-pages/'],
-        ' serves the content there,',
-        ' and studying what the ',
-        ['[', 'sandbox', '(', 'https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#sandbox'],
-        ' combined with the ',
-        ['[', 'Content Security Policy', '(', 'https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP'],
-        ' does, you may feel comfortable using',
-        ' both private data and untrusted code at the same time inside the sandbox.',
-        ' With the two layers of sandboxing, all network requests from inside the sandbox are blocked, and',
-        ' links can only be followed with an extra step. ',
-        'There is also an extra step to download files.'
+        'The code loaded dynamically from Markdown files is run inside a sandboxed ',
+        'iframe with a Content-Security-Policy that prevents network access and only ',
+        'runs allowlisted JavaScript directly in the window. It prevents following ',
+        'links and downloading files directly from the iFrame, but instead shows ',
+        'them in an overlay window. Untrusted code will be runnable with ',
+        'WebAssembly and its actions guarded using the allowlisted code. ',
+        'The goal is to have data never leave the sandbox without user action, ',
+        'and the design limits the amount of code that needs to be inspected ',
+        'to be confident that this is the case. This is not guaranteed, and if you ',
+        'have any security concerns, please report them by creating an issue or ',
+        'sending an email (',
+        [
+          '[', 'see the the project on Codeberg', '(',
+          'https://codeberg.org/macchiato/ristretto'
+        ],
+        ')'
       ],
       [
-        'The interface for working with code and data is meant to be powerful and flexible. Please check out the notebooks ',
-        'to the left. Some of them were quite fun to develop. There are some nifty features. ',
-        'For instance, in ', ['`', 'editable-data-table.md'], ', ',
-        'keyboard navigation works even inside Safari which has an issue with selection ranges inside a shadow DOM. ',
-        ' The code icon in the upper right corner shows the Markdown code, some of which contains text, ',
-        'indicating a notebook format. Others follow more of a playground format. A 3-pane editor that provides a ',
-        'playground-notebook hybrid interface is under way in notebook-view.md.'
+        'The interfaces for working with code and data support a few formats, ',
+        'such as Markdown files with embedded code blocks, CSV files, JSON, ',
+        'and images. They can be seen by going to the Explore tab. An upload ',
+        'page is being implemented which upon selecting a file will show ',
+        'supported notebooks to run on the data.',
       ],
       [
-        'Ristretto runs locally, but will contain code for running outside of it. That way you can play locally, and as ',
-        'you learn, you can deploy notebooks with a server. These will be sandboxed as well, using Deno.'
+        'Ristretto runs locally, but will contain code for running outside of ',
+        'it. That way you can play locally, and as you learn, you can deploy ',
+        'notebooks with a server. These will be sandboxed as well, using Deno,',
+        'WebAssembly, and ',
+        ['[', 'containers', '(', 'https://opencontainers.org/'],
+        '.',
       ],
     ].map(block => {
       const el = document.createElement('p')
