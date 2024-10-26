@@ -334,7 +334,7 @@ async function run(src) {
 run(__source)
 ```
 
-``
+`run.sh`
 
 ```
 deno run --allow-read=. --allow-write=./build,./out --unstable-worker-options run-build.js

@@ -92,14 +92,34 @@ The Loader takes the sources and transforms them to run inside an iframe, by mak
 `loader.js`
 
 ```js
-const defaultIntro = `
+const introScript = `
+class Macchiato {
+  static {
+    function replacementFn() { throw new Error('WebRTC call blocked') }
+    Object.defineProperties(window, Object.fromEntries(
+      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
+        name => ([name, {value: replacementFn, configurable: false, writable: false}])
+      )
+    ))
+    this.initialized = true
+  }
 
-window.Macchiato = {
-  modules: {},
-  data: {}
+  static init() {
+    if (!this.initialized) {
+      throw new Error('Not initialized')
+    }
+  }
+
+  static modules = {}
+  static data = {}
 }
 
-`.trim()
+Object.defineProperty(window, 'Macchiato', {
+  value: Macchiato,
+  writable: false,
+  configurable: false,
+})
+`.trimLeft()
 
 export class Loader {
   constructor(src) {
@@ -230,30 +250,16 @@ export class Loader {
       }
     )
     return (
-      out + initAppend + append
+      `Macchiato.init()\n` + out + initAppend + append
     )
   }
 
+  // TODO: replace data models with including in supplied Markdown
   buildDataModule(name, data) {
     const path = JSON.stringify(name)
     const mref = `Macchiato.data[${path}]`
     const dataStr = JSON.stringify(data)
     return `${mref} = ${dataStr}`
-  }
-
-  buildReplace(filesMap) {
-    if ('_replace.js' in filesMap) {
-      const rSrc = filesMap['_replace.js']
-      return new Function(
-        rSrc.match(/\((\w+)\)/)[1],
-        rSrc.slice(
-          rSrc.indexOf('{') + 1,
-          rSrc.lastIndexOf('}')
-        )
-      )
-    } else {
-      return ({data}) => data
-    }
   }
 
   build() {
@@ -262,26 +268,14 @@ export class Loader {
         ({name, data}) => ([name, data])
       )
     )
-    const replace = this.buildReplace(filesMap)
-    const intro = this.buildModule(
-      '_intro.js',
-      replace({
-        name: '_intro.js',
-        data: (
-          '_intro.js' in filesMap ? 
-          filesMap['_intro.js'] :
-          defaultIntro
-        ),
-        files: this.files,
-      })
-    )
+    const intro = introScript
     const modules = this.files.filter(({name}) => (
       name.endsWith('.js') && 
       !name.startsWith('_')
     )).map(file => (
       this.buildModule(
         file.name,
-        replace({...file, files: this.files}),
+        file.data,
       )
     ))
     const dataModules = this.dataFiles.map(file => (
