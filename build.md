@@ -173,39 +173,33 @@ async function buildNotebook() {
       }
       return 0
     })
-    const paths = [
-      ...sortedPaths.filter(path => (
-        path.at('-1').endsWith('.md') &&
-        path.at(0) !== 'build' &&
-        path.at(0) !== 'out'
-      )).map(path => ([path, true])),
-    ]
+    const paths = sortedPaths.filter(path => (
+      path.at('-1').endsWith('.md') &&
+      path.at(0) !== 'build' &&
+      path.at(0) !== 'out'
+    ))
     let output = await renderNotebook()
-    for (const [path, wrap] of paths) {
+    for (const path of paths) {
       const text = new TextDecoder().decode(await readFile(path))
-      if (wrap) {
-        const quotes = '`'.repeat(Math.max(
-          (
-            text
-            .matchAll(new RegExp('^\\s*(`+)', 'gm'))
-            .map(m => m[1].length)
-            .toArray()
-            .toSorted((a, b) => a - b)
-            .at(-1) ?? 0
-          ) + 1,
-          3
-        ))
-        if (path.some(part => part.includes('/'))) {
-          throw new Error('/ found in path component')
-        }
-        const strPath = path.join('/')
-        output = (
-          output.trimRight() +
-          `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
-        )
-      } else {
-        output = output.trimRight() + "\n\n" + text + "\n"
+      const quotes = '`'.repeat(Math.max(
+        (
+          text
+          .matchAll(new RegExp('^\\s*(`+)', 'gm'))
+          .map(m => m[1].length)
+          .toArray()
+          .toSorted((a, b) => a - b)
+          .at(-1) ?? 0
+        ) + 1,
+        3
+      ))
+      if (path.some(part => part.includes('/'))) {
+        throw new Error('/ found in path component')
       }
+      const strPath = path.join('/')
+      output = (
+        output.trimRight() +
+        `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
+      )
     }
     const data = new TextEncoder().encode(output.trimLeft())
     await writeFile(['out', 'notebook.md'], data)
