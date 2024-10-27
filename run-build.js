@@ -61,7 +61,15 @@ async function handleMessage(e) {
   const [cmd, ...args] = e.data
   const port = e.ports[0]
   try {
-    if (cmd === 'readPaths') {
+    if (cmd === '_log') {
+      const [message] = args
+      console.log(message)
+      port.postMessage(undefined)
+    } else if (cmd === '_err') {
+      const [err] = args
+      console.error(err)
+      port.postMessage(undefined)
+    } else if (cmd === 'readPaths') {
       const paths = await Array.fromAsync(readPaths())
       port.postMessage(paths)
     } else if (cmd === 'readFile') {

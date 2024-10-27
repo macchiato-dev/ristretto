@@ -71,7 +71,15 @@ async function handleMessage(e) {
   const [cmd, ...args] = e.data
   const port = e.ports[0]
   try {
-    if (cmd === 'readPaths') {
+    if (cmd === '_log') {
+      const [message] = args
+      console.log(message)
+      port.postMessage(undefined)
+    } else if (cmd === '_err') {
+      const [err] = args
+      console.error(err)
+      port.postMessage(undefined)
+    } else if (cmd === 'readPaths') {
       const paths = await Array.fromAsync(readPaths())
       port.postMessage(paths)
     } else if (cmd === 'readFile') {
@@ -131,6 +139,10 @@ async function parentRequest(...data) {
   return result
 }
 
+async function log(message) {
+  return await parentRequest('_log', message)
+}
+
 async function readPaths() {
   return await parentRequest('readPaths')
 }
@@ -160,54 +172,48 @@ async function renderNotebook() {
 }
 
 async function buildNotebook() {
-  try {
-    const allPaths = await readPaths()
-    const sortedPaths = allPaths.sort((a, b) => {
-      const withBundle = [a, b].map(path => [path.some(s => s.includes('codemirror-bundle.md')) ? 'b' : 'a', ...path])
-      const len = Math.max(...withBundle.map(path => path.length))
-      for (let i=0; i < len; i++) {
-        const result = (withBundle[0][i] ?? '').localeCompare(withBundle[1][i] ?? '')
-        if (result !== 0) {
-          return result
-        }
+  const allPaths = await readPaths()
+  const sortedPaths = allPaths.sort((a, b) => {
+    const withBundle = [a, b].map(path => [path.some(s => s.includes('codemirror-bundle.md')) ? 'b' : 'a', ...path])
+    const len = Math.max(...withBundle.map(path => path.length))
+    for (let i=0; i < len; i++) {
+      const result = (withBundle[0][i] ?? '').localeCompare(withBundle[1][i] ?? '')
+      if (result !== 0) {
+        return result
       }
-      return 0
-    })
-    const paths = sortedPaths.filter(path => (
-      path.at('-1').endsWith('.md') &&
-      path.at(0) !== 'build' &&
-      path.at(0) !== 'out'
-    ))
-    let output = await renderNotebook()
-    for (const path of paths) {
-      const text = new TextDecoder().decode(await readFile(path))
-      const quotes = '`'.repeat(Math.max(
-        (
-          text
-          .matchAll(new RegExp('^\\s*(`+)', 'gm'))
-          .map(m => m[1].length)
-          .toArray()
-          .toSorted((a, b) => a - b)
-          .at(-1) ?? 0
-        ) + 1,
-        3
-      ))
-      if (path.some(part => part.includes('/'))) {
-        throw new Error('/ found in path component')
-      }
-      const strPath = path.join('/')
-      output = (
-        output.trimRight() +
-        `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
-      )
     }
-    const data = new TextEncoder().encode(output.trimLeft())
-    await writeFile(['out', 'notebook.md'], data)
-    close()
-  } catch (err) {
-    console.error(err)
-    close()
+    return 0
+  })
+  const paths = sortedPaths.filter(path => (
+    path.at('-1').endsWith('.md') &&
+    path.at(0) !== 'build' &&
+    path.at(0) !== 'out'
+  ))
+  let output = await renderNotebook()
+  for (const path of paths) {
+    const text = new TextDecoder().decode(await readFile(path))
+    const quotes = '`'.repeat(Math.max(
+      (
+        text
+        .matchAll(new RegExp('^\\s*(`+)', 'gm'))
+        .map(m => m[1].length)
+        .toArray()
+        .toSorted((a, b) => a - b)
+        .at(-1) ?? 0
+      ) + 1,
+      3
+    ))
+    if (path.some(part => part.includes('/'))) {
+      throw new Error('/ found in path component')
+    }
+    const strPath = path.join('/')
+    output = (
+      output.trimRight() +
+      `\n\n\`${strPath}\`\n\n${quotes}\n${text}\n${quotes}\n`
+    )
   }
+  const data = new TextEncoder().encode(output.trimLeft())
+  await writeFile(['out', 'notebook.md'], data)
 }
 
 async function buildScript(path, blockName, out) {
@@ -267,26 +273,146 @@ async function buildScripts() {
   )
 }
 
+const introScript = `
+class Macchiato {
+  static {
+    function replacementFn() { throw new Error('WebRTC call blocked') }
+    Object.defineProperties(window, Object.fromEntries(
+      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
+        name => ([name, {value: replacementFn, configurable: false, writable: false}])
+      )
+    ))
+    this.initialized = true
+  }
+
+  static init() {
+    if (!this.initialized) {
+      throw new Error('Not initialized')
+    }
+  }
+
+  static modules = {}
+  static data = {}
+}
+
+Object.defineProperty(window, 'Macchiato', {
+  value: Macchiato,
+  writable: false,
+  configurable: false,
+})
+`.trimLeft()
+
+// from loader
+async function buildModule(name, data) {
+  let initAppend = ""
+  let append = ""
+  const out = data.replaceAll(
+    /^\s*export\s+(?:class|function|async\s+function|const)\s+([^\s(]+)/gms,
+    (match, p1) => {
+      const path = JSON.stringify(name)
+      const mref = `Macchiato.modules[${path}]`
+      const pref = `[${JSON.stringify(p1)}]`
+      initAppend = `\n\n${mref} = {}`
+      const s = `${mref}${pref} = ${p1}`
+      append += "\n" + s
+      return `// append: ${s}\n${match}`
+    }
+  ).replaceAll(
+    /^\s*import\s+(\{[^}]+\})\s+from\s+("[^"]+"|'[^']+')/gms,
+    (match, p1, p2) => {
+      const vars = p1.replaceAll(' as ', ': ')
+      const importPath = p2.slice(1, -1)
+      if (importPath.startsWith('/')) {
+        const path = JSON.stringify(importPath.slice(1))
+        const ref = `Macchiato.modules[${path}]`
+        return `const ${vars} = ${ref}`
+      } else {
+        const path = JSON.stringify(importPath)
+        const ref = `Macchiato.externalModules[${path}]`
+        return `const ${vars} = ${ref}`
+      }
+    }
+  )
+  return (
+    `Macchiato.init()\n` + out + initAppend + append
+  )
+}
+
+async function getSha(src) {
+  const data = new TextEncoder().encode(src)
+  const shaData = await crypto.subtle.digest('SHA-384', data)
+  return await new Promise(r => {
+    const fr = new FileReader()
+    fr.onload = () => r(fr.result.split(',')[1])
+    fr.readAsDataURL(new Blob([shaData]))
+  })
+}
+
+async function readCsps() {
+  const result = {}
+  try {
+    const src = new TextDecoder().decode(await readFile(['build', 'csps.md']))
+    for (const line of src.split("\n")) {
+      const match = line.match(/^- `([\w/+]+)` `([\w-]+)` \[([^\]]*)\]/)
+      if (match) {
+        const [sha, status, name] = match.slice(1)
+        result[name] = {sha, status}
+      }
+    }
+  } catch (err) {
+    await log(`Error loading CSPs, skipping: ${err}`)
+  }
+  return result
+}
+
 async function buildCsps() {
+  const cspInfo = await readCsps()
   const paths = (await readPaths()).filter(path => (
     path.at('-1').endsWith('.md') &&
     path.at(0) !== 'build' &&
     path.at(0) !== 'out'
-  ))
+  )).toSorted((a, b) => a.join('/').localeCompare(b.join('/')))
+  let output = `# CSPs\n\n`
   for (const path of paths) {
-    for (const block of readNamedBlocks(path)) {
-      console.log(block.name)
+    const src = new TextDecoder().decode(await readFile(path))
+    let blocks = []
+    for (const block of readBlocksWithNames(src)) {
+      if ((block.name ?? '').endsWith('.js')) {
+        blocks.push(block)
+      }
+    }
+    for (const block of blocks.toSorted((a, b) => a.name.localeCompare(b.name))) {
+      const blockSrc = src.slice(...block.contentRange)
+      const blockPath = `${path.join('/').replace(/.md$/, '')}/${block.name}`
+      const sha = await getSha(blockPath, blockSrc)
+      const name = `${path.join('/')}/${block.name}`
+      const info = cspInfo[name]
+      let status = info?.status ?? 'none'
+      if (!(status === 'none' || status.startsWith('review-')) && info?.sha !== sha) {
+        status = `review-${status}`
+      }
+      output += `- \`${sha}\` \`${status}\` [${name}](../${path.join('/')})\n`
     }
   }
+  await writeFile(['build', 'csps.md'], new TextEncoder().encode(output))
 }
 
 async function build() {
+  await log(`Building scripts...`)
   await buildScripts()
+  await log(`Building notebook...`)
   await buildNotebook()
+  await log(`Building CSPs...`)
   await buildCsps()
+  await log(`Done.`)
 }
 
-await build()
+try {
+  await build()
+} catch (err) {
+  await parentRequest('_err', `${err}`)
+}
+close()
 ```
 
 `entry.js`
