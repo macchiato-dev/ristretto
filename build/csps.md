@@ -196,3 +196,24 @@
 - `MWYwNUXjyYpuVG14aJPRyudPq9woRQwq1I7MwGs9Qs6LsACjq8MibcRo4Za3zw7B` `none` [websocket-shared-doc.md/ServerWrapper.js](../websocket-shared-doc.md)
 - `hkI9aqW9t4LGH3zGRhIIQXww0MnQzaX7YHQNmszNetI8vaMJ68YDeNTRirqt9PqZ` `none` [websocket-shared-doc.md/SharedComponents.js](../websocket-shared-doc.md)
 - `TbMYoPVrB1vyvgrmfyfO90BBJ37fc8QaZKH0a4nFLX/rSnKcTolt5vDRbS2WITg2` `none` [websocket-shared-doc.md/SimulatedServerRunner.js](../websocket-shared-doc.md)
+
+
+## window
+
+```
+'sha384-Uvfj9yqTTaGrygU3wxAvnUspdZ1pb5KLt4N5TZZWTbX1V6tQ8k69vWLh5s6Z0YYb'
+```
+
+
+## worker
+
+```
+'sha384-bi12XhaIPX6pSWwNwWXf36uUpbwwHQkZpsMbiYhLgQj9WzLxOGJWgbuXedfiuqJ/'
+```
+
+
+## wasm
+
+```
+
+```

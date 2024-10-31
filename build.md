@@ -373,6 +373,7 @@ async function buildCsps() {
     path.at(0) !== 'out'
   )).toSorted((a, b) => a.join('/').localeCompare(b.join('/')))
   let output = `# CSPs\n\n`
+  const cspShas = {window: [], worker: [], wasm: []}
   for (const path of paths) {
     const src = new TextDecoder().decode(await readFile(path))
     let blocks = []
@@ -388,11 +389,20 @@ async function buildCsps() {
       const name = `${path.join('/')}/${block.name}`
       const info = cspInfo[name]
       let status = info?.status ?? 'none'
-      if (!(status === 'none' || status.startsWith('review-')) && info?.sha !== sha) {
-        status = `review-${status}`
+      if (!(status === 'none' || status.startsWith('review-'))) {
+        if (info?.sha === sha) {
+          cspShas[status].push(sha)
+        } else {
+          status = `review-${status}`
+        }
       }
       output += `- \`${sha}\` \`${status}\` [${name}](../${path.join('/')})\n`
     }
+  }
+  for (const [key, value] of Object.entries(cspShas)) {
+    output += `\n\n## ${key}\n\n`
+    const cspEntries = value.map(s => `'sha384-${s}'`).join(' ')
+    output += `\`\`\`\n${cspEntries}\n\`\`\`\n`
   }
   await writeFile(['build', 'csps.md'], new TextEncoder().encode(output))
 }
