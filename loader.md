@@ -608,3 +608,36 @@ function setup() {
 
 setup()
 ```
+
+This is here for preparing the CSP in the build.
+
+`_intro.js`
+
+```js
+class Macchiato {
+  static {
+    function replacementFn() { throw new Error('WebRTC call blocked') }
+    Object.defineProperties(window, Object.fromEntries(
+      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
+        name => ([name, {value: replacementFn, configurable: false, writable: false}])
+      )
+    ))
+    this.initialized = true
+  }
+
+  static init() {
+    if (!this.initialized) {
+      throw new Error('Not initialized')
+    }
+  }
+
+  static modules = {}
+  static data = {}
+}
+
+Object.defineProperty(window, 'Macchiato', {
+  value: Macchiato,
+  writable: false,
+  configurable: false,
+})
+```

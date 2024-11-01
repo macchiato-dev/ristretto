@@ -273,37 +273,8 @@ async function buildScripts() {
   )
 }
 
-const introScript = `
-class Macchiato {
-  static {
-    function replacementFn() { throw new Error('WebRTC call blocked') }
-    Object.defineProperties(window, Object.fromEntries(
-      Object.getOwnPropertyNames(window).filter(name => name.includes('RTC')).map(
-        name => ([name, {value: replacementFn, configurable: false, writable: false}])
-      )
-    ))
-    this.initialized = true
-  }
-
-  static init() {
-    if (!this.initialized) {
-      throw new Error('Not initialized')
-    }
-  }
-
-  static modules = {}
-  static data = {}
-}
-
-Object.defineProperty(window, 'Macchiato', {
-  value: Macchiato,
-  writable: false,
-  configurable: false,
-})
-`.trimLeft()
-
 // from loader
-async function buildModule(name, data) {
+function buildModule(name, data) {
   let initAppend = ""
   let append = ""
   const out = data.replaceAll(
@@ -385,9 +356,13 @@ async function buildCsps() {
     for (const block of blocks.toSorted((a, b) => a.name.localeCompare(b.name))) {
       const blockSrc = src.slice(...block.contentRange)
       const blockPath = `${path.join('/').replace(/.md$/, '')}/${block.name}`
-      const sha = await getSha(blockPath, blockSrc)
       const name = `${path.join('/')}/${block.name}`
       const info = cspInfo[name]
+      let blockModuleSrc = blockSrc
+      if (!['loader/entry.js', 'loader/_intro.js'].includes(name)) {
+        blockModuleSrc = buildModule(name, blockModuleSrc)
+      }
+      const sha = await getSha(blockModuleSrc)
       let status = info?.status ?? 'none'
       if (!(status === 'none' || status.startsWith('review-'))) {
         if (info?.sha === sha) {
